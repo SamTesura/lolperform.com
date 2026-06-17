@@ -1,0 +1,174 @@
+import { z } from 'zod';
+import { ROLES, RANK_BRACKETS, REGIONS, TIER_GRADES } from './constants.js';
+
+/* ------------------------------------------------------------------ *
+ * Primitive enums (derived from the canonical constant tuples)
+ * ------------------------------------------------------------------ */
+
+export const roleSchema = z.enum(ROLES);
+export const rankBracketSchema = z.enum(RANK_BRACKETS);
+export const regionSchema = z.enum(REGIONS);
+export const tierGradeSchema = z.enum(TIER_GRADES);
+
+/** Patch label as `major.minor`, e.g. "14.12". */
+export const patchSchema = z.string().regex(/^\d{1,2}\.\d{1,2}$/, 'patch must look like "14.12"');
+
+/** Numeric Riot champion key as a string, e.g. "21" (Miss Fortune). */
+export const championKeySchema = z.string().regex(/^\d+$/, 'champion key must be numeric');
+
+/* ------------------------------------------------------------------ *
+ * Static champion metadata (from Data Dragon)
+ * ------------------------------------------------------------------ */
+
+export const championMetaSchema = z.object({
+  key: championKeySchema,
+  id: z.string().min(1), // alphanumeric id, e.g. "MissFortune" — used for slugs/images
+  name: z.string().min(1),
+  title: z.string(),
+  roles: z.array(roleSchema),
+});
+export type ChampionMeta = z.infer<typeof championMetaSchema>;
+
+/* ------------------------------------------------------------------ *
+ * Aggregated records (output of the pipeline, source rows in D1)
+ * ------------------------------------------------------------------ */
+
+/** A slice key shared by every aggregated record. */
+const sliceShape = {
+  patch: patchSchema,
+  region: regionSchema,
+  rank: rankBracketSchema,
+};
+
+/** Per-champion, per-role performance in one slice. */
+export const roleStatsSchema = z.object({
+  ...sliceShape,
+  role: roleSchema,
+  championKey: championKeySchema,
+  games: z.number().int().nonnegative(),
+  wins: z.number().int().nonnegative(),
+  winRate: z.number().min(0).max(1),
+  pickRate: z.number().min(0).max(1),
+  banRate: z.number().min(0).max(1),
+  /** Wilson lower bound used for ranking/tiering. */
+  wilsonLower: z.number().min(0).max(1),
+  /** Composite score that drives the tier grade. */
+  score: z.number(),
+  tier: tierGradeSchema,
+  /** Win-rate change vs the previous patch, in absolute proportion (e.g. +0.012). */
+  deltaWinRate: z.number().nullable().default(null),
+  /** Tier movement vs the previous patch. */
+  deltaTier: z.number().int().nullable().default(null),
+});
+export type RoleStats = z.infer<typeof roleStatsSchema>;
+
+/** Champion-vs-champion lane matchup (same role, opposing teams). */
+export const matchupSchema = z.object({
+  ...sliceShape,
+  role: roleSchema,
+  championKey: championKeySchema,
+  opponentKey: championKeySchema,
+  games: z.number().int().nonnegative(),
+  wins: z.number().int().nonnegative(),
+  winRate: z.number().min(0).max(1),
+  wilsonLower: z.number().min(0).max(1),
+});
+export type Matchup = z.infer<typeof matchupSchema>;
+
+/** ADC + Support duo synergy (same team, bot lane). */
+export const duoSynergySchema = z.object({
+  ...sliceShape,
+  adcKey: championKeySchema,
+  supportKey: championKeySchema,
+  games: z.number().int().nonnegative(),
+  wins: z.number().int().nonnegative(),
+  winRate: z.number().min(0).max(1),
+  wilsonLower: z.number().min(0).max(1),
+});
+export type DuoSynergy = z.infer<typeof duoSynergySchema>;
+
+/** A rune setup. Ids are Riot perk/style ids. */
+export const runePageSchema = z.object({
+  keystone: z.number().int(),
+  primaryStyle: z.number().int(),
+  subStyle: z.number().int(),
+  primary: z.array(z.number().int()),
+  secondary: z.array(z.number().int()),
+  shards: z.array(z.number().int()),
+});
+export type RunePage = z.infer<typeof runePageSchema>;
+
+/** Most common winning build for a champion (optionally vs an opponent). */
+export const buildPathSchema = z.object({
+  ...sliceShape,
+  role: roleSchema,
+  championKey: championKeySchema,
+  opponentKey: championKeySchema.nullable().default(null),
+  /** Core item ids in completion order. */
+  items: z.array(z.number().int()),
+  runes: runePageSchema,
+  games: z.number().int().nonnegative(),
+  wins: z.number().int().nonnegative(),
+  winRate: z.number().min(0).max(1),
+});
+export type BuildPath = z.infer<typeof buildPathSchema>;
+
+/* ------------------------------------------------------------------ *
+ * API response envelopes
+ * ------------------------------------------------------------------ */
+
+export const datasetMetaSchema = z.object({
+  patch: patchSchema,
+  generatedAt: z.string(), // ISO 8601
+  regions: z.array(regionSchema),
+  ranks: z.array(rankBracketSchema),
+  totalMatches: z.number().int().nonnegative(),
+});
+export type DatasetMeta = z.infer<typeof datasetMetaSchema>;
+
+export const tierListResponseSchema = z.object({
+  ...sliceShape,
+  role: roleSchema,
+  generatedAt: z.string(),
+  champions: z.array(roleStatsSchema),
+});
+export type TierListResponse = z.infer<typeof tierListResponseSchema>;
+
+export const championDetailResponseSchema = z.object({
+  meta: championMetaSchema,
+  stats: z.array(roleStatsSchema),
+  matchups: z.array(matchupSchema),
+  synergies: z.array(duoSynergySchema),
+  builds: z.array(buildPathSchema),
+});
+export type ChampionDetailResponse = z.infer<typeof championDetailResponseSchema>;
+
+/** A single counter-pick suggestion. */
+export const counterPickSchema = z.object({
+  championKey: championKeySchema,
+  winRate: z.number().min(0).max(1),
+  wilsonLower: z.number().min(0).max(1),
+  games: z.number().int().nonnegative(),
+  tier: tierGradeSchema,
+});
+export type CounterPick = z.infer<typeof counterPickSchema>;
+
+/* ------------------------------------------------------------------ *
+ * API query params (validated at the Worker edge)
+ * ------------------------------------------------------------------ */
+
+export const tierListQuerySchema = z.object({
+  region: regionSchema,
+  rank: rankBracketSchema,
+  role: roleSchema,
+});
+export type TierListQuery = z.infer<typeof tierListQuerySchema>;
+
+export const counterQuerySchema = z.object({
+  region: regionSchema,
+  rank: rankBracketSchema,
+  role: roleSchema,
+  /** The enemy champion the user is trying to counter. */
+  opponentKey: championKeySchema,
+});
+export type CounterQuery = z.infer<typeof counterQuerySchema>;

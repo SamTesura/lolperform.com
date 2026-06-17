@@ -1,0 +1,18 @@
+title = "lolperform gitleaks config"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "riot-api-key"
+description = "Riot Games API key"
+regex = '''RGAPI-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'''
+tags = ["riot", "api-key"]
+
+[allowlist]
+description = "Ignore generated data, lockfiles, and example env"
+paths = [
+  '''pnpm-lock\.yaml''',
+  '''pipeline/data/.*\.json''',
+  '''\.env\.example''',
+]

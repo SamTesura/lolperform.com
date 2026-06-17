@@ -1,0 +1,40 @@
+{
+  "name": "lolperform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Bot-lane-first League of Legends tier list and matchup wiki.",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @lolperform/web dev",
+    "build": "pnpm --filter @lolperform/web build",
+    "preview": "pnpm --filter @lolperform/web preview",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "cf:dev": "wrangler dev",
+    "deploy": "pnpm --filter @lolperform/web build && wrangler deploy"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.4",
+    "@types/node": "24.13.2",
+    "@vitest/coverage-v8": "4.1.9",
+    "eslint": "9.39.4",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-astro": "1.7.0",
+    "globals": "17.6.0",
+    "prettier": "3.8.4",
+    "prettier-plugin-astro": "0.14.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.61.1",
+    "vitest": "4.1.9",
+    "wrangler": "4.101.0"
+  }
+}

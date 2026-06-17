@@ -1,0 +1,14 @@
+# Cloudflare Worker: serves the prebuilt Astro site (ASSETS) + the /api/v1 surface.
+# KV and D1 bindings are added in P3/P4. Secrets (RIOT_API_KEY) are set out-of-band
+# via `wrangler secret put` and never committed.
+name = "lolperform"
+main = "worker/src/index.ts"
+compatibility_date = "2026-06-01"
+
+[observability]
+enabled = true
+
+[assets]
+directory = "apps/web/dist"
+binding = "ASSETS"
+not_found_handling = "404-page"

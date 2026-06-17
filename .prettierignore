@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.astro/
+.wrangler/
+coverage/
+pnpm-lock.yaml
+pipeline/data/**/*.json
+**/*.min.*
