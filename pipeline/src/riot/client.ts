@@ -37,6 +37,13 @@ export class RiotClient {
       if (res.ok) return (await res.json()) as T;
       if (res.status === 404) return null;
 
+      // Auth problems are almost always a bad/expired key — fail loudly and early.
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(
+          `Riot API ${res.status} for ${path}. The RIOT_API_KEY is invalid, expired, or lacks access.`,
+        );
+      }
+
       if (res.status === 429) {
         const retryAfter = Number(res.headers.get('retry-after') ?? '1');
         await sleep((Number.isFinite(retryAfter) ? retryAfter : 1) * 1000);
@@ -46,7 +53,8 @@ export class RiotClient {
         await sleep(2 ** attempt * 500);
         continue;
       }
-      throw new Error(`Riot API ${res.status} ${res.statusText} for ${path}`);
+      // Other unexpected 4xx (e.g. a deprecated endpoint): skip rather than abort the crawl.
+      return null;
     }
     throw new Error(`Riot API exhausted retries for ${path}`);
   }

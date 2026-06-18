@@ -69,7 +69,7 @@ jobs:
         if: steps.decide.outputs.run == 'true'
         env:
           RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
-        run: pnpm --filter @lolperform/pipeline run
+        run: pnpm --filter @lolperform/pipeline crawl
 
       - name: Generate load SQL
         if: steps.decide.outputs.run == 'true'
