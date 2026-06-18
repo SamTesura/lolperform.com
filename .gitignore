@@ -19,9 +19,11 @@ db/.generated/
 .env
 .env.*
 !.env.example
-riot.txt
 *.secret
 secrets/
+# NOTE: riot.txt is Riot's PUBLIC domain-verification token (served at /riot.txt
+# from apps/web/public/) — do NOT add it here. The API key only ever lives in
+# .dev.vars / GitHub secrets.
 
 # test / coverage
 coverage/
