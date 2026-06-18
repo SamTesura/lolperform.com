@@ -5,6 +5,10 @@ name = "lolperform"
 main = "worker/src/index.ts"
 compatibility_date = "2026-06-01"
 
+# Build the static site before deploying so the ASSETS directory exists.
+[build]
+command = "pnpm --filter @lolperform/web build"
+
 [observability]
 enabled = true
 
@@ -19,11 +23,11 @@ not_found_handling = "404-page"
 [[d1_databases]]
 binding = "DB"
 database_name = "lolperform"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "11da0a75-75e5-49f2-a601-fa7f705142da"
 migrations_dir = "db/migrations"
 
 # KV — hot cache for computed API responses. Create with:
 #   wrangler kv namespace create CACHE
 [[kv_namespaces]]
 binding = "CACHE"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "23032c0b19d144aa93a149ce8a85845c"
