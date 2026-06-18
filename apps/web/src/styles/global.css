@@ -4,11 +4,15 @@
 /* =============================================================================
    lolperform.com — Base styles
    Tuned for dense, scannable esports-analytics data. Dark-first.
+   Wrapped in @layer base so Tailwind utility classes (text-*, bg-*, …) always
+   win over these element defaults — without the layer, unlayered element rules
+   beat every utility in Tailwind v4's cascade.
    ============================================================================= */
 
-:root {
-  color-scheme: dark;
-}
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
 
 html {
   -webkit-text-size-adjust: 100%;
@@ -84,6 +88,7 @@ hr {
   background: var(--gradient-broadcast-rule);
   margin: var(--spacing-6) 0;
 }
+} /* @layer base */
 
 /* =============================================================================
    Utility classes — composable primitives used across components.
