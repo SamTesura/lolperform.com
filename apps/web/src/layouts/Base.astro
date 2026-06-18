@@ -10,6 +10,8 @@ interface Props {
   fullWidth?: boolean;
   /** Hide from search engines (styleguide, previews). */
   noindex?: boolean;
+  /** Social-share image (absolute or root-relative path). */
+  image?: string;
 }
 
 const {
@@ -17,9 +19,20 @@ const {
   description = 'Readable League of Legends tier list and deep ADC/bot-lane matchup data, refreshed every patch.',
   fullWidth = false,
   noindex = false,
+  image = '/og.svg',
 } = Astro.props;
 
+const SITE_NAME = 'LolPerform';
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const ogImage = new URL(image, Astro.site).href;
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: SITE_NAME,
+  url: Astro.site?.href,
+  description,
+};
 ---
 
 <!doctype html>
@@ -30,14 +43,32 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta name="theme-color" content="#07090d" />
     <link rel="canonical" href={canonical} />
-    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    {
+      noindex ? (
+        <meta name="robots" content="noindex, nofollow" />
+      ) : (
+        <meta name="robots" content="index, follow, max-image-preview:large" />
+      )
+    }
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </head>
   <body class="flex min-h-dvh flex-col">
     <SiteHeader />

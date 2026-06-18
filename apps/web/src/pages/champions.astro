@@ -1,0 +1,42 @@
+---
+import Base from '../layouts/Base.astro';
+import { getBuildChampions } from '../lib/ddragonBuild';
+import { championSquare } from '../lib/ddragon';
+
+const { version, champions } = await getBuildChampions();
+---
+
+<Base
+  title="All Champions — lolperform"
+  description="Browse every League of Legends champion. Per-champion tiers, matchups, synergy, and builds."
+>
+  <div class="space-y-4 py-4">
+    <header class="space-y-1">
+      <h1>Champions</h1>
+      <p class="text-text-secondary">{champions.length} champions · patch {version.split('.').slice(0, 2).join('.')}</p>
+    </header>
+
+    <ul class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+      {
+        champions.map((c) => (
+          <li>
+            <a
+              href={`/champion/${c.id}`}
+              class="flex flex-col items-center gap-1 rounded-md border border-border-subtle bg-bg-surface p-2 transition-colors duration-150 hover:bg-bg-elevated"
+            >
+              <img
+                src={championSquare(c.id, version)}
+                alt={c.name}
+                width={56}
+                height={56}
+                loading="lazy"
+                class="rounded-sm bg-bg-inset"
+              />
+              <span class="w-full truncate text-center text-2xs text-text-secondary">{c.name}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</Base>

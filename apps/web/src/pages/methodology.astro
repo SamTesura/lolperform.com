@@ -1,0 +1,92 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base
+  title="Methodology — How the data works — lolperform"
+  description="How lolperform samples ranked matches, scores champions, assigns tiers, and handles sample size. No black boxes."
+>
+  <article class="mx-auto max-w-2xl space-y-8 py-6 text-md leading-relaxed text-text-secondary">
+    <header class="space-y-1">
+      <p class="text-sm font-semibold tracking-widest text-accent uppercase">Methodology</p>
+      <h1>How these numbers are made.</h1>
+      <p>Most stats sites hide this page. Here it's the point: you should be able to check our work.</p>
+    </header>
+
+    <section class="space-y-2">
+      <h2>Where the data comes from</h2>
+      <p>
+        Riot's API has no "tier list" endpoint. Like every stats site, we build it ourselves: we
+        crawl ranked Solo/Duo ladders (the <code class="text-text-primary">league-v4</code> and
+        <code class="text-text-primary">match-v5</code> APIs), then aggregate the matches. Champion
+        art and item icons come from Riot's Data Dragon CDN.
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2>It's a sample, and we say so</h2>
+      <p>
+        We don't claim to read every game. We sample high-elo ranked matches across regions and
+        divisions on the current patch. That keeps the project within a free API budget — and it's
+        why <strong class="text-text-primary">every statistic shows its sample size</strong>. A win
+        rate over 40 games is not the same as one over 40,000, and the UI never lets you forget it.
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2>Ranking: Wilson lower bound, not raw win rate</h2>
+      <p>
+        Champions are ordered by the <strong class="text-text-primary">Wilson score interval lower
+        bound</strong>, not their raw win rate. This penalises small samples: a 60% win rate over 10
+        games will not outrank a 53% win rate over 5,000. It's the same math used to sort “best
+        rated” lists — reward certainty, not luck.
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2>Tiers</h2>
+      <p>
+        The grade is deliberately simple and explainable: a champion is placed on a fine
+        <strong class="text-text-primary">S+ → D−</strong> scale by its win rate. The base letter sets
+        the colour and the row; the <strong class="text-text-primary">+ / −</strong> shows where it
+        sits inside that band.
+      </p>
+      <ul class="list-inside list-disc space-y-1 text-text-muted">
+        <li><span class="text-tier-s">S</span> tier ≥ 52.5% win rate (S+ ≥ 55%, S ≥ 53.5%, S− ≥ 52.5%)</li>
+        <li><span class="text-tier-a">A</span> tier ≥ 51% &nbsp;·&nbsp; <span class="text-tier-b">B</span> tier ≥ 49.5%</li>
+        <li><span class="text-tier-c">C</span> tier ≥ 47% &nbsp;·&nbsp; <span class="text-tier-d">D</span> tier below that</li>
+      </ul>
+      <p>
+        A champion must clear a minimum game count before it can be tiered above D− — so a tiny lucky
+        sample never shows up as S+.
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2>Confidence</h2>
+      <p>Sample size maps to a visible treatment on every stat:</p>
+      <ul class="list-inside list-disc space-y-1 text-text-muted">
+        <li><strong class="text-text-primary">High</strong> (≥ 1,000 games): solid.</li>
+        <li><strong class="text-text-primary">Medium</strong> (≥ 200): dimmed, dashed underline.</li>
+        <li><strong class="text-text-primary">Low</strong> (≥ 30): heavily dimmed, ⚠ chip.</li>
+        <li>Below 30: treated as low and often hidden — we won't show a number we don't trust.</li>
+      </ul>
+    </section>
+
+    <section class="space-y-2">
+      <h2>How fresh it is</h2>
+      <p>
+        A scheduled job checks Riot's patch version a few times a day. When a new patch ships, it
+        re-crawls and reloads the dataset automatically — so the tiers track the live meta without
+        anyone pressing a button.
+      </p>
+    </section>
+
+    <section class="space-y-2 border-t border-border-subtle pt-6 text-sm text-text-muted">
+      <p>
+        lolperform.com isn't endorsed by or affiliated with Riot Games. We display only aggregate
+        statistics and never expose individual players' match histories.
+      </p>
+    </section>
+  </article>
+</Base>
