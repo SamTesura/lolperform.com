@@ -16,6 +16,9 @@ dist/
 .env
 .env.*
 !.env.example
+riot.txt
+*.secret
+secrets/
 
 # test / coverage
 coverage/

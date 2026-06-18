@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "run": "tsx src/run.ts",
+    "detect-patch": "tsx src/detect-patch.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
