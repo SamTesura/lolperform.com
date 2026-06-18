@@ -1,0 +1,84 @@
+name: Patch Watch
+
+# Detects new League patches and refreshes the dataset. Runs every 6h and on
+# demand. State lives in D1 (the patches table), so a new patch is detected by
+# comparing Data Dragon's latest patch to the newest patch already loaded.
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Crawl even if the patch is unchanged'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: patch-watch
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Latest Data Dragon patch
+        id: ddragon
+        run: |
+          latest=$(curl -fsSL https://ddragon.leagueoflegends.com/api/versions.json | jq -r '.[0]' | cut -d. -f1,2)
+          echo "patch=$latest" >> "$GITHUB_OUTPUT"
+          echo "Latest ddragon patch: $latest"
+
+      - name: Patch already loaded in D1
+        id: loaded
+        run: |
+          json=$(pnpm exec wrangler d1 execute lolperform --remote --json \
+            --command "SELECT patch FROM patches ORDER BY generated_at DESC LIMIT 1" 2>/dev/null || echo '[]')
+          loaded=$(echo "$json" | jq -r '.[0].results[0].patch // ""')
+          echo "patch=$loaded" >> "$GITHUB_OUTPUT"
+          echo "Loaded patch: ${loaded:-<none>}"
+
+      - name: Decide
+        id: decide
+        run: |
+          if [ "${{ github.event.inputs.force }}" = "true" ] || \
+             [ "${{ steps.ddragon.outputs.patch }}" != "${{ steps.loaded.outputs.patch }}" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Patch ${{ steps.ddragon.outputs.patch }} already loaded — nothing to do."
+          fi
+
+      - name: Crawl + aggregate
+        if: steps.decide.outputs.run == 'true'
+        env:
+          RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
+        run: pnpm --filter @lolperform/pipeline run
+
+      - name: Generate load SQL
+        if: steps.decide.outputs.run == 'true'
+        run: pnpm --filter @lolperform/pipeline load
+
+      - name: Load into D1
+        if: steps.decide.outputs.run == 'true'
+        run: pnpm exec wrangler d1 execute lolperform --remote --file db/.generated/load.sql
+
+      - name: Summary
+        if: steps.decide.outputs.run == 'true'
+        run: echo "Loaded patch ${{ steps.ddragon.outputs.patch }} into D1. Live API updates within the 10-min KV TTL."
