@@ -7,7 +7,7 @@
 const CDN = 'https://ddragon.leagueoflegends.com/cdn';
 
 /** Fallback used until a dataset meta supplies the live version. Updated each patch. */
-export const FALLBACK_DDRAGON_VERSION = '15.13.1';
+export const FALLBACK_DDRAGON_VERSION = '16.12.1';
 
 /** Square champion portrait. `championId` is the alphanumeric id, e.g. "MissFortune". */
 export function championSquare(championId: string, version = FALLBACK_DDRAGON_VERSION): string {

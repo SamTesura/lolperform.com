@@ -1,0 +1,42 @@
+---
+import Base from '../../layouts/Base.astro';
+import ChampionStats from '../../components/islands/ChampionStats';
+import { getBuildChampions } from '../../lib/ddragonBuild';
+import { championSquare } from '../../lib/ddragon';
+import type { ChampionMeta } from '@lolperform/shared';
+
+export async function getStaticPaths() {
+  const { version, champions } = await getBuildChampions();
+  return champions.map((c) => ({ params: { slug: c.id }, props: { champion: c, version } }));
+}
+
+interface Props {
+  champion: ChampionMeta;
+  version: string;
+}
+
+const { champion, version } = Astro.props;
+---
+
+<Base
+  title={`${champion.name} — Tiers, Matchups & Builds — lolperform`}
+  description={`${champion.name}, ${champion.title}: win rate by role, best and toughest matchups, bot-lane synergy, and builds, refreshed every patch.`}
+>
+  <div class="space-y-6 py-4">
+    <header class="flex items-center gap-4">
+      <img
+        src={championSquare(champion.id, version)}
+        alt={champion.name}
+        width={72}
+        height={72}
+        class="rounded-lg bg-bg-inset"
+      />
+      <div>
+        <h1>{champion.name}</h1>
+        <p class="text-text-muted">{champion.title}</p>
+      </div>
+    </header>
+
+    <ChampionStats championId={champion.id} client:load />
+  </div>
+</Base>

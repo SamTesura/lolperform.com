@@ -1,6 +1,7 @@
-import { confidenceLevel, type ChampionMeta, type RoleStats } from '@lolperform/shared';
+import { assignFullTier, confidenceLevel, type ChampionMeta, type RoleStats } from '@lolperform/shared';
 import { ChampionPortrait } from './ChampionPortrait';
 import { DeltaBadge } from './DeltaBadge';
+import { TierBadge } from './TierBadge';
 import { formatPercent } from '../../lib/format';
 
 /** Map sample size to the .confidence-* wrapper class from global.css. */
@@ -30,6 +31,9 @@ export function TierTile({ stat, meta, version, href }: Props) {
       href={href ?? `/champion/${meta.id}`}
       className={`group relative flex w-[88px] flex-col gap-1 rounded-md border border-border-default bg-bg-surface p-1.5 transition-[transform,background-color] duration-150 ease-out hover:-translate-y-0.5 hover:bg-bg-elevated hover:shadow-md ${confidenceClass(stat.games)}`}
     >
+      <div className="absolute top-1 left-1 z-10">
+        <TierBadge tier={stat.tier} grade={assignFullTier(stat.winRate, stat.games)} size="sm" />
+      </div>
       <div className="absolute top-1 right-1 z-10">
         <DeltaBadge delta={stat.deltaWinRate} />
       </div>

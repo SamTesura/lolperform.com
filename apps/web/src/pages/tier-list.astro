@@ -1,0 +1,19 @@
+---
+import Base from '../layouts/Base.astro';
+import TierGrid from '../components/islands/TierGrid';
+---
+
+<Base
+  title="LoL Tier List by Role & Rank — lolperform"
+  description="League of Legends champion tier list ranked by role, rank, and region. Readable, sample-size-honest, refreshed every patch."
+>
+  <div class="space-y-4 py-4">
+    <header class="space-y-1">
+      <h1>Tier List</h1>
+      <p class="text-text-secondary">
+        Champions ranked within each lane. Tiles dim when the sample is thin — hover for the numbers.
+      </p>
+    </header>
+    <TierGrid client:load />
+  </div>
+</Base>

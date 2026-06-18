@@ -1,0 +1,32 @@
+---
+import Base from '../layouts/Base.astro';
+import CounterRecommender from '../components/islands/CounterRecommender';
+import BotLaneSynergy from '../components/islands/BotLaneSynergy';
+---
+
+<Base
+  title="Bot Lane — ADC Matchups, Synergy & Counters — lolperform"
+  description="Bot-lane-first League data: ADC + Support duo synergy and a counter-pick recommender that ranks the best picks into any enemy."
+>
+  <div class="space-y-10 py-4">
+    <header class="space-y-1">
+      <p class="text-sm font-semibold tracking-widest text-accent uppercase">Bot Lane</p>
+      <h1>Win the 2v2.</h1>
+      <p class="max-w-2xl text-text-secondary">
+        The depth other sites bury: who counters who, and which ADC + Support pairings actually win.
+      </p>
+    </header>
+
+    <section class="space-y-3">
+      <h2>Counter-pick recommender</h2>
+      <p class="text-sm text-text-muted">Pick the enemy; get the champions with the best record into them.</p>
+      <CounterRecommender client:load />
+    </section>
+
+    <section class="space-y-3">
+      <h2>ADC + Support synergy</h2>
+      <p class="text-sm text-text-muted">Top duo pairings by win rate, ranked with small-sample correction.</p>
+      <BotLaneSynergy client:load />
+    </section>
+  </div>
+</Base>

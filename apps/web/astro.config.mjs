@@ -12,6 +12,13 @@ export default defineConfig({
   integrations: [react(), mdx(), sitemap()],
   vite: {
     plugins: [tailwindcss()],
+    // Local dev: proxy the API to a locally-running Worker (`wrangler dev`).
+    // In production the Worker serves both the site and /api from the same origin.
+    server: {
+      proxy: {
+        '/api': 'http://localhost:8787',
+      },
+    },
   },
   build: {
     inlineStylesheets: 'auto',
