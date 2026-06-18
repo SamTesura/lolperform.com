@@ -1,0 +1,136 @@
+---
+import Base from '../layouts/Base.astro';
+import { TierTile } from '../components/primitives/TierTile';
+import { MatchupRow } from '../components/primitives/MatchupRow';
+import { RoleTabs } from '../components/primitives/RoleTabs';
+import { TierBadge } from '../components/primitives/TierBadge';
+import { StatBadge } from '../components/primitives/StatBadge';
+import { ConfidenceChip } from '../components/primitives/ConfidenceChip';
+import { DeltaBadge } from '../components/primitives/DeltaBadge';
+import { TIER_GRADES, type ChampionMeta, type RoleStats, type Matchup } from '@lolperform/shared';
+
+const meta = (key: string, id: string, name: string, title: string): ChampionMeta => ({
+  key,
+  id,
+  name,
+  title,
+  roles: ['BOTTOM'],
+});
+
+const champs: Record<string, ChampionMeta> = {
+  caitlyn: meta('51', 'Caitlyn', 'Caitlyn', 'the Sheriff of Piltover'),
+  jhin: meta('202', 'Jhin', 'Jhin', 'the Virtuoso'),
+  aphelios: meta('523', 'Aphelios', 'Aphelios', 'the Weapon of the Faithful'),
+  missfortune: meta('21', 'MissFortune', 'Miss Fortune', 'the Bounty Hunter'),
+  lux: meta('99', 'Lux', 'Lux', 'the Lady of Luminosity'),
+};
+
+const stat = (
+  champ: ChampionMeta,
+  tier: RoleStats['tier'],
+  winRate: number,
+  games: number,
+  deltaWinRate: number | null,
+): RoleStats => ({
+  patch: '15.13',
+  region: 'na1',
+  rank: 'emerald_plus',
+  role: 'BOTTOM',
+  championKey: champ.key,
+  games,
+  wins: Math.round(winRate * games),
+  winRate,
+  pickRate: 0.082,
+  banRate: 0.041,
+  wilsonLower: winRate - 0.02,
+  score: winRate,
+  tier,
+  deltaWinRate,
+  deltaTier: null,
+});
+
+const tierExamples: RoleStats[] = [
+  stat(champs.caitlyn, 'S', 0.534, 14820, 0.008),
+  stat(champs.jhin, 'A', 0.521, 9210, -0.004),
+  stat(champs.aphelios, 'B', 0.503, 640, 0.012),
+  stat(champs.missfortune, 'C', 0.491, 180, -0.011),
+  stat(champs.lux, 'D', 0.472, 22, null),
+];
+
+const matchupExamples: Matchup[] = [
+  { patch: '15.13', region: 'na1', rank: 'emerald_plus', role: 'BOTTOM', championKey: '51', opponentKey: '202', games: 1820, wins: 1010, winRate: 0.555, wilsonLower: 0.53 },
+  { patch: '15.13', region: 'na1', rank: 'emerald_plus', role: 'BOTTOM', championKey: '51', opponentKey: '523', games: 340, wins: 168, winRate: 0.494, wilsonLower: 0.44 },
+  { patch: '15.13', region: 'na1', rank: 'emerald_plus', role: 'BOTTOM', championKey: '51', opponentKey: '21', games: 47, wins: 19, winRate: 0.404, wilsonLower: 0.28 },
+];
+
+const champByKey: Record<string, ChampionMeta> = Object.fromEntries(
+  Object.values(champs).map((c) => [c.key, c]),
+);
+---
+
+<Base title="Styleguide — Broadcast Obsidian" noindex>
+  <div class="space-y-12">
+    <header class="space-y-1">
+      <p class="text-xs font-semibold tracking-widest text-accent uppercase">Design System</p>
+      <h1>Broadcast Obsidian — Component Styleguide</h1>
+      <p class="text-text-secondary">Visual proof that tokens map to utilities. Not indexed.</p>
+    </header>
+
+    <section class="space-y-3">
+      <h2>Tier badges</h2>
+      <div class="flex items-center gap-3">
+        {TIER_GRADES.map((t) => <TierBadge tier={t} size="lg" />)}
+      </div>
+    </section>
+
+    <section class="space-y-3">
+      <h2>Role tabs</h2>
+      <RoleTabs active="BOTTOM" />
+    </section>
+
+    <section class="space-y-3">
+      <h2>Confidence chips &amp; deltas</h2>
+      <div class="flex flex-wrap items-center gap-3">
+        <ConfidenceChip games={14820} />
+        <ConfidenceChip games={640} />
+        <ConfidenceChip games={47} />
+        <DeltaBadge delta={0.012} />
+        <DeltaBadge delta={-0.009} />
+        <DeltaBadge delta={0.0001} />
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <StatBadge label="Win" value="53.4%" tone="positive" glyph="▲" />
+        <StatBadge label="Pick" value="8.2%" />
+        <StatBadge label="Ban" value="4.1%" />
+        <StatBadge label="Sample" value="low" tone="warning" glyph="⚠" />
+      </div>
+    </section>
+
+    <section class="space-y-3">
+      <h2>Tier tiles (S → D, descending confidence)</h2>
+      <div class="flex flex-wrap gap-3">
+        {
+          tierExamples.map((s) => (
+            <TierTile stat={s} meta={champByKey[s.championKey]!} />
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="space-y-3">
+      <h2>Matchup rows (favored / even / unfavored, falling confidence)</h2>
+      <div class="max-w-xl overflow-hidden rounded-lg border border-border-default">
+        {
+          matchupExamples.map((m, i) => (
+            <MatchupRow
+              matchup={m}
+              self={champs.caitlyn}
+              opponent={champByKey[m.opponentKey]!}
+              striped={i % 2 === 1}
+            />
+          ))
+        }
+      </div>
+    </section>
+  </div>
+</Base>
