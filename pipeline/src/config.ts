@@ -22,9 +22,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PipelineConfig
   return {
     riotApiKey,
     regions: ACTIVE_REGIONS,
-    playersPerDivision: Number(env.PLAYERS_PER_DIVISION ?? 50),
-    matchesPerPlayer: Number(env.MATCHES_PER_PLAYER ?? 20),
-    maxMatchesPerRegion: Number(env.MAX_MATCHES_PER_REGION ?? 20_000),
+    // Defaults are sized for a personal/dev key (100 requests / 2 min) to finish
+    // inside the GitHub Actions timeout. Raise via env once on a production key.
+    playersPerDivision: Number(env.PLAYERS_PER_DIVISION ?? 20),
+    matchesPerPlayer: Number(env.MATCHES_PER_PLAYER ?? 15),
+    maxMatchesPerRegion: Number(env.MAX_MATCHES_PER_REGION ?? 800),
   };
 }
 
