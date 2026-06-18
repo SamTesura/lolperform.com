@@ -12,3 +12,18 @@ enabled = true
 directory = "apps/web/dist"
 binding = "ASSETS"
 not_found_handling = "404-page"
+
+# D1 — source of truth (patch history). Create with:
+#   wrangler d1 create lolperform
+# then paste the returned database_id below (it is not a secret).
+[[d1_databases]]
+binding = "DB"
+database_name = "lolperform"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "db/migrations"
+
+# KV — hot cache for computed API responses. Create with:
+#   wrangler kv namespace create CACHE
+[[kv_namespaces]]
+binding = "CACHE"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
