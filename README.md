@@ -70,13 +70,13 @@ pnpm typecheck && pnpm lint
 ## Roadmap
 
 - [x] P0 — Monorepo scaffold + tooling
-- [ ] P1 — Design system
-- [ ] P2 — Data pipeline (crawl + aggregate + tier)
-- [ ] P3 — Storage (D1 + KV)
-- [ ] P4 — Worker API + security
-- [ ] P5 — Frontend (tier list, bot lane, champion/matchup pages, methodology)
-- [ ] P6 — Auto-update CI
-- [ ] P7 — Security review + go-live
+- [x] P1 — Design system
+- [x] P2 — Data pipeline (crawl + aggregate + tier)
+- [x] P3 — Storage (D1 + KV)
+- [x] P4 — Worker API + security
+- [x] P5 — Frontend (tier list, bot lane, champion/matchup pages, methodology)
+- [x] P6 — Auto-update CI
+- [x] P7 — Security review + go-live
 
 ---
 
