@@ -1,0 +1,46 @@
+---
+const path = Astro.url.pathname;
+const links = [
+  { href: '/tier-list', label: 'Tier List' },
+  { href: '/bot-lane', label: 'Bot Lane' },
+  { href: '/champions', label: 'Champions' },
+  { href: '/methodology', label: 'Methodology' },
+];
+const isActive = (href: string) => path === href || path.startsWith(href + '/');
+---
+
+<header
+  class="sticky top-0 z-50 border-b border-border-subtle bg-bg-base/85 backdrop-blur-md"
+>
+  <div class="mx-auto flex h-14 max-w-[88rem] items-center justify-between gap-4 px-4 sm:px-6">
+    <a href="/" class="flex items-center gap-2" aria-label="LolPerform home">
+      <svg viewBox="0 0 64 64" width="26" height="26" aria-hidden="true">
+        <rect width="64" height="64" rx="14" fill="#0d1118"></rect>
+        <path d="M18 16h7v24h13v7H18z" fill="#4ee0c8"></path>
+        <circle cx="44" cy="20" r="5" fill="#ffd166"></circle>
+      </svg>
+      <span class="font-display text-md font-bold tracking-tight text-text-primary">
+        lol<span class="text-accent">perform</span>
+      </span>
+    </a>
+
+    <nav aria-label="Primary" class="flex items-center gap-1">
+      {
+        links.map((link) => (
+          <a
+            href={link.href}
+            aria-current={isActive(link.href) ? 'page' : undefined}
+            class:list={[
+              'rounded-sm px-3 py-1.5 text-sm font-medium transition-colors duration-150',
+              isActive(link.href)
+                ? 'text-accent'
+                : 'text-text-secondary hover:text-text-primary',
+            ]}
+          >
+            {link.label}
+          </a>
+        ))
+      }
+    </nav>
+  </div>
+</header>

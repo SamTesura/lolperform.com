@@ -1,15 +1,25 @@
 ---
 import '../styles/global.css';
+import SiteHeader from '../components/site/SiteHeader.astro';
+import SiteFooter from '../components/site/SiteFooter.astro';
 
 interface Props {
   title?: string;
   description?: string;
+  /** Opt out of the default centered content container (e.g. full-bleed grids). */
+  fullWidth?: boolean;
+  /** Hide from search engines (styleguide, previews). */
+  noindex?: boolean;
 }
 
 const {
   title = 'LolPerform — Bot-Lane-First LoL Tier List & Matchups',
   description = 'Readable League of Legends tier list and deep ADC/bot-lane matchup data, refreshed every patch.',
+  fullWidth = false,
+  noindex = false,
 } = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
 ---
 
 <!doctype html>
@@ -20,12 +30,20 @@ const {
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical} />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
-  <body>
-    <slot />
+  <body class="flex min-h-dvh flex-col">
+    <SiteHeader />
+    <main class={fullWidth ? 'flex-1' : 'mx-auto w-full max-w-[88rem] flex-1 px-4 py-6 sm:px-6'}>
+      <slot />
+    </main>
+    <SiteFooter />
   </body>
 </html>

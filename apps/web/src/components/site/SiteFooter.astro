@@ -1,0 +1,36 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="mt-16 border-t border-border-subtle bg-bg-surface">
+  <div
+    class="mx-auto flex max-w-[88rem] flex-col gap-4 px-4 py-8 text-sm text-text-muted sm:flex-row sm:items-start sm:justify-between sm:px-6"
+  >
+    <div class="max-w-md space-y-2">
+      <p class="font-display text-md font-bold text-text-primary">
+        lol<span class="text-accent">perform</span>
+      </p>
+      <p class="text-xs leading-relaxed">
+        Bot-lane-first League of Legends tier list and matchup data, refreshed every patch.
+        Every statistic carries its sample size — see the
+        <a href="/methodology" class="text-accent">methodology</a>.
+      </p>
+    </div>
+
+    <nav aria-label="Footer" class="flex flex-col gap-1.5 text-xs">
+      <a href="/tier-list" class="hover:text-text-primary">Tier List</a>
+      <a href="/bot-lane" class="hover:text-text-primary">Bot Lane</a>
+      <a href="/champions" class="hover:text-text-primary">Champions</a>
+      <a href="/methodology" class="hover:text-text-primary">Methodology</a>
+    </nav>
+  </div>
+
+  <div class="border-t border-border-subtle px-4 py-4 sm:px-6">
+    <p class="mx-auto max-w-[88rem] text-2xs leading-relaxed text-text-disabled">
+      lolperform.com isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot
+      Games or anyone officially involved in producing or managing Riot Games properties. Riot Games
+      and all associated properties are trademarks or registered trademarks of Riot Games, Inc.
+      &copy; {year} lolperform.com
+    </p>
+  </div>
+</footer>
