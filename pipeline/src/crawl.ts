@@ -8,53 +8,87 @@ import type { PipelineConfig } from './config.js';
 import type { RiotClient } from './riot/client.js';
 import { normalizeMatch, type NormMatch } from './riot/types.js';
 
-const APEX: { tier: LeagueTier; kind: 'challenger' | 'grandmaster' | 'master' }[] = [
-  { tier: 'CHALLENGER', kind: 'challenger' },
-  { tier: 'GRANDMASTER', kind: 'grandmaster' },
-  { tier: 'MASTER', kind: 'master' },
+/**
+ * Seed-tier weights (× playersPerDivision). Weighted toward the larger
+ * populations so the sample resembles the real Emerald+ ladder instead of
+ * over-representing apex — the bias that made the first dataset unusable.
+ */
+const APEX: { tier: LeagueTier; kind: 'challenger' | 'grandmaster' | 'master'; weight: number }[] = [
+  { tier: 'CHALLENGER', kind: 'challenger', weight: 0.34 },
+  { tier: 'GRANDMASTER', kind: 'grandmaster', weight: 0.5 },
+  { tier: 'MASTER', kind: 'master', weight: 1 },
 ];
 
-const LADDER_TIERS: LeagueTier[] = ['DIAMOND', 'EMERALD'];
+const LADDER: { tier: LeagueTier; weight: number }[] = [
+  { tier: 'DIAMOND', weight: 3 },
+  { tier: 'EMERALD', weight: 4 },
+];
 
-function take<T>(arr: T[], n: number): T[] {
-  return arr.slice(0, n);
+function shuffle<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j]!, arr[i]!];
+  }
+  return arr;
 }
 
-/** Collect a sample of player PUUIDs per league tier for one region. */
+async function apexPuuids(
+  client: RiotClient,
+  region: Region,
+  kind: 'challenger' | 'grandmaster' | 'master',
+  target: number,
+): Promise<string[]> {
+  const list = await client.getApexLeague(region, kind);
+  const puuids = (list?.entries ?? [])
+    .map((e) => e.puuid)
+    .filter((p): p is string => typeof p === 'string');
+  return shuffle(puuids).slice(0, target);
+}
+
+async function ladderPuuids(
+  client: RiotClient,
+  region: Region,
+  tier: LeagueTier,
+  target: number,
+): Promise<string[]> {
+  const out: string[] = [];
+  const perDivision = Math.ceil(target / LEAGUE_DIVISIONS.length);
+  for (const division of LEAGUE_DIVISIONS) {
+    let got = 0;
+    for (let page = 1; got < perDivision && page <= 5; page++) {
+      const entries = await client.getLeagueEntries(region, tier, division, page);
+      if (!entries || entries.length === 0) break;
+      for (const e of entries) {
+        if (typeof e.puuid === 'string') {
+          out.push(e.puuid);
+          got++;
+        }
+      }
+    }
+  }
+  return out;
+}
+
 async function seedPuuids(
   client: RiotClient,
   region: Region,
   config: PipelineConfig,
 ): Promise<Map<LeagueTier, string[]>> {
+  const p = config.playersPerDivision;
   const seeds = new Map<LeagueTier, string[]>();
-
-  for (const { tier, kind } of APEX) {
-    const list = await client.getApexLeague(region, kind);
-    const puuids = (list?.entries ?? [])
-      .map((e) => e.puuid)
-      .filter((p): p is string => typeof p === 'string');
-    seeds.set(tier, take(puuids, config.playersPerDivision * 4));
+  for (const { tier, kind, weight } of APEX) {
+    seeds.set(tier, await apexPuuids(client, region, kind, Math.round(p * weight)));
   }
-
-  for (const tier of LADDER_TIERS) {
-    const puuids: string[] = [];
-    for (const division of LEAGUE_DIVISIONS) {
-      const entries = await client.getLeagueEntries(region, tier, division, 1);
-      for (const e of entries ?? []) {
-        if (typeof e.puuid === 'string') puuids.push(e.puuid);
-        if (puuids.length >= config.playersPerDivision * LEAGUE_DIVISIONS.length) break;
-      }
-    }
-    seeds.set(tier, puuids);
+  for (const { tier, weight } of LADDER) {
+    seeds.set(tier, await ladderPuuids(client, region, tier, Math.round(p * weight)));
   }
-
   return seeds;
 }
 
 /**
- * Crawl a sampled set of ranked matches for the target patch across the
- * configured regions. Each match is tagged with the seed tier it was found
- * through so the aggregator can build cumulative rank brackets.
+ * Crawl a representative, sampled set of ranked matches for the target patch.
+ * Players are round-robined across tiers so the per-region cap stays balanced
+ * rather than being filled entirely by one tier.
  */
 export async function crawl(
   client: RiotClient,
@@ -65,13 +99,23 @@ export async function crawl(
 
   for (const region of config.regions) {
     const seeds = await seedPuuids(client, region, config);
-
-    // Discover unique match ids, remembering the tier each was first seen at.
     const matchTier = new Map<string, LeagueTier>();
-    outer: for (const [tier, puuids] of seeds) {
-      for (const puuid of puuids) {
+
+    const queues = [...seeds.entries()].map(([tier, puuids]) => ({
+      tier,
+      puuids: shuffle(puuids),
+      i: 0,
+    }));
+
+    let active = true;
+    outer: while (active) {
+      active = false;
+      for (const q of queues) {
+        if (q.i >= q.puuids.length) continue;
+        active = true;
+        const puuid = q.puuids[q.i++]!;
         const ids = await client.getMatchIds(region, puuid, config.matchesPerPlayer);
-        for (const id of ids ?? []) if (!matchTier.has(id)) matchTier.set(id, tier);
+        for (const id of ids ?? []) if (!matchTier.has(id)) matchTier.set(id, q.tier);
         if (matchTier.size >= config.maxMatchesPerRegion) break outer;
       }
     }

@@ -4,7 +4,7 @@ import {
   type LeagueDivision,
   type Region,
 } from '@lolperform/shared';
-import { DEV_KEY_WINDOWS, RateLimiter, sleep } from './rateLimiter.js';
+import { RateLimiter, sleep } from './rateLimiter.js';
 import type { LeagueEntryDTO, LeagueListDTO, MatchDTO } from './types.js';
 
 const MAX_RETRIES = 4;
@@ -23,9 +23,11 @@ export class RiotClient {
 
   constructor(
     private readonly apiKey: string,
-    limiter = new RateLimiter(DEV_KEY_WINDOWS),
+    rps = 20,
   ) {
-    this.limiter = limiter;
+    // One per-second window; the 429/Retry-After handler is the backstop if the
+    // key's app-rate limit is tighter than `rps`.
+    this.limiter = new RateLimiter([{ limit: rps, intervalMs: 1000 }]);
   }
 
   private async request<T>(host: string, path: string): Promise<T | null> {

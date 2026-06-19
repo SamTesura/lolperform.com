@@ -15,6 +15,8 @@ export interface PipelineConfig {
   matchesPerPlayer: number;
   /** Hard ceiling on unique matches per region per run (rate-limit guard). */
   maxMatchesPerRegion: number;
+  /** Requests/second budget for the rate limiter (raise on a production key). */
+  riotRps: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): PipelineConfig {
@@ -22,11 +24,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PipelineConfig
   return {
     riotApiKey,
     regions: ACTIVE_REGIONS,
-    // Defaults are sized for a personal/dev key (100 requests / 2 min) to finish
-    // inside the GitHub Actions timeout. Raise via env once on a production key.
-    playersPerDivision: Number(env.PLAYERS_PER_DIVISION ?? 20),
-    matchesPerPlayer: Number(env.MATCHES_PER_PLAYER ?? 15),
-    maxMatchesPerRegion: Number(env.MAX_MATCHES_PER_REGION ?? 800),
+    // Defaults are sized for a PRODUCTION key. Broad sampling (many players, few
+    // matches each) keeps the sample representative; ~25k matches/region across
+    // NA/EUW/KR gives popular champions credible volume within the Actions timeout.
+    // Every value is env-overridable so the cron can be tuned without a deploy.
+    playersPerDivision: Number(env.PLAYERS_PER_DIVISION ?? 400),
+    matchesPerPlayer: Number(env.MATCHES_PER_PLAYER ?? 8),
+    maxMatchesPerRegion: Number(env.MAX_MATCHES_PER_REGION ?? 25000),
+    riotRps: Number(env.RIOT_RPS ?? 30),
   };
 }
 

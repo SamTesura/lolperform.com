@@ -113,7 +113,8 @@ function aggregateSlice(
   };
 
   for (const m of slice) {
-    for (const id of m.bans) bans.set(String(id), (bans.get(String(id)) ?? 0) + 1);
+    // Dedupe per match: a champion banned by both teams counts once.
+    for (const id of new Set(m.bans)) bans.set(String(id), (bans.get(String(id)) ?? 0) + 1);
 
     const team: Record<100 | 200, Partial<Record<Role, NormParticipant>>> = { 100: {}, 200: {} };
     for (const p of m.participants) {

@@ -4,7 +4,7 @@ import { aggregate } from './aggregate.js';
 import { botLaneMatches } from './__fixtures__/matches.js';
 
 describe('aggregate', () => {
-  const matches = botLaneMatches(100, 60); // Caitlyn bot wins 60/100
+  const matches = botLaneMatches(250, 150); // Caitlyn bot wins 150/250 = 60% (>= min-tier games)
 
   it('computes per-role win/pick rates and tiers', () => {
     const result = aggregate(matches);
@@ -13,8 +13,8 @@ describe('aggregate', () => {
     );
     expect(cait).toHaveLength(1);
     const c = cait[0]!;
-    expect(c.games).toBe(100);
-    expect(c.wins).toBe(60);
+    expect(c.games).toBe(250);
+    expect(c.wins).toBe(150);
     expect(c.winRate).toBeCloseTo(0.6, 5);
     expect(c.pickRate).toBeCloseTo(1, 5); // present in every game on team 100
     expect(c.tier).toBe('S'); // 60% over 100 games
@@ -46,7 +46,7 @@ describe('aggregate', () => {
     const duo = result.duos.find(
       (d) => d.adcKey === '51' && d.supportKey === '412' && d.rank === 'emerald_plus',
     );
-    expect(duo?.games).toBe(100);
+    expect(duo?.games).toBe(250);
     expect(duo?.winRate).toBeCloseTo(0.6, 5);
   });
 
