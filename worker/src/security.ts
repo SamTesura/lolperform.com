@@ -9,14 +9,22 @@
  *   styles are low risk; inline scripts are not, hence the asymmetry.
  * - `img-src` allows the Data Dragon CDN (champion/item art) and data: URIs.
  */
+// Google AdSense requires its script/frame/img/connect domains to be allowlisted,
+// and in practice needs 'unsafe-inline' for the scripts it injects. This is a
+// deliberate tradeoff for monetization; the site renders no user-supplied HTML
+// (all data is numeric/enum from our own D1, escaped by React), so the residual
+// XSS surface is low. Everything non-ad stays tightly scoped.
+const GOOGLE_ADS = 'https://*.googlesyndication.com https://*.googleadservices.com https://*.google.com https://*.doubleclick.net';
+
 const CSP = [
   "default-src 'self'",
   "base-uri 'self'",
-  "img-src 'self' https://ddragon.leagueoflegends.com data:",
-  "script-src 'self'",
+  `img-src 'self' data: https://ddragon.leagueoflegends.com https://*.gstatic.com ${GOOGLE_ADS}`,
+  `script-src 'self' 'unsafe-inline' https://adservice.google.com https://*.googletagservices.com ${GOOGLE_ADS}`,
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
-  "connect-src 'self'",
+  `connect-src 'self' ${GOOGLE_ADS}`,
+  `frame-src ${GOOGLE_ADS}`,
   "form-action 'self'",
   "frame-ancestors 'none'",
   "object-src 'none'",

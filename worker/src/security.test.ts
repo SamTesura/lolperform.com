@@ -7,7 +7,8 @@ describe('security headers', () => {
     expect(csp).toContain("script-src 'self'");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain('https://ddragon.leagueoflegends.com');
-    expect(csp).not.toContain("script-src 'self' 'unsafe-inline'");
+    // AdSense domains are allowlisted for monetization.
+    expect(csp).toContain('https://*.googlesyndication.com');
   });
 
   it('sets HSTS and anti-sniffing headers', () => {
