@@ -73,6 +73,13 @@ const jsonLd = {
     <meta name="twitter:image" content={ogImage} />
 
     <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+    <!-- Google AdSense (verifies ownership + serves ads) -->
+    <script
+      is:inline
+      async
+      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7585621325528982"
+      crossorigin="anonymous"></script>
   </head>
   <body class="flex min-h-dvh flex-col">
     <SiteHeader />
