@@ -1,11 +1,12 @@
 # lolperform.com
 
-**A bot-lane-first League of Legends tier list and matchup wiki — readable, transparent, and refreshed every patch.**
+**Readable, bot-lane-first League of Legends stats — ADC matchups, ADC↔Support synergy, and counters, plus a clean tier list, with an honest sample size on every number. Refreshed every patch.**
 
 Most stats sites stack everything on one screen and hide their methodology. LolPerform inverts
-that: a clean tier grid you can scan in seconds, progressive drill-down into champions and
-matchups, and a published methodology so you can trust the numbers. It goes deep where it matters
-most for bottom lane — ADC matchups and ADC↔Support synergy.
+that: a clean tier grid you can scan in seconds, real bottom-lane depth (ADC matchups, ADC↔Support
+synergy, a counter-pick recommender), and a published methodology. It's a **sampled** dataset, not a
+full-ladder aggregator like the giants — and it's transparent about exactly that, surfacing the
+sample size and confidence behind every stat.
 
 > Status: in active development. See [`progress`](#roadmap) below.
 

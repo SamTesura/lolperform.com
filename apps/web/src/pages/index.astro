@@ -3,37 +3,58 @@ import Base from '../layouts/Base.astro';
 import TopPicks from '../components/islands/TopPicks';
 
 const cards = [
-  { href: '/tier-list', title: 'Tier List', body: 'Every champion ranked by role, rank, and region — scannable at a glance.' },
-  { href: '/bot-lane', title: 'Bot Lane', body: 'ADC matchups, ADC + Support synergy, and a counter-pick recommender.' },
-  { href: '/champions', title: 'Champions', body: 'Per-champion stats, best and toughest matchups, and builds.' },
-  { href: '/methodology', title: 'Methodology', body: 'Exactly how the data is sampled, scored, and tiered. No black boxes.' },
+  {
+    href: '/bot-lane',
+    title: 'Bot Lane',
+    body: 'ADC matchups, ADC + Support synergy, and a counter-pick recommender. The reason this site exists.',
+  },
+  {
+    href: '/tier-list',
+    title: 'Tier List',
+    body: 'Every champion ranked by role, rank, and region — scannable at a glance, confidence built in.',
+  },
+  {
+    href: '/champions',
+    title: 'Champions',
+    body: 'Per-champion stats, best and toughest matchups, and builds.',
+  },
+  {
+    href: '/methodology',
+    title: 'Methodology',
+    body: 'Exactly how the data is sampled, scored, and tiered — and where the limits are.',
+  },
 ];
 ---
 
 <Base>
   <section class="flex flex-col gap-4 py-10 sm:py-16">
-    <p class="text-sm font-semibold tracking-widest text-accent uppercase">lolperform.com</p>
+    <p class="text-sm font-semibold tracking-widest text-accent uppercase">
+      Bot-lane-first LoL analytics
+    </p>
     <h1 class="max-w-3xl text-4xl text-balance sm:text-5xl">
-      The League tier list that respects your time — and goes deep on bot lane.
+      League stats you can actually read — built for bot lane.
     </h1>
     <p class="max-w-2xl text-lg text-text-secondary">
-      Readable rankings, ADC matchup depth, and honest numbers. Every stat shows its sample size,
-      refreshed every patch.
+      ADC matchups, ADC + Support synergy, and counter picks, plus a clean tier list. Every number
+      carries its sample size and confidence — sampled high-elo data, refreshed each patch.
     </p>
     <div class="flex flex-wrap gap-3 pt-2">
       <a
-        href="/tier-list"
+        href="/bot-lane"
         class="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-fg hover:bg-accent-hover"
       >
-        Open the tier list
+        Explore bot lane
       </a>
       <a
-        href="/bot-lane"
+        href="/tier-list"
         class="rounded-md border border-border-default px-4 py-2 text-sm font-semibold text-text-primary hover:bg-bg-elevated"
       >
-        Bot-lane tools
+        Tier list
       </a>
     </div>
+    <p class="text-xs text-text-muted">
+      Sampled, not full-ladder — and honest about it. <a href="/methodology">How the data works →</a>
+    </p>
   </section>
 
   <section class="space-y-3">
