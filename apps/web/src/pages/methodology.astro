@@ -26,10 +26,12 @@ import Base from '../layouts/Base.astro';
     <section class="space-y-2">
       <h2>It's a sample, and we say so</h2>
       <p>
-        We don't claim to read every game. We sample high-elo ranked matches across regions and
-        divisions on the current patch. That keeps the project within a free API budget — and it's
-        why <strong class="text-text-primary">every statistic shows its sample size</strong>. A win
-        rate over 40 games is not the same as one over 40,000, and the UI never lets you forget it.
+        We don't claim to read every game. We sample ranked matches across <strong
+          class="text-text-primary">NA, EUW, and KR</strong> on the current patch, weighted toward the
+        larger rank populations so the sample isn't skewed toward the apex few. We're a sampled
+        dataset, not a full-ladder one like the largest sites — which is exactly why <strong
+          class="text-text-primary">every statistic shows its sample size</strong>. A win rate over 40
+        games is not the same as one over 40,000, and the UI never lets you forget it.
       </p>
     </section>
 
@@ -52,13 +54,14 @@ import Base from '../layouts/Base.astro';
         sits inside that band.
       </p>
       <ul class="list-inside list-disc space-y-1 text-text-muted">
-        <li><span class="text-tier-s">S</span> tier ≥ 52.5% win rate (S+ ≥ 55%, S ≥ 53.5%, S− ≥ 52.5%)</li>
-        <li><span class="text-tier-a">A</span> tier ≥ 51% &nbsp;·&nbsp; <span class="text-tier-b">B</span> tier ≥ 49.5%</li>
-        <li><span class="text-tier-c">C</span> tier ≥ 47% &nbsp;·&nbsp; <span class="text-tier-d">D</span> tier below that</li>
+        <li><span class="text-tier-s">S</span> tier ≥ 51.5% win rate (S+ ≥ 53.5%, S ≥ 52.5%, S− ≥ 51.5%)</li>
+        <li><span class="text-tier-a">A</span> tier ≥ 50% &nbsp;·&nbsp; <span class="text-tier-b">B</span> tier ≥ 48.5%</li>
+        <li><span class="text-tier-c">C</span> tier ≥ 46% &nbsp;·&nbsp; <span class="text-tier-d">D</span> tier below that</li>
       </ul>
       <p>
-        A champion must clear a minimum game count before it can be tiered above D− — so a tiny lucky
-        sample never shows up as S+.
+        Bands are calibrated to the real ranked win-rate distribution (champions cluster near 50%, the
+        strongest reach ~52–53%). A champion must also clear <strong class="text-text-primary">200
+        games</strong> before it can be tiered above D− — so a tiny lucky sample never shows up as S+.
       </p>
     </section>
 

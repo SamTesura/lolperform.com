@@ -76,8 +76,8 @@ export const REGION_ROUTE: Record<Region, RegionalRoute> = {
   kr: 'asia',
 };
 
-/** Regions sampled in v1. */
-export const ACTIVE_REGIONS: readonly Region[] = ['na1', 'euw1'];
+/** Regions sampled by the crawler. KR is the reference meta region. */
+export const ACTIVE_REGIONS: readonly Region[] = ['na1', 'euw1', 'kr'];
 
 export const DEFAULT_REGION: Region = 'na1';
 

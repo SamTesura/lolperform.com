@@ -21,7 +21,7 @@ async function main(): Promise<void> {
   const { latestVersion, latestPatch } = await detectPatch();
   console.info(`[run] target patch ${latestPatch} (ddragon ${latestVersion})`);
 
-  const client = new RiotClient(config.riotApiKey);
+  const client = new RiotClient(config.riotApiKey, config.riotRps);
   const matches = await crawl(client, config, latestPatch);
   console.info(`[run] aggregating ${matches.length} matches`);
 
