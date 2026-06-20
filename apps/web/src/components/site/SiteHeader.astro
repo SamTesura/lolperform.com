@@ -1,4 +1,7 @@
 ---
+import { getBuildChampions } from '../../lib/ddragonBuild';
+import ChampionSearch from '../islands/ChampionSearch';
+
 const path = Astro.url.pathname;
 const links = [
   { href: '/tier-list', label: 'Tier List' },
@@ -7,13 +10,20 @@ const links = [
   { href: '/methodology', label: 'Methodology' },
 ];
 const isActive = (href: string) => path === href || path.startsWith(href + '/');
+
+const { version, champions } = await getBuildChampions();
+const searchChampions = champions.map((c) => ({ key: c.key, id: c.id, name: c.name }));
 ---
 
-<header
-  class="sticky top-0 z-50 border-b border-border-subtle bg-bg-base/85 backdrop-blur-md"
->
-  <div class="mx-auto flex h-14 max-w-[88rem] items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6">
-    <a href="/" class="flex shrink-0 items-center gap-2" aria-label="LolPerform home">
+<header class="sticky top-0 z-50 border-b border-border-subtle bg-bg-base/85 backdrop-blur-md">
+  <div
+    class="mx-auto flex max-w-[88rem] flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 sm:px-6 md:h-14 md:flex-nowrap md:py-0"
+  >
+    <a
+      href="/"
+      class="order-1 flex shrink-0 items-center gap-2"
+      aria-label="LolPerform home"
+    >
       <svg viewBox="0 0 64 64" width="26" height="26" aria-hidden="true">
         <rect width="64" height="64" rx="14" fill="#0d1118"></rect>
         <path d="M18 16h7v24h13v7H18z" fill="#4ee0c8"></path>
@@ -24,7 +34,10 @@ const isActive = (href: string) => path === href || path.startsWith(href + '/');
       </span>
     </a>
 
-    <nav aria-label="Primary" class="-mr-1 flex items-center gap-0.5 overflow-x-auto sm:gap-1">
+    <nav
+      aria-label="Primary"
+      class="order-2 ml-auto flex items-center gap-0.5 overflow-x-auto sm:gap-1 md:order-3"
+    >
       {
         links.map((link) => (
           <a
@@ -32,9 +45,7 @@ const isActive = (href: string) => path === href || path.startsWith(href + '/');
             aria-current={isActive(link.href) ? 'page' : undefined}
             class:list={[
               'rounded-sm px-2 py-1.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 sm:px-3',
-              isActive(link.href)
-                ? 'text-accent'
-                : 'text-text-secondary hover:text-text-primary',
+              isActive(link.href) ? 'text-accent' : 'text-text-secondary hover:text-text-primary',
             ]}
           >
             {link.label}
@@ -42,5 +53,9 @@ const isActive = (href: string) => path === href || path.startsWith(href + '/');
         ))
       }
     </nav>
+
+    <div class="order-3 w-full md:order-2 md:mx-4 md:w-auto md:max-w-xs md:flex-1">
+      <ChampionSearch champions={searchChampions} version={version} client:load />
+    </div>
   </div>
 </header>

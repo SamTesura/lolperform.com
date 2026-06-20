@@ -109,16 +109,12 @@ hr {
   font-size: var(--text-sm);
 }
 
-/* Confidence visual language — apply to any container wrapping a statistic. */
-.confidence-high   { opacity: var(--confidence-high-opacity); }
-.confidence-medium {
-  opacity: var(--confidence-medium-opacity);
-  border-bottom: var(--confidence-medium-rule);
-}
-.confidence-low {
-  opacity: var(--confidence-low-opacity);
-  background-image: var(--confidence-low-hatch);
-}
+/* Confidence visual language — a gentle fade only. Low-sample tiles must still
+   look like normal, selectable cards (not disabled), so we drop the heavy
+   hatch/dashed treatments and lean on the inline sample-size + ⚠ chip instead. */
+.confidence-high { opacity: var(--confidence-high-opacity); }
+.confidence-medium { opacity: var(--confidence-medium-opacity); }
+.confidence-low { opacity: var(--confidence-low-opacity); }
 
 /* Visually-hide while staying screen-reader available. Reused for "▲ rising"
    labels alongside the arrow glyph so colorblind users hear the trend. */

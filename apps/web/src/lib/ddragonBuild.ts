@@ -12,7 +12,15 @@ export interface DdragonBuildData {
   champions: ChampionMeta[];
 }
 
-export async function getBuildChampions(): Promise<DdragonBuildData> {
+let cached: Promise<DdragonBuildData> | null = null;
+
+/** Memoized so the shared header can call it once per build, not per page. */
+export function getBuildChampions(): Promise<DdragonBuildData> {
+  cached ??= loadBuildChampions();
+  return cached;
+}
+
+async function loadBuildChampions(): Promise<DdragonBuildData> {
   const versions = (await (await fetch(`${DDRAGON}/api/versions.json`)).json()) as string[];
   const version = versions[0] ?? '16.12.1';
   const json = (await (
