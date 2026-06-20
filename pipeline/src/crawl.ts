@@ -32,6 +32,30 @@ function shuffle<T>(arr: T[]): T[] {
   return arr;
 }
 
+/**
+ * Run `fn` over `items` with bounded concurrency. The Riot client's rate limiter
+ * still caps the actual request rate; concurrency just keeps that many requests
+ * in flight so throughput is limiter-bound, not latency-bound (the bug that made
+ * the sequential crawl time out).
+ */
+async function mapPool<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]!);
+    }
+  };
+  const n = Math.max(1, Math.min(concurrency, items.length));
+  await Promise.all(Array.from({ length: n }, worker));
+  return results;
+}
+
 async function apexPuuids(
   client: RiotClient,
   region: Region,
@@ -85,10 +109,28 @@ async function seedPuuids(
   return seeds;
 }
 
+/** Round-robin the per-tier puuid lists into one balanced, interleaved list. */
+function interleave(seeds: Map<LeagueTier, string[]>): { puuid: string; tier: LeagueTier }[] {
+  const queues = [...seeds.entries()].map(([tier, puuids]) => ({ tier, puuids: shuffle([...puuids]) }));
+  const out: { puuid: string; tier: LeagueTier }[] = [];
+  let added = true;
+  while (added) {
+    added = false;
+    for (const q of queues) {
+      const puuid = q.puuids.pop();
+      if (puuid) {
+        out.push({ puuid, tier: q.tier });
+        added = true;
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * Crawl a representative, sampled set of ranked matches for the target patch.
- * Players are round-robined across tiers so the per-region cap stays balanced
- * rather than being filled entirely by one tier.
+ * Both discovery (match ids per player) and fetch (match detail) run with
+ * bounded concurrency so a region finishes well inside the Actions timeout.
  */
 export async function crawl(
   client: RiotClient,
@@ -96,35 +138,38 @@ export async function crawl(
   targetPatch: string,
 ): Promise<NormMatch[]> {
   const all: NormMatch[] = [];
+  const concurrency = config.riotRps;
 
   for (const region of config.regions) {
     const seeds = await seedPuuids(client, region, config);
-    const matchTier = new Map<string, LeagueTier>();
 
-    const queues = [...seeds.entries()].map(([tier, puuids]) => ({
-      tier,
-      puuids: shuffle(puuids),
-      i: 0,
+    // Only sample as many players as we need to reach the match cap (+buffer for
+    // de-duplication and off-patch / non-soloq matches).
+    const needPuuids = Math.ceil((config.maxMatchesPerRegion / config.matchesPerPlayer) * 1.5);
+    const seedList = interleave(seeds).slice(0, needPuuids);
+
+    const idLists = await mapPool(seedList, concurrency, async (s) => ({
+      tier: s.tier,
+      ids: (await client.getMatchIds(region, s.puuid, config.matchesPerPlayer)) ?? [],
     }));
 
-    let active = true;
-    outer: while (active) {
-      active = false;
-      for (const q of queues) {
-        if (q.i >= q.puuids.length) continue;
-        active = true;
-        const puuid = q.puuids[q.i++]!;
-        const ids = await client.getMatchIds(region, puuid, config.matchesPerPlayer);
-        for (const id of ids ?? []) if (!matchTier.has(id)) matchTier.set(id, q.tier);
-        if (matchTier.size >= config.maxMatchesPerRegion) break outer;
+    const matchTier = new Map<string, LeagueTier>();
+    for (const { tier, ids } of idLists) {
+      for (const id of ids) {
+        if (matchTier.size >= config.maxMatchesPerRegion) break;
+        if (!matchTier.has(id)) matchTier.set(id, tier);
       }
     }
 
-    let kept = 0;
-    for (const [id, tier] of matchTier) {
+    const entries = [...matchTier.entries()];
+    const norms = await mapPool(entries, concurrency, async ([id, tier]) => {
       const dto = await client.getMatch(region, id);
-      if (!dto || dto.info.queueId !== QUEUE_RANKED_SOLO) continue;
-      const norm = normalizeMatch(dto, region, tier);
+      if (!dto || dto.info.queueId !== QUEUE_RANKED_SOLO) return null;
+      return normalizeMatch(dto, region, tier);
+    });
+
+    let kept = 0;
+    for (const norm of norms) {
       if (norm && norm.patch === targetPatch) {
         all.push(norm);
         kept += 1;
