@@ -4,11 +4,12 @@ import {
   assignFullTier,
   DEFAULT_RANK_BRACKET,
   DEFAULT_REGION,
+  type ChampionMeta,
   type RankBracket,
   type Region,
   type Role,
 } from '@lolperform/shared';
-import { fetchCounters, fetchMeta } from '../../lib/api';
+import { fetchCounters, fetchMeta, fetchTierList } from '../../lib/api';
 import { championIndex } from '../../lib/champions';
 import { ChampionPortrait } from '../primitives/ChampionPortrait';
 import { ConfidenceChip } from '../primitives/ConfidenceChip';
@@ -25,6 +26,13 @@ function Recommender() {
   const [opponentKey, setOpponentKey] = useState<string>('');
 
   const meta = useQuery({ queryKey: ['meta'], queryFn: fetchMeta });
+  // Enemy options come from the champions actually played in the selected role,
+  // so e.g. a top laner never shows up under Bot.
+  const roleList = useQuery({
+    queryKey: ['tierlist', region, rank, role],
+    queryFn: () => fetchTierList(region, rank, role),
+    retry: false,
+  });
   const counters = useQuery({
     queryKey: ['counters', region, rank, role, opponentKey],
     queryFn: () => fetchCounters(region, rank, role, opponentKey),
@@ -32,14 +40,25 @@ function Recommender() {
     retry: false,
   });
 
-  const index = meta.data ? championIndex(meta.data.champions) : new Map();
+  const index: Map<string, ChampionMeta> = meta.data
+    ? championIndex(meta.data.champions)
+    : new Map();
   const version = meta.data?.version;
-  const champoptions = meta.data?.champions ?? [];
+  const champoptions = (roleList.data?.champions ?? [])
+    .map((s) => index.get(s.championKey))
+    .filter((c): c is ChampionMeta => Boolean(c))
+    .sort((a, b) => a.name.localeCompare(b.name));
   const enemy = opponentKey ? index.get(opponentKey) : undefined;
 
   return (
     <div className="space-y-4">
-      <RoleTabsInteractive value={role} onChange={setRole} />
+      <RoleTabsInteractive
+        value={role}
+        onChange={(r) => {
+          setRole(r);
+          setOpponentKey('');
+        }}
+      />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <label className="flex flex-col gap-1 text-xs text-text-muted">
           <span className="uppercase tracking-[0.08em]">Enemy you're laning against</span>

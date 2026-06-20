@@ -219,8 +219,8 @@
      Components consume these via the .confidence-{high|medium|low} classes
      defined in global.css.                                                    */
   --confidence-high-opacity: 1;
-  --confidence-medium-opacity: 0.78;
-  --confidence-low-opacity: 0.55;
+  --confidence-medium-opacity: 0.96;
+  --confidence-low-opacity: 0.88;
 
   --confidence-medium-rule: 1px dashed var(--color-border-strong);
   --confidence-low-hatch:
