@@ -56,9 +56,9 @@ function Grid() {
             return (
               <section
                 key={grade}
-                className="flex gap-3 rounded-lg border border-border-subtle bg-bg-surface p-3"
+                className="flex flex-col gap-2 rounded-lg border border-border-subtle bg-bg-surface p-3 sm:flex-row sm:gap-3"
               >
-                <div className="shrink-0 pt-1">
+                <div className="shrink-0 sm:pt-1">
                   <TierBadge tier={grade} size="lg" />
                 </div>
                 <div className="flex flex-wrap gap-2">

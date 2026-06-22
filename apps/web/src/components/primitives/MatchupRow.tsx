@@ -37,7 +37,9 @@ export function MatchupRow({ matchup, self, opponent, version, striped }: Props)
       </div>
 
       <div className="flex items-center gap-3">
-        <ConfidenceChip games={matchup.games} />
+        <span className="hidden sm:inline-flex">
+          <ConfidenceChip games={matchup.games} />
+        </span>
         <div className="text-right">
           <div className={`stat text-sm font-semibold ${v.tone}`}>
             <span aria-hidden className="mr-0.5">

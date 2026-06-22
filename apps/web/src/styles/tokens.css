@@ -25,7 +25,7 @@
 
   --color-text-primary: #e8ecf3;     /* body + headings.   Ratio 14.8:1 on base */
   --color-text-secondary: #a7b0c2;   /* secondary copy.    Ratio  7.2:1 on base */
-  --color-text-muted: #6b7689;       /* labels, captions.  Ratio  4.6:1 on base */
+  --color-text-muted: #7e8a9e;       /* labels, captions. ~5.4:1 on base, ~4.6:1 on elevated (AA) */
   --color-text-disabled: #434b5c;    /* disabled states */
   --color-text-inverse: #07090d;     /* text on accent / tier fills */
 

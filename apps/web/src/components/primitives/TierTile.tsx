@@ -29,7 +29,7 @@ export function TierTile({ stat, meta, version, href }: Props) {
   return (
     <a
       href={href ?? `/champion/${meta.id}`}
-      className={`group relative flex w-[88px] flex-col gap-1 rounded-md border border-border-default bg-bg-surface p-1.5 transition-[transform,background-color] duration-150 ease-out hover:-translate-y-0.5 hover:bg-bg-elevated hover:shadow-md ${confidenceClass(stat.games)}`}
+      className="group relative flex w-[72px] flex-col gap-1 rounded-md border border-border-default bg-bg-surface p-1.5 transition-[transform,background-color] duration-150 ease-out hover:-translate-y-0.5 hover:bg-bg-elevated hover:shadow-md sm:w-[88px]"
     >
       <div className="absolute top-1 left-1 z-10">
         <TierBadge tier={stat.tier} grade={assignFullTier(stat.winRate, stat.games)} size="sm" />
@@ -44,7 +44,7 @@ export function TierTile({ stat, meta, version, href }: Props) {
         version={version}
         tier={stat.tier}
         size={76}
-        className="h-[76px] w-[76px]"
+        className={`h-[60px] w-[60px] sm:h-[76px] sm:w-[76px] ${confidenceClass(stat.games)}`}
       />
 
       <div className="flex items-baseline justify-between px-0.5">
@@ -55,6 +55,7 @@ export function TierTile({ stat, meta, version, href }: Props) {
             {winning ? '▲' : '▼'}
           </span>
           {formatPercent(stat.winRate)}
+          <span className="sr-only">{winning ? ' winning' : ' losing'}</span>
         </span>
       </div>
 

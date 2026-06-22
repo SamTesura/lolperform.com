@@ -67,10 +67,12 @@ function Detail({ championId }: { championId: string }) {
               >
                 <TierBadge tier={s.tier} grade={assignFullTier(s.winRate, s.games)} size="md" />
                 <span className="text-sm font-medium text-text-secondary">{ROLE_LABELS[s.role]}</span>
-                <StatBadge label="Win" value={formatPercent(s.winRate)} tone={s.winRate >= 0.5 ? 'positive' : 'negative'} />
-                <StatBadge label="Pick" value={formatPercent(s.pickRate)} />
-                <StatBadge label="Ban" value={formatPercent(s.banRate)} />
-                <StatBadge label="Games" value={s.games.toLocaleString('en-US')} />
+                <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:gap-3">
+                  <StatBadge label="Win" value={formatPercent(s.winRate)} tone={s.winRate >= 0.5 ? 'positive' : 'negative'} />
+                  <StatBadge label="Pick" value={formatPercent(s.pickRate)} />
+                  <StatBadge label="Ban" value={formatPercent(s.banRate)} />
+                  <StatBadge label="Games" value={s.games.toLocaleString('en-US')} />
+                </div>
               </div>
             ))}
           </div>

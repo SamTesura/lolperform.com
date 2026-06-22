@@ -44,7 +44,7 @@ const searchChampions = champions.map((c) => ({ key: c.key, id: c.id, name: c.na
             href={link.href}
             aria-current={isActive(link.href) ? 'page' : undefined}
             class:list={[
-              'rounded-sm px-2 py-1.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 sm:px-3',
+              'inline-flex min-h-11 items-center rounded-sm px-2 text-sm font-medium whitespace-nowrap transition-colors duration-150 sm:px-3',
               isActive(link.href) ? 'text-accent' : 'text-text-secondary hover:text-text-primary',
             ]}
           >
