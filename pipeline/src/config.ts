@@ -17,6 +17,9 @@ export interface PipelineConfig {
   maxMatchesPerRegion: number;
   /** Requests/second budget for the rate limiter (raise on a production key). */
   riotRps: number;
+  /** Wall-clock budget for the whole crawl; split evenly across regions so a
+   *  slow/throttled key still finishes and loads partial data before timeout. */
+  maxRuntimeMinutes: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): PipelineConfig {
@@ -31,7 +34,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PipelineConfig
     playersPerDivision: Number(env.PLAYERS_PER_DIVISION ?? 400),
     matchesPerPlayer: Number(env.MATCHES_PER_PLAYER ?? 8),
     maxMatchesPerRegion: Number(env.MAX_MATCHES_PER_REGION ?? 25000),
-    riotRps: Number(env.RIOT_RPS ?? 30),
+    riotRps: Number(env.RIOT_RPS ?? 20),
+    maxRuntimeMinutes: Number(env.MAX_RUNTIME_MINUTES ?? 95),
   };
 }
 

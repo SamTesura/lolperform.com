@@ -7,7 +7,7 @@ import {
 import { RateLimiter, sleep } from './rateLimiter.js';
 import type { LeagueEntryDTO, LeagueListDTO, MatchDTO } from './types.js';
 
-const MAX_RETRIES = 4;
+const MAX_RETRIES = 8;
 
 type ApexKind = 'challenger' | 'grandmaster' | 'master';
 

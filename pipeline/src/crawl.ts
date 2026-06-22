@@ -139,8 +139,14 @@ export async function crawl(
 ): Promise<NormMatch[]> {
   const all: NormMatch[] = [];
   const concurrency = config.riotRps;
+  // Split the wall-clock budget evenly across regions; reserve most of each
+  // region's slice for match-fetch (the bulk) over id-discovery.
+  const regionBudgetMs = (config.maxRuntimeMinutes * 60_000) / Math.max(1, config.regions.length);
 
   for (const region of config.regions) {
+    const regionStart = Date.now();
+    const idDeadline = regionStart + regionBudgetMs * 0.35;
+    const matchDeadline = regionStart + regionBudgetMs * 0.97;
     const seeds = await seedPuuids(client, region, config);
 
     // Only sample as many players as we need to reach the match cap (+buffer for
@@ -148,10 +154,16 @@ export async function crawl(
     const needPuuids = Math.ceil((config.maxMatchesPerRegion / config.matchesPerPlayer) * 1.5);
     const seedList = interleave(seeds).slice(0, needPuuids);
 
-    const idLists = await mapPool(seedList, concurrency, async (s) => ({
-      tier: s.tier,
-      ids: (await client.getMatchIds(region, s.puuid, config.matchesPerPlayer)) ?? [],
-    }));
+    const idLists = await mapPool(seedList, concurrency, async (s) => {
+      if (Date.now() > idDeadline) return { tier: s.tier, ids: [] as string[] };
+      try {
+        const ids = (await client.getMatchIds(region, s.puuid, config.matchesPerPlayer)) ?? [];
+        return { tier: s.tier, ids };
+      } catch {
+        // A single rate-limited/failed request must not abort the whole crawl.
+        return { tier: s.tier, ids: [] as string[] };
+      }
+    });
 
     const matchTier = new Map<string, LeagueTier>();
     for (const { tier, ids } of idLists) {
@@ -163,9 +175,14 @@ export async function crawl(
 
     const entries = [...matchTier.entries()];
     const norms = await mapPool(entries, concurrency, async ([id, tier]) => {
-      const dto = await client.getMatch(region, id);
-      if (!dto || dto.info.queueId !== QUEUE_RANKED_SOLO) return null;
-      return normalizeMatch(dto, region, tier);
+      if (Date.now() > matchDeadline) return null;
+      try {
+        const dto = await client.getMatch(region, id);
+        if (!dto || dto.info.queueId !== QUEUE_RANKED_SOLO) return null;
+        return normalizeMatch(dto, region, tier);
+      } catch {
+        return null;
+      }
     });
 
     let kept = 0;
