@@ -37,7 +37,7 @@ export function RoleTabsInteractive({
             type="button"
             aria-pressed={active}
             onClick={() => onChange(role)}
-            className={`-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm font-medium transition-colors duration-150 ${
+            className={`-mb-px flex min-h-11 items-center gap-1.5 border-b-2 px-4 py-2 text-sm font-medium transition-colors duration-150 ${
               active
                 ? 'border-accent text-accent'
                 : 'border-transparent text-text-secondary hover:text-text-primary'
@@ -71,7 +71,7 @@ function Select<T extends string>({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
-        className="rounded-sm border border-border-default bg-bg-elevated px-2 py-1 text-sm text-text-primary"
+        className="min-h-11 rounded-sm border border-border-default bg-bg-elevated px-2 py-1 text-sm text-text-primary"
       >
         {options.map((o) => (
           <option key={o} value={o}>

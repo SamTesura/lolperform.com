@@ -65,7 +65,7 @@ function Recommender() {
           <select
             value={opponentKey}
             onChange={(e) => setOpponentKey(e.target.value)}
-            className="min-w-56 rounded-sm border border-border-default bg-bg-elevated px-2 py-1.5 text-sm text-text-primary"
+            className="min-h-11 min-w-56 rounded-sm border border-border-default bg-bg-elevated px-2 py-1.5 text-sm text-text-primary"
           >
             <option value="">Select a champion…</option>
             {champoptions.map((c) => (
