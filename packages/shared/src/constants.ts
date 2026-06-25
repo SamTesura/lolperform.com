@@ -52,34 +52,52 @@ export const BRACKET_TIERS: Record<RankBracket, readonly LeagueTier[]> = {
 };
 
 /**
- * Platform routing values (one ranked ladder each) mapped to their regional
- * routing host used by match-v5. v1 samples NA + EUW; the rest are ready to enable.
+ * Platform routing values we crawl — one ranked ladder each — mapped to the
+ * regional routing host match-v5 uses. Add a platform here and it becomes
+ * crawlable and selectable in the UI in one step.
  */
-export const REGIONS = ['na1', 'euw1', 'kr', 'eun1', 'br1'] as const;
+export const PLATFORMS = ['na1', 'euw1', 'kr', 'eun1', 'br1', 'jp1', 'oc1', 'vn2'] as const;
+export type Platform = (typeof PLATFORMS)[number];
+
+/**
+ * Region filter values exposed to users: every crawled platform plus the pooled
+ * "all" view (all regions combined). Pooling is the largest, most stable sample,
+ * so it is the default — adding more platforms enriches it instead of thinning
+ * each per-region slice. "all" is an aggregation bucket, never a crawl target.
+ */
+export const REGIONS = ['all', ...PLATFORMS] as const;
 export type Region = (typeof REGIONS)[number];
 
 export const REGION_LABELS: Record<Region, string> = {
+  all: 'All Regions',
   na1: 'NA',
   euw1: 'EUW',
   kr: 'KR',
   eun1: 'EUNE',
   br1: 'BR',
+  jp1: 'JP',
+  oc1: 'OCE',
+  vn2: 'VN',
 };
 
-export type RegionalRoute = 'americas' | 'europe' | 'asia';
+export type RegionalRoute = 'americas' | 'europe' | 'asia' | 'sea';
 
-export const REGION_ROUTE: Record<Region, RegionalRoute> = {
+export const REGION_ROUTE: Record<Platform, RegionalRoute> = {
   na1: 'americas',
   br1: 'americas',
   euw1: 'europe',
   eun1: 'europe',
   kr: 'asia',
+  jp1: 'asia',
+  oc1: 'sea',
+  vn2: 'sea',
 };
 
-/** Regions sampled by the crawler. KR is the reference meta region. */
-export const ACTIVE_REGIONS: readonly Region[] = ['na1', 'euw1', 'kr'];
+/** Platforms sampled by the crawler. */
+export const ACTIVE_REGIONS: readonly Platform[] = PLATFORMS;
 
-export const DEFAULT_REGION: Region = 'na1';
+/** Default UI/API region: the pooled all-regions view (biggest, steadiest sample). */
+export const DEFAULT_REGION: Region = 'all';
 
 /** Tier grades, best first. */
 export const TIER_GRADES = ['S', 'A', 'B', 'C', 'D'] as const;
