@@ -1,4 +1,4 @@
-import { ACTIVE_REGIONS, type Region } from '@lolperform/shared';
+import { ACTIVE_REGIONS, type Platform } from '@lolperform/shared';
 
 /**
  * Pipeline configuration. Tunables here control how much of the ladder we sample.
@@ -8,7 +8,7 @@ export interface PipelineConfig {
   /** Riot API key (RGAPI-...). Required for live crawls. */
   riotApiKey: string;
   /** Platform regions to crawl. */
-  regions: readonly Region[];
+  regions: readonly Platform[];
   /** Ranked entries to sample per league tier+division page. */
   playersPerDivision: number;
   /** Recent ranked matches to pull per sampled player. */

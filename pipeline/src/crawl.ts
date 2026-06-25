@@ -2,7 +2,7 @@ import {
   LEAGUE_DIVISIONS,
   QUEUE_RANKED_SOLO,
   type LeagueTier,
-  type Region,
+  type Platform,
 } from '@lolperform/shared';
 import type { PipelineConfig } from './config.js';
 import type { RiotClient } from './riot/client.js';
@@ -58,7 +58,7 @@ async function mapPool<T, R>(
 
 async function apexPuuids(
   client: RiotClient,
-  region: Region,
+  region: Platform,
   kind: 'challenger' | 'grandmaster' | 'master',
   target: number,
 ): Promise<string[]> {
@@ -71,7 +71,7 @@ async function apexPuuids(
 
 async function ladderPuuids(
   client: RiotClient,
-  region: Region,
+  region: Platform,
   tier: LeagueTier,
   target: number,
 ): Promise<string[]> {
@@ -95,7 +95,7 @@ async function ladderPuuids(
 
 async function seedPuuids(
   client: RiotClient,
-  region: Region,
+  region: Platform,
   config: PipelineConfig,
 ): Promise<Map<LeagueTier, string[]>> {
   const p = config.playersPerDivision;
@@ -128,15 +128,16 @@ function interleave(seeds: Map<LeagueTier, string[]>): { puuid: string; tier: Le
 }
 
 /**
- * Crawl a representative, sampled set of ranked matches for the target patch.
+ * Crawl a representative, sampled set of recent ranked matches across regions.
  * Both discovery (match ids per player) and fetch (match detail) run with
  * bounded concurrency so a region finishes well inside the Actions timeout.
+ *
+ * We keep every valid recent match regardless of its in-client patch label —
+ * Data Dragon's CDN version routinely lags/leads the live game patch, and an
+ * exact-equality filter against it silently discarded ~84% of fetched matches.
+ * `run.ts` picks the dominant patch actually present and tags the dataset with it.
  */
-export async function crawl(
-  client: RiotClient,
-  config: PipelineConfig,
-  targetPatch: string,
-): Promise<NormMatch[]> {
+export async function crawl(client: RiotClient, config: PipelineConfig): Promise<NormMatch[]> {
   const all: NormMatch[] = [];
   const concurrency = config.riotRps;
   // Split the wall-clock budget evenly across regions; reserve most of each
@@ -186,14 +187,20 @@ export async function crawl(
     });
 
     let kept = 0;
+    const byPatch = new Map<string, number>();
     for (const norm of norms) {
-      if (norm && norm.patch === targetPatch) {
-        all.push(norm);
-        kept += 1;
-      }
+      if (!norm) continue;
+      all.push(norm);
+      kept += 1;
+      byPatch.set(norm.patch, (byPatch.get(norm.patch) ?? 0) + 1);
     }
+    const top = [...byPatch.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([p, n]) => `${p}:${n}`)
+      .join(' ');
     console.info(
-      `[crawl] ${region}: ${matchTier.size} ids discovered, ${kept} kept on patch ${targetPatch}`,
+      `[crawl] ${region}: ${matchTier.size} ids discovered, ${kept} matches kept (patches ${top})`,
     );
   }
 

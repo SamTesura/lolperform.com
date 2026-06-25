@@ -60,9 +60,17 @@ function buildSignature(p: NormParticipant): string {
 export function aggregate(matches: NormMatch[]): AggregateResult {
   const out: AggregateResult = { roleStats: [], matchups: [], duos: [], builds: [] };
   const regions = [...new Set(matches.map((m) => m.region))];
+  // "all" pools every region into the largest, steadiest sample. Only emit it
+  // when the crawl spans more than one region, so a single-region run doesn't
+  // duplicate its rows under both its own key and "all".
+  const pool = regions.length > 1;
 
   for (const bracket of RANK_BRACKETS) {
     const allowed = new Set(BRACKET_TIERS[bracket]);
+    if (pool) {
+      const pooled = matches.filter((m) => allowed.has(m.tier));
+      if (pooled.length > 0) aggregateSlice(pooled, bracket, 'all', out);
+    }
     for (const region of regions) {
       const slice = matches.filter((m) => m.region === region && allowed.has(m.tier));
       if (slice.length > 0) aggregateSlice(slice, bracket, region, out);

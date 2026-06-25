@@ -2,7 +2,7 @@ import {
   QUEUE_RANKED_SOLO,
   REGION_ROUTE,
   type LeagueDivision,
-  type Region,
+  type Platform,
 } from '@lolperform/shared';
 import { RateLimiter, sleep } from './rateLimiter.js';
 import type { LeagueEntryDTO, LeagueListDTO, MatchDTO } from './types.js';
@@ -63,7 +63,7 @@ export class RiotClient {
 
   /** Ranked entries for a non-apex tier/division (one page of ~205). */
   getLeagueEntries(
-    region: Region,
+    region: Platform,
     tier: string,
     division: LeagueDivision,
     page = 1,
@@ -75,7 +75,7 @@ export class RiotClient {
   }
 
   /** Full apex ladder (challenger / grandmaster / master). */
-  getApexLeague(region: Region, kind: ApexKind): Promise<LeagueListDTO | null> {
+  getApexLeague(region: Platform, kind: ApexKind): Promise<LeagueListDTO | null> {
     return this.request<LeagueListDTO>(
       region,
       `/lol/league/v4/${APEX_PATH[kind]}/by-queue/RANKED_SOLO_5x5`,
@@ -83,7 +83,7 @@ export class RiotClient {
   }
 
   /** Recent ranked-solo match ids for a player. */
-  getMatchIds(region: Region, puuid: string, count = 20): Promise<string[] | null> {
+  getMatchIds(region: Platform, puuid: string, count = 20): Promise<string[] | null> {
     const route = REGION_ROUTE[region];
     return this.request<string[]>(
       route,
@@ -92,7 +92,7 @@ export class RiotClient {
   }
 
   /** Full match detail. */
-  getMatch(region: Region, matchId: string): Promise<MatchDTO | null> {
+  getMatch(region: Platform, matchId: string): Promise<MatchDTO | null> {
     const route = REGION_ROUTE[region];
     return this.request<MatchDTO>(route, `/lol/match/v5/matches/${matchId}`);
   }
