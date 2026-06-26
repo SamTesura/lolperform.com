@@ -1,0 +1,18 @@
+---
+import Base from '../layouts/Base.astro';
+import MatchupDetail from '../components/islands/MatchupDetail';
+---
+
+<Base
+  title="Lane Matchup — lolperform"
+  description="Head-to-head lane matchup: win rate, sample size, and verdict for any champion pairing, refreshed every patch."
+>
+  <div class="space-y-6 py-4">
+    <header class="space-y-1">
+      <h1>Lane Matchup</h1>
+      <p class="text-text-muted">Head-to-head win rate from the same game pool, both perspectives.</p>
+    </header>
+
+    <MatchupDetail client:load />
+  </div>
+</Base>

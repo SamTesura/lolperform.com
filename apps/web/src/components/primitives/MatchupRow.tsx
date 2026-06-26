@@ -24,7 +24,7 @@ export function MatchupRow({ matchup, self, opponent, version, striped }: Props)
   const v = verdict(matchup.winRate);
   return (
     <a
-      href={`/matchup/${self.id}-vs-${opponent.id}`}
+      href={`/matchup?self=${self.id}&opp=${opponent.id}&role=${matchup.role}`}
       className={`grid grid-cols-[40px_1fr_auto] items-center gap-3 rounded-sm px-3 py-2 transition-colors duration-150 hover:bg-bg-elevated ${
         striped ? 'bg-bg-surface' : 'bg-bg-base'
       }`}
