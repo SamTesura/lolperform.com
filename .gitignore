@@ -43,6 +43,8 @@ Thumbs.db
 
 # data snapshots are generated; keep only committed seed under pipeline/data
 pipeline/.cache/
+# accumulated match store — runtime state, synced to R2, never committed
+pipeline/data/store/
 
 # claude code local machine settings
 .claude/settings.local.json
