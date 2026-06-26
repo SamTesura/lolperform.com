@@ -8,6 +8,7 @@ import type { Role } from '@lolperform/shared';
  * more games than a sampled site has to be trustworthy. The recommender shows
  * these picks and enriches each with its live role win rate when available.
  *
+ * Each champion appears once, with every role it's commonly played as an enemy.
  * `note` is a short "why". Champion ids must match Data Dragon exactly
  * (e.g. Kai'Sa → "Kaisa", Wukong → "MonkeyKing", Cho'Gath → "Chogath").
  */
@@ -23,14 +24,12 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
       { id: 'Teemo', note: 'Blind + ranged poke denies stacks' },
       { id: 'Quinn', note: 'Ranged harass, roams before he scales' },
       { id: 'Darius', note: 'Wins every early all-in' },
-      { id: 'Vayne', note: 'Kites the slow melee' },
     ],
   },
   Darius: {
     TOP: [
-      { id: 'Quinn', note: 'Ranged, never lets him touch you' },
+      { id: 'Quinn', note: 'Ranged, never lets him pull you' },
       { id: 'Vayne', note: 'Condemn + kite his short range' },
-      { id: 'Teemo', note: 'Blind cancels his pull/all-in' },
       { id: 'Gnar', note: 'Pokes in mini, disengages mega' },
     ],
   },
@@ -45,7 +44,7 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
     TOP: [
       { id: 'Malphite', note: 'Armor + unstoppable ult through windwall' },
       { id: 'Renekton', note: 'Early all-in before he scales' },
-      { id: 'Pantheon', note: 'Point-and-click stun, early kill pressure' },
+      { id: 'Pantheon', note: 'Point-and-click stun, early pressure' },
     ],
     MIDDLE: [
       { id: 'Malzahar', note: 'Suppress + voidlings ignore windwall' },
@@ -56,14 +55,14 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
   Fiora: {
     TOP: [
       { id: 'Pantheon', note: 'Early burst before her item spikes' },
-      { id: 'Jax', note: 'Counter-strike dodges her riposte windows' },
+      { id: 'Jax', note: 'Counter-strike dodges her riposte' },
       { id: 'Malphite', note: 'Armor stacking blunts her duels' },
     ],
   },
   Riven: {
     TOP: [
       { id: 'Renekton', note: 'Out-trades her early all-in' },
-      { id: 'Pantheon', note: 'Stun + burst punishes her engage' },
+      { id: 'Pantheon', note: 'Stun + burst punish her engage' },
       { id: 'Malphite', note: 'Armor + slow shut her down' },
     ],
   },
@@ -77,8 +76,13 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
   Irelia: {
     TOP: [
       { id: 'Pantheon', note: 'Early kill pressure before she snowballs' },
-      { id: 'Renekton', note: 'Out-trades level 1-6' },
+      { id: 'Renekton', note: 'Out-trades level 1–6' },
       { id: 'Malphite', note: 'Armor + ult lock her down' },
+    ],
+    MIDDLE: [
+      { id: 'Pantheon', note: 'Early kill pressure, denies her snowball' },
+      { id: 'Lissandra', note: 'CC chains shut her dash combo' },
+      { id: 'Malzahar', note: 'Suppress stops her all-in' },
     ],
   },
   Camille: {
@@ -99,14 +103,218 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
     TOP: [
       { id: 'Vayne', note: 'Kites, true damage in the death realm' },
       { id: 'Quinn', note: 'Ranged, outmaneuvers his slow' },
-      { id: 'Gangplank', note: 'Barrels + cleanse on crit, hard to pin' },
+      { id: 'Gangplank', note: 'Barrels + cleanse, hard to pin down' },
     ],
   },
   Teemo: {
     TOP: [
-      { id: 'Malphite', note: 'Armor + magic resist shrugs off poke' },
+      { id: 'Malphite', note: 'Armor + MR shrugs off the poke' },
       { id: 'DrMundo', note: 'Sustains through the harass' },
       { id: 'Yorick', note: 'Maiden + cage out-pressure him' },
+    ],
+  },
+  Jax: {
+    TOP: [
+      { id: 'Pantheon', note: 'Early burst before his item spikes' },
+      { id: 'Malphite', note: 'Armor stacking blunts his duels' },
+      { id: 'Quinn', note: 'Ranged, kites his jump' },
+    ],
+  },
+  Malphite: {
+    TOP: [
+      { id: 'Vayne', note: 'True damage melts the armor stack' },
+      { id: 'Quinn', note: 'Ranged poke, out-trades him' },
+      { id: 'Kennen', note: 'Ranged AP poke he can’t answer' },
+    ],
+  },
+  Renekton: {
+    TOP: [
+      { id: 'Kennen', note: 'Ranged poke out-trades his early' },
+      { id: 'Quinn', note: 'Kites his short dash range' },
+      { id: 'Gnar', note: 'Ranged harass + disengage' },
+    ],
+  },
+  Gnar: {
+    TOP: [
+      { id: 'Renekton', note: 'All-ins him in mini form' },
+      { id: 'Darius', note: 'Punishes mini Gnar all-in' },
+      { id: 'MonkeyKing', note: 'Burst combo before mega' },
+    ],
+  },
+  Olaf: {
+    TOP: [
+      { id: 'Quinn', note: 'Kites the unstoppable melee' },
+      { id: 'Vayne', note: 'Condemn + kite his charge' },
+      { id: 'Gnar', note: 'Ranged poke, disengage' },
+    ],
+  },
+  Urgot: {
+    TOP: [
+      { id: 'Quinn', note: 'Out-ranges and kites him' },
+      { id: 'Vayne', note: 'Mobility avoids his shotgun knee' },
+      { id: 'Gnar', note: 'Ranged poke before he scales' },
+    ],
+  },
+  Gangplank: {
+    TOP: [
+      { id: 'Renekton', note: 'All-ins before his barrels scale' },
+      { id: 'Darius', note: 'Wins the early all-in' },
+      { id: 'Pantheon', note: 'Early kill pressure' },
+    ],
+  },
+  Kled: {
+    TOP: [
+      { id: 'Quinn', note: 'Ranged poke dismounts him' },
+      { id: 'Vayne', note: 'Kites his remount window' },
+      { id: 'Gnar', note: 'Pokes him off Skaarl' },
+    ],
+  },
+  MonkeyKing: {
+    TOP: [
+      { id: 'Pantheon', note: 'Early burst, stun lock' },
+      { id: 'Renekton', note: 'Out-trades his early' },
+      { id: 'Gnar', note: 'Ranged kite, disengage' },
+    ],
+  },
+  Shen: {
+    TOP: [
+      { id: 'Teemo', note: 'Ranged poke before his ult range' },
+      { id: 'Quinn', note: 'Out-trades and roams' },
+      { id: 'Gnar', note: 'Pokes him down in lane' },
+    ],
+  },
+  Ornn: {
+    TOP: [
+      { id: 'Darius', note: 'All-ins the scaling tank early' },
+      { id: 'Renekton', note: 'Dominates early before he spikes' },
+      { id: 'Quinn', note: 'Ranged poke denies his farm' },
+    ],
+  },
+  Sion: {
+    TOP: [
+      { id: 'Quinn', note: 'Ranged poke, never gets stunned' },
+      { id: 'Vayne', note: 'Kites his slow combo' },
+      { id: 'Gnar', note: 'Pokes him down safely' },
+    ],
+  },
+  Chogath: {
+    TOP: [
+      { id: 'Teemo', note: 'Ranged poke through his sustain' },
+      { id: 'Quinn', note: 'Kites his rupture range' },
+      { id: 'Vayne', note: 'True damage on the tank' },
+    ],
+  },
+  Volibear: {
+    TOP: [
+      { id: 'Quinn', note: 'Kites his engage' },
+      { id: 'Vayne', note: 'Mobility avoids his all-in' },
+      { id: 'Gnar', note: 'Ranged harass before he spikes' },
+    ],
+  },
+  Illaoi: {
+    TOP: [
+      { id: 'Fiora', note: 'Dodges tentacles, duels her' },
+      { id: 'Camille', note: 'Mobility avoids her E' },
+      { id: 'Gnar', note: 'Ranged poke, never near tentacles' },
+    ],
+  },
+  Yorick: {
+    TOP: [
+      { id: 'Quinn', note: 'Out-ranges and roams' },
+      { id: 'Vayne', note: 'Kites Maiden + Yorick' },
+      { id: 'Gnar', note: 'Pokes through his wall' },
+    ],
+  },
+  Tryndamere: {
+    TOP: [
+      { id: 'Malphite', note: 'Armor + slow blunt his crits' },
+      { id: 'Vayne', note: 'Kites + condemn his rage' },
+      { id: 'Quinn', note: 'Ranged harass denies him' },
+    ],
+  },
+  Jayce: {
+    TOP: [
+      { id: 'Irelia', note: 'Gap-closes past his poke' },
+      { id: 'Camille', note: 'Engages onto the immobile poke' },
+      { id: 'Riven', note: 'All-ins past his range' },
+    ],
+  },
+  Gwen: {
+    TOP: [
+      { id: 'Renekton', note: 'All-ins before she scales' },
+      { id: 'Darius', note: 'Wins the early game hard' },
+      { id: 'Fiora', note: 'Duels through her mist' },
+    ],
+  },
+  KSante: {
+    TOP: [
+      { id: 'Darius', note: 'All-ins before he gets tanky' },
+      { id: 'Fiora', note: 'Duels and parries his combo' },
+      { id: 'Renekton', note: 'Out-trades the early game' },
+    ],
+  },
+  DrMundo: {
+    TOP: [
+      { id: 'Vayne', note: 'True damage on the HP stacker' },
+      { id: 'Teemo', note: 'Ranged poke + grievous' },
+      { id: 'Quinn', note: 'Kites his slow engage' },
+    ],
+  },
+  Singed: {
+    TOP: [
+      { id: 'Teemo', note: 'Ranged poke, never chases' },
+      { id: 'Vayne', note: 'Kites the runner' },
+      { id: 'Quinn', note: 'Out-trades and disengages' },
+    ],
+  },
+  Kayle: {
+    TOP: [
+      { id: 'Darius', note: 'Wrecks her weak early game' },
+      { id: 'Renekton', note: 'All-ins before she scales' },
+      { id: 'Pantheon', note: 'Denies farm with kill pressure' },
+    ],
+    MIDDLE: [
+      { id: 'Talon', note: 'Roams + kills her weak early' },
+      { id: 'Zed', note: 'Bullies her pre-6' },
+      { id: 'Pantheon', note: 'Early kill pressure' },
+    ],
+  },
+  Pantheon: {
+    TOP: [
+      { id: 'Gnar', note: 'Out-ranges his early all-in' },
+      { id: 'Vayne', note: 'Kites and scales past him' },
+      { id: 'Teemo', note: 'Ranged poke, blind his combo' },
+    ],
+    MIDDLE: [
+      { id: 'Xerath', note: 'Out-ranges his point-blank kit' },
+      { id: 'Orianna', note: 'Pokes safely, scales past him' },
+      { id: 'Cassiopeia', note: 'Out-sustains and out-scales' },
+    ],
+  },
+  Quinn: {
+    TOP: [
+      { id: 'Fiora', note: 'Out-duels her once she steps up' },
+      { id: 'Jax', note: 'Scales past her lane bully phase' },
+      { id: 'Malphite', note: 'Armor + R answer her poke' },
+    ],
+  },
+  Kennen: {
+    TOP: [
+      { id: 'Yasuo', note: 'Windwall eats his shurikens' },
+      { id: 'Irelia', note: 'Gap-closes onto the immobile mage' },
+      { id: 'Fiora', note: 'Duels and parries his stun' },
+    ],
+    MIDDLE: [
+      { id: 'Zed', note: 'All-ins his immobility' },
+      { id: 'Talon', note: 'Roams + dives him' },
+      { id: 'Fizz', note: 'E dodges his combo' },
+    ],
+  },
+  Heimerdinger: {
+    TOP: [
+      { id: 'Irelia', note: 'Dives past the turrets' },
+      { id: 'Camille', note: 'Engages onto him directly' },
+      { id: 'Riven', note: 'All-ins through his zone' },
     ],
   },
 
@@ -115,26 +323,112 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
     JUNGLE: [
       { id: 'Rammus', note: 'Thornmail + taunt melts his autos' },
       { id: 'Malzahar', note: 'Suppress shuts down his ult' },
-      { id: 'Lillia', note: 'Kites with sleep, never gets caught' },
+      { id: 'Lillia', note: 'Kites with sleep, never caught' },
     ],
   },
   Kayn: {
     JUNGLE: [
-      { id: 'XinZhao', note: 'Wins the early skirmishes before he transforms' },
-      { id: 'LeeSin', note: 'Early pressure, invades his clear' },
+      { id: 'XinZhao', note: 'Wins skirmishes before he transforms' },
+      { id: 'LeeSin', note: 'Invades and pressures his clear' },
+      { id: 'Elise', note: 'Early bully, dives him' },
     ],
   },
   Karthus: {
     JUNGLE: [
-      { id: 'LeeSin', note: 'Early ganks/invades punish his slow start' },
-      { id: 'Elise', note: 'Early-game bully, dives him' },
-      { id: 'Khazix', note: 'Picks him off, snowballs early' },
+      { id: 'LeeSin', note: 'Early ganks punish his slow start' },
+      { id: 'Elise', note: 'Invades his weak early clear' },
+      { id: 'Khazix', note: 'Picks him off, snowballs' },
     ],
   },
   Graves: {
     JUNGLE: [
-      { id: 'XinZhao', note: 'Sticks to him, all-in early' },
-      { id: 'LeeSin', note: 'Out-duels and invades early' },
+      { id: 'XinZhao', note: 'Sticks to him, all-ins early' },
+      { id: 'LeeSin', note: 'Out-duels and invades' },
+      { id: 'Nidalee', note: 'Pokes him out of his clear' },
+    ],
+  },
+  LeeSin: {
+    JUNGLE: [
+      { id: 'Karthus', note: 'Out-scales his early tempo' },
+      { id: 'Kayn', note: 'Scales past his power window' },
+      { id: 'Nunu', note: 'Tanky, out-objectives him late' },
+    ],
+  },
+  Khazix: {
+    JUNGLE: [
+      { id: 'Elise', note: 'Early-game bully, out-duels him' },
+      { id: 'LeeSin', note: 'Invades before he snowballs' },
+      { id: 'XinZhao', note: 'All-ins past his isolation burst' },
+    ],
+  },
+  Elise: {
+    JUNGLE: [
+      { id: 'Karthus', note: 'Out-scales her early power' },
+      { id: 'Kayn', note: 'Scales past her tempo' },
+      { id: 'Nunu', note: 'Tanky, contests her objectives' },
+    ],
+  },
+  Nidalee: {
+    JUNGLE: [
+      { id: 'XinZhao', note: 'All-ins the squishy poke jungler' },
+      { id: 'Warwick', note: 'Sustains poke, dives her' },
+      { id: 'LeeSin', note: 'Out-skirmishes her early' },
+    ],
+  },
+  Hecarim: {
+    JUNGLE: [
+      { id: 'Maokai', note: 'Roots + tank shut his engage' },
+      { id: 'Elise', note: 'Early pressure before he scales' },
+      { id: 'Nidalee', note: 'Kites his charge' },
+    ],
+  },
+  Warwick: {
+    JUNGLE: [
+      { id: 'Khazix', note: 'Bursts him before he heals' },
+      { id: 'Elise', note: 'Out-duels his early clear' },
+      { id: 'Nidalee', note: 'Kites his low-HP hunt' },
+    ],
+  },
+  Viego: {
+    JUNGLE: [
+      { id: 'XinZhao', note: 'Wins the early skirmish' },
+      { id: 'LeeSin', note: 'Out-tempos his clear' },
+      { id: 'Elise', note: 'Bullies him early' },
+    ],
+  },
+  Belveth: {
+    JUNGLE: [
+      { id: 'LeeSin', note: 'Pressures her weak early' },
+      { id: 'XinZhao', note: 'All-ins before she stacks' },
+      { id: 'Elise', note: 'Invades her clear' },
+    ],
+  },
+  Rengar: {
+    JUNGLE: [
+      { id: 'Maokai', note: 'CC stops his leap assassination' },
+      { id: 'Sejuani', note: 'Tank + CC blunt his burst' },
+      { id: 'Nunu', note: 'Tanky, hard to one-shot' },
+    ],
+  },
+  Briar: {
+    JUNGLE: [
+      { id: 'Maokai', note: 'Roots interrupt her frenzy' },
+      { id: 'Sejuani', note: 'CC chains lock her down' },
+      { id: 'Nunu', note: 'Tanky, survives her dive' },
+    ],
+  },
+  JarvanIV: {
+    JUNGLE: [
+      { id: 'XinZhao', note: 'Out-duels him in his own ult' },
+      { id: 'LeeSin', note: 'Matches his early tempo' },
+      { id: 'Elise', note: 'Bullies his clear' },
+    ],
+  },
+  Evelynn: {
+    JUNGLE: [
+      { id: 'XinZhao', note: 'All-ins before her stealth spikes' },
+      { id: 'LeeSin', note: 'Invades her weak early' },
+      { id: 'Elise', note: 'Out-duels her pre-6' },
     ],
   },
 
@@ -157,34 +451,34 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
     MIDDLE: [
       { id: 'Galio', note: 'Knock-up + MR interrupt her ult' },
       { id: 'Diana', note: 'Out-duels and bursts her' },
-      { id: 'Lissandra', note: 'Hard CC stops her reset spree' },
+      { id: 'Lissandra', note: 'CC stops her reset spree' },
     ],
   },
   Akali: {
     MIDDLE: [
       { id: 'Galio', note: 'MR + taunt punish her dives' },
-      { id: 'Lissandra', note: 'CC catches her through shroud' },
-      { id: 'Kassadin', note: 'Out-scales and survives her burst' },
+      { id: 'Lissandra', note: 'CC lands through her shroud' },
+      { id: 'Kassadin', note: 'Out-scales and survives burst' },
     ],
   },
   Fizz: {
     MIDDLE: [
-      { id: 'Lissandra', note: 'CC lands despite his E untargetable' },
+      { id: 'Lissandra', note: 'CC lands despite his E' },
       { id: 'Malzahar', note: 'Shield + suppress blunt his all-in' },
-      { id: 'Annie', note: 'Stun before he can E away' },
+      { id: 'Annie', note: 'Stun before he E’s away' },
     ],
   },
   Kassadin: {
     MIDDLE: [
-      { id: 'Talon', note: 'Roams + kills him before level 16' },
+      { id: 'Talon', note: 'Kills him before level 16' },
       { id: 'Zed', note: 'Bullies his weak early game' },
-      { id: 'Pantheon', note: 'Early kill pressure, denies farm' },
+      { id: 'Pantheon', note: 'Denies farm with kill pressure' },
     ],
   },
   Veigar: {
     MIDDLE: [
-      { id: 'Talon', note: 'Gap-closes past his cage to kill' },
-      { id: 'Zed', note: 'All-in before he gets stacks' },
+      { id: 'Talon', note: 'Gap-closes past his cage' },
+      { id: 'Zed', note: 'All-ins before he stacks' },
       { id: 'Kassadin', note: 'R dodges the cage, out-scales' },
     ],
   },
@@ -208,6 +502,11 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
     ],
   },
   Vladimir: {
+    TOP: [
+      { id: 'Renekton', note: 'All-ins his weak early game' },
+      { id: 'Darius', note: 'Punishes before he scales' },
+      { id: 'Quinn', note: 'Ranged poke through his sustain' },
+    ],
     MIDDLE: [
       { id: 'Talon', note: 'Bullies his weak early game' },
       { id: 'Kassadin', note: 'Out-scales, dodges with R' },
@@ -218,28 +517,174 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
     MIDDLE: [
       { id: 'Annie', note: 'Stun before he heals off you' },
       { id: 'Malzahar', note: 'Suppress shuts his combo' },
+      { id: 'Lissandra', note: 'CC chains stop his dives' },
+    ],
+  },
+  Ahri: {
+    MIDDLE: [
+      { id: 'Kassadin', note: 'Out-scales and survives her burst' },
+      { id: 'Fizz', note: 'E dodges her charm' },
+      { id: 'Talon', note: 'All-ins past her mobility' },
+    ],
+  },
+  Orianna: {
+    MIDDLE: [
+      { id: 'Talon', note: 'Dives the immobile control mage' },
+      { id: 'Zed', note: 'Punishes her lack of escape' },
+      { id: 'Fizz', note: 'Jumps onto her' },
+    ],
+  },
+  Viktor: {
+    MIDDLE: [
+      { id: 'Zed', note: 'All-ins before he scales' },
+      { id: 'Talon', note: 'Roams + kills his early' },
+      { id: 'Fizz', note: 'Burst through his shield' },
+    ],
+  },
+  TwistedFate: {
+    MIDDLE: [
+      { id: 'Zed', note: 'Punishes his squishy lane' },
+      { id: 'Talon', note: 'All-ins his immobility' },
+      { id: 'Fizz', note: 'Dives him before he roams' },
+    ],
+  },
+  Anivia: {
+    MIDDLE: [
+      { id: 'Talon', note: 'Dives past her wall + stun' },
+      { id: 'Zed', note: 'Bursts her squishy frame' },
+      { id: 'Fizz', note: 'Jumps her before ult ramps' },
+    ],
+  },
+  Cassiopeia: {
+    MIDDLE: [
+      { id: 'Zed', note: 'All-ins past her no-boots kit' },
+      { id: 'Talon', note: 'Dives her immobility' },
+      { id: 'Fizz', note: 'Burst through her sustain' },
+    ],
+  },
+  Ryze: {
+    MIDDLE: [
+      { id: 'Zed', note: 'Bullies his weak early game' },
+      { id: 'Talon', note: 'Roams + kills him early' },
+      { id: 'Fizz', note: 'Jumps onto him' },
+    ],
+  },
+  Galio: {
+    MIDDLE: [
+      { id: 'Viktor', note: 'Out-pokes the anti-AP tank' },
+      { id: 'Cassiopeia', note: 'Sustained DPS through his MR' },
+      { id: 'Xerath', note: 'Long-range poke he can’t answer' },
+    ],
+  },
+  Annie: {
+    MIDDLE: [
+      { id: 'Xerath', note: 'Out-ranges her stun' },
+      { id: 'Orianna', note: 'Pokes safely outside her range' },
+      { id: 'Viktor', note: 'Out-scales and pokes her' },
+    ],
+  },
+  Diana: {
+    MIDDLE: [
+      { id: 'Xerath', note: 'Pokes before she reaches you' },
+      { id: 'Orianna', note: 'Shields + pokes her engage' },
+      { id: 'Cassiopeia', note: 'Kites her dash combo' },
+    ],
+  },
+  Talon: {
+    MIDDLE: [
+      { id: 'Galio', note: 'Tanky + MR survives his burst' },
+      { id: 'Pantheon', note: 'Out-trades the assassin early' },
+      { id: 'Lissandra', note: 'CC + self-peel stop his dive' },
+    ],
+  },
+  Qiyana: {
+    MIDDLE: [
+      { id: 'Malzahar', note: 'Suppress + shield blunt her all-in' },
+      { id: 'Lissandra', note: 'CC stops her engage' },
+      { id: 'Galio', note: 'MR + taunt survive her burst' },
+    ],
+  },
+  Naafiri: {
+    MIDDLE: [
+      { id: 'Malzahar', note: 'Suppress + voidlings vs her pack' },
+      { id: 'Lissandra', note: 'CC stops her dash all-in' },
+      { id: 'Galio', note: 'Tanky MR survives the burst' },
+    ],
+  },
+  Ekko: {
+    MIDDLE: [
+      { id: 'Zed', note: 'All-ins before his ult value' },
+      { id: 'Talon', note: 'Punishes his early game' },
+      { id: 'Pantheon', note: 'Out-trades him early' },
+    ],
+  },
+  Leblanc: {
+    MIDDLE: [
+      { id: 'Malzahar', note: 'Suppress + shield negate her burst' },
+      { id: 'Galio', note: 'Tanky MR survives her combo' },
+      { id: 'Kassadin', note: 'Out-scales, R dodges her chain' },
+    ],
+  },
+  Xerath: {
+    MIDDLE: [
+      { id: 'Zed', note: 'Dives the immobile artillery mage' },
+      { id: 'Talon', note: 'Gap-closes past his poke' },
+      { id: 'Kassadin', note: 'R closes the gap to kill him' },
+    ],
+    UTILITY: [
+      { id: 'Leona', note: 'Engages past his poke' },
+      { id: 'Nautilus', note: 'Hard engage onto immobile Xerath' },
+      { id: 'Pyke', note: 'Dives him under his range' },
+    ],
+  },
+  Hwei: {
+    MIDDLE: [
+      { id: 'Zed', note: 'All-ins his immobility' },
+      { id: 'Talon', note: 'Dives past his skillshots' },
+      { id: 'Fizz', note: 'Jumps onto him' },
+    ],
+  },
+  Taliyah: {
+    MIDDLE: [
+      { id: 'Zed', note: 'Punishes her squishy lane' },
+      { id: 'Talon', note: 'Dives her immobility' },
+      { id: 'Fizz', note: 'E dodges her combo' },
+    ],
+  },
+  Vex: {
+    MIDDLE: [
+      { id: 'Xerath', note: 'Out-ranges her poke' },
+      { id: 'Orianna', note: 'Pokes safely, scales past her' },
+      { id: 'Viktor', note: 'Out-scales the anti-mobility mage' },
+    ],
+  },
+  AurelionSol: {
+    MIDDLE: [
+      { id: 'Zed', note: 'All-ins before he stacks' },
+      { id: 'Talon', note: 'Roams + kills his early' },
+      { id: 'Pantheon', note: 'Denies his farm and stacks' },
     ],
   },
 
   // ---------------- BOTTOM (ADC) ----------------
   Draven: {
     BOTTOM: [
-      { id: 'Caitlyn', note: 'Out-ranges him, traps deny axe-catching' },
+      { id: 'Caitlyn', note: 'Out-ranges him, traps deny axes' },
       { id: 'Ashe', note: 'Permaslow stops his snowball' },
-      { id: 'Sivir', note: 'Spell shield + waveclear deny his lane' },
+      { id: 'Sivir', note: 'Spell shield + waveclear deny lane' },
     ],
   },
   Caitlyn: {
     BOTTOM: [
-      { id: 'Draven', note: 'Out-damages her in a level-2 all-in' },
+      { id: 'Draven', note: 'Out-damages her level-2 all-in' },
       { id: 'Lucian', note: 'Burst all-in beats her early' },
-      { id: 'Samira', note: 'Dives onto her once she steps up' },
+      { id: 'Samira', note: 'Dives her once she steps up' },
     ],
   },
   Jhin: {
     BOTTOM: [
       { id: 'Draven', note: 'Punishes his reload windows' },
-      { id: 'Lucian', note: 'All-in while he’s mid-reload' },
+      { id: 'Lucian', note: 'All-ins while he’s mid-reload' },
       { id: 'Caitlyn', note: 'Out-ranges his poke' },
     ],
   },
@@ -247,13 +692,14 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
     BOTTOM: [
       { id: 'Caitlyn', note: 'Out-ranges her weak early game' },
       { id: 'Draven', note: 'Snowballs before she scales' },
-      { id: 'Lucian', note: 'All-in her immobility' },
+      { id: 'Lucian', note: 'All-ins her immobility' },
     ],
   },
   Kaisa: {
     BOTTOM: [
       { id: 'Caitlyn', note: 'Out-ranges her short early range' },
-      { id: 'Draven', note: 'Wins lane before her item spikes' },
+      { id: 'Draven', note: 'Wins lane before her spikes' },
+      { id: 'Ashe', note: 'Slows + pokes her out' },
     ],
   },
   Ezreal: {
@@ -265,7 +711,7 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
   },
   Vayne: {
     BOTTOM: [
-      { id: 'Caitlyn', note: 'Out-ranges her terrible early game' },
+      { id: 'Caitlyn', note: 'Out-ranges her terrible early' },
       { id: 'Draven', note: 'Snowballs before she scales' },
       { id: 'MissFortune', note: 'Lane bully, denies farm' },
     ],
@@ -279,16 +725,16 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
   },
   Samira: {
     BOTTOM: [
-      { id: 'Caitlyn', note: 'Pokes + traps stop her dashes in' },
+      { id: 'Caitlyn', note: 'Pokes + traps stop her dash-in' },
       { id: 'Ashe', note: 'Permaslow denies her engage' },
-      { id: 'Varus', note: 'Long-range poke before she reaches you' },
+      { id: 'Varus', note: 'Long-range poke before she reaches' },
     ],
   },
   Twitch: {
     BOTTOM: [
       { id: 'Caitlyn', note: 'Out-ranges and zones him pre-6' },
       { id: 'Draven', note: 'Wins the early game hard' },
-      { id: 'Ashe', note: 'Vision-slow stops his stealth roams' },
+      { id: 'Ashe', note: 'Vision-slow stops his roams' },
     ],
   },
   KogMaw: {
@@ -302,6 +748,96 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
     BOTTOM: [
       { id: 'Draven', note: 'Wins lane before her scaling' },
       { id: 'Caitlyn', note: 'Out-ranges her early' },
+      { id: 'Ashe', note: 'Slow shuts her kiting' },
+    ],
+  },
+  Lucian: {
+    BOTTOM: [
+      { id: 'Caitlyn', note: 'Out-ranges his double-up' },
+      { id: 'Sivir', note: 'Spell shield + clear blunt his poke' },
+      { id: 'Ezreal', note: 'Safe poke, out-scales him' },
+    ],
+  },
+  MissFortune: {
+    BOTTOM: [
+      { id: 'Caitlyn', note: 'Out-ranges her poke' },
+      { id: 'Draven', note: 'Out-damages her in lane' },
+      { id: 'Lucian', note: 'All-ins her immobility' },
+    ],
+  },
+  Sivir: {
+    BOTTOM: [
+      { id: 'Draven', note: 'Out-damages her in lane' },
+      { id: 'Caitlyn', note: 'Out-ranges her poke' },
+      { id: 'Lucian', note: 'All-ins past her spell shield' },
+    ],
+  },
+  Ashe: {
+    BOTTOM: [
+      { id: 'Draven', note: 'Out-damages the immobile ADC' },
+      { id: 'Lucian', note: 'All-ins her lack of escape' },
+      { id: 'Samira', note: 'Dives onto her' },
+    ],
+  },
+  Varus: {
+    BOTTOM: [
+      { id: 'Draven', note: 'Wins the all-in before his poke' },
+      { id: 'Lucian', note: 'All-ins his immobility' },
+      { id: 'Caitlyn', note: 'Out-ranges his poke' },
+    ],
+  },
+  Xayah: {
+    BOTTOM: [
+      { id: 'Draven', note: 'Out-damages her early lane' },
+      { id: 'Caitlyn', note: 'Out-ranges her' },
+      { id: 'Lucian', note: 'All-ins before her feathers' },
+    ],
+  },
+  Smolder: {
+    BOTTOM: [
+      { id: 'Draven', note: 'Punishes his weak early game' },
+      { id: 'Caitlyn', note: 'Out-ranges him pre-stacks' },
+      { id: 'Lucian', note: 'All-ins before he scales' },
+    ],
+  },
+  Tristana: {
+    BOTTOM: [
+      { id: 'Caitlyn', note: 'Out-ranges her level 1–8' },
+      { id: 'Ashe', note: 'Slows her jump engage' },
+      { id: 'Varus', note: 'Pokes her before she spikes' },
+    ],
+  },
+  Nilah: {
+    BOTTOM: [
+      { id: 'Caitlyn', note: 'Out-ranges the melee ADC' },
+      { id: 'Ashe', note: 'Slow + poke keep her away' },
+      { id: 'Varus', note: 'Long-range poke denies her' },
+    ],
+  },
+  Senna: {
+    BOTTOM: [
+      { id: 'Draven', note: 'Out-damages her early' },
+      { id: 'Lucian', note: 'All-ins before she scales' },
+      { id: 'Caitlyn', note: 'Out-ranges her poke' },
+    ],
+    UTILITY: [
+      { id: 'Leona', note: 'All-in engage before she scales' },
+      { id: 'Nautilus', note: 'Hard engage past her poke' },
+      { id: 'Pyke', note: 'Dives her squishy lane' },
+    ],
+  },
+  Corki: {
+    BOTTOM: [
+      { id: 'Draven', note: 'Punishes his early game' },
+      { id: 'Caitlyn', note: 'Out-ranges his poke' },
+      { id: 'Lucian', note: 'All-ins before package' },
+    ],
+  },
+  Ziggs: {
+    BOTTOM: [
+      { id: 'Draven', note: 'All-ins the immobile mage' },
+      { id: 'Lucian', note: 'Dives past his zone' },
+      { id: 'Samira', note: 'Closes the gap onto him' },
     ],
   },
 
@@ -331,32 +867,26 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
     UTILITY: [
       { id: 'Morgana', note: 'Black Shield stops her whole combo' },
       { id: 'Janna', note: 'Knock-up cancels her engage' },
-      { id: 'Lulu', note: 'Polymorph shuts her down mid-dive' },
+      { id: 'Lulu', note: 'Polymorph shuts her mid-dive' },
     ],
   },
   Nautilus: {
     UTILITY: [
       { id: 'Morgana', note: 'Black Shield blocks hook + ult' },
       { id: 'Janna', note: 'Disengage undoes his engage' },
-    ],
-  },
-  Senna: {
-    UTILITY: [
-      { id: 'Leona', note: 'All-in engage before she scales' },
-      { id: 'Nautilus', note: 'Hard engage past her poke' },
-      { id: 'Pyke', note: 'Dives her squishy backline lane' },
+      { id: 'Lulu', note: 'Peel + polymorph stop his chain' },
     ],
   },
   Soraka: {
     UTILITY: [
-      { id: 'Pyke', note: 'Dive + grievous wounds shut her healing' },
+      { id: 'Pyke', note: 'Dive + grievous shut her healing' },
       { id: 'Leona', note: 'All-in kills before she heals' },
       { id: 'Brand', note: 'Burst out-paces her sustain' },
     ],
   },
   Yuumi: {
     UTILITY: [
-      { id: 'Blitzcrank', note: 'Hooks the host the instant she detaches' },
+      { id: 'Blitzcrank', note: 'Hooks the host when she detaches' },
       { id: 'Pyke', note: 'Dives the host she can’t protect' },
       { id: 'Brand', note: 'AoE punishes the stacked duo' },
     ],
@@ -372,13 +902,112 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
     UTILITY: [
       { id: 'Leona', note: 'Engages past her bubble' },
       { id: 'Nautilus', note: 'Chain CC out-locks her' },
-      { id: 'Pyke', note: 'All-in her squishy lane' },
+      { id: 'Pyke', note: 'All-ins her squishy lane' },
     ],
   },
   Janna: {
     UTILITY: [
       { id: 'Leona', note: 'Lock-down before she disengages' },
       { id: 'Pyke', note: 'Picks off her carry through the shield' },
+      { id: 'Nautilus', note: 'Chain CC beats her single peel' },
+    ],
+  },
+  Alistar: {
+    UTILITY: [
+      { id: 'Morgana', note: 'Black Shield blocks his combo' },
+      { id: 'Janna', note: 'Disengage undoes his knock-up' },
+      { id: 'Brand', note: 'Pokes him down before he engages' },
+    ],
+  },
+  Rakan: {
+    UTILITY: [
+      { id: 'Morgana', note: 'Black Shield stops his charm' },
+      { id: 'Janna', note: 'Disengages his engage' },
+      { id: 'Lulu', note: 'Polymorph cancels his all-in' },
+    ],
+  },
+  Rell: {
+    UTILITY: [
+      { id: 'Morgana', note: 'Black Shield blocks her stun' },
+      { id: 'Janna', note: 'Knock-up cancels her engage' },
+      { id: 'Lulu', note: 'Peel undoes her dive' },
+    ],
+  },
+  Brand: {
+    UTILITY: [
+      { id: 'Leona', note: 'Engages past his poke' },
+      { id: 'Nautilus', note: 'Hard engage onto the immobile mage' },
+      { id: 'Pyke', note: 'Dives him before he scales' },
+    ],
+  },
+  Zyra: {
+    UTILITY: [
+      { id: 'Leona', note: 'Engages through her plants' },
+      { id: 'Nautilus', note: 'Hard engage onto her' },
+      { id: 'Pyke', note: 'Dives the immobile mage' },
+    ],
+  },
+  Velkoz: {
+    UTILITY: [
+      { id: 'Leona', note: 'Engages past his skillshots' },
+      { id: 'Nautilus', note: 'Hard engage onto the immobile mage' },
+      { id: 'Pyke', note: 'Dives him before he scales' },
+    ],
+  },
+  Karma: {
+    UTILITY: [
+      { id: 'Leona', note: 'All-in past her shield poke' },
+      { id: 'Nautilus', note: 'Chain CC beats her single peel' },
+      { id: 'Pyke', note: 'Dives her squishy lane' },
+    ],
+  },
+  Milio: {
+    UTILITY: [
+      { id: 'Leona', note: 'All-in kills before he peels' },
+      { id: 'Pyke', note: 'Grievous + dive shut his sustain' },
+      { id: 'Brand', note: 'Burst out-paces his shields' },
+    ],
+  },
+  Renata: {
+    UTILITY: [
+      { id: 'Morgana', note: 'Black Shield blocks her root' },
+      { id: 'Janna', note: 'Disengage undoes her engage' },
+      { id: 'Lulu', note: 'Polymorph stops her ult setup' },
+    ],
+  },
+  Bard: {
+    UTILITY: [
+      { id: 'Leona', note: 'Engages past his Q poke' },
+      { id: 'Nautilus', note: 'Hard engage when he roams off' },
+      { id: 'Pyke', note: 'Punishes his roams 2v1' },
+    ],
+  },
+  Maokai: {
+    UTILITY: [
+      { id: 'Morgana', note: 'Black Shield blocks his root' },
+      { id: 'Janna', note: 'Disengages his W engage' },
+      { id: 'Lulu', note: 'Peel undoes his all-in' },
+    ],
+  },
+  Taric: {
+    UTILITY: [
+      { id: 'Brand', note: 'Pokes him down before his ult' },
+      { id: 'Pyke', note: 'Grievous + dive cut his healing' },
+      { id: 'Leona', note: 'All-in before stun + ult' },
+    ],
+  },
+  Sona: {
+    UTILITY: [
+      { id: 'Leona', note: 'All-in kills the squishy enchanter' },
+      { id: 'Pyke', note: 'Dives her in lane' },
+      { id: 'Blitzcrank', note: 'Hooks her out of position' },
+    ],
+  },
+  Swain: {
+    UTILITY: [
+      { id: 'Leona', note: 'Engages past his pull range' },
+      { id: 'Nautilus', note: 'Hard engage onto immobile Swain' },
+      { id: 'Pyke', note: 'Dives him before he ramps' },
     ],
   },
 };
