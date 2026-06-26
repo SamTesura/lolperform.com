@@ -3,13 +3,18 @@ import type { TierGrade } from './constants.js';
 /**
  * Tiering policy — deliberately simple and explainable (published on /methodology).
  * A champion is graded by its observed win rate on a fine S+ … D− scale, but only
- * once it clears a minimum game count; below that it can't earn above D−, so a
- * tiny lucky sample never shows up as S.
+ * once it clears a minimum game count. Below that it is "Unranked" (not graded at
+ * all) rather than dumped into D−, so a tiny lucky/unlucky sample never shows up
+ * as a real grade — and a 100%-win-rate / 40-game champion isn't mislabelled D−.
  *
  * Lives in shared so the pipeline (which stores the base letter) and the UI
  * (which derives the +/− sub-grade from the same win rate) never disagree.
+ *
+ * The floor is intentionally provisional (a sampled site building volume), not
+ * the tens-of-thousands a full-ladder site uses. Sample size is shown on every
+ * tile, so a 60-game grade is visibly less trustworthy than a 6,000-game one.
  */
-export const MIN_TIER_GAMES = 200;
+export const MIN_TIER_GAMES = 50;
 
 /**
  * Fine-grained win-rate floors, highest first. Base letter = first character.
@@ -36,6 +41,11 @@ export const FULL_TIER_BANDS = [
 ] as const;
 
 export type FullTierGrade = (typeof FULL_TIER_BANDS)[number]['grade'];
+
+/** Whether a champion has enough games to earn a real tier (else "Unranked"). */
+export function isRanked(games: number): boolean {
+  return games >= MIN_TIER_GAMES;
+}
 
 /** Full sub-graded tier, e.g. "S+". Low-sample champions are capped at D−. */
 export function assignFullTier(winRate: number, games: number): FullTierGrade {

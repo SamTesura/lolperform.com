@@ -17,6 +17,8 @@ interface Props {
   meta: ChampionMeta;
   version?: string;
   href?: string;
+  /** Below the games floor: show the numbers but no (misleading) tier grade. */
+  unranked?: boolean;
 }
 
 /**
@@ -24,16 +26,18 @@ interface Props {
  * win rate (largest), pick/ban, and a patch-delta corner badge. The whole tile
  * is a link into the champion page.
  */
-export function TierTile({ stat, meta, version, href }: Props) {
+export function TierTile({ stat, meta, version, href, unranked }: Props) {
   const winning = stat.winRate >= 0.5;
   return (
     <a
       href={href ?? `/champion/${meta.id}`}
       className="group relative flex w-[72px] flex-col gap-1 rounded-md border border-border-default bg-bg-surface p-1.5 transition-[transform,background-color] duration-150 ease-out hover:-translate-y-0.5 hover:bg-bg-elevated hover:shadow-md sm:w-[88px]"
     >
-      <div className="absolute top-1 left-1 z-10">
-        <TierBadge tier={stat.tier} grade={assignFullTier(stat.winRate, stat.games)} size="sm" />
-      </div>
+      {!unranked ? (
+        <div className="absolute top-1 left-1 z-10">
+          <TierBadge tier={stat.tier} grade={assignFullTier(stat.winRate, stat.games)} size="sm" />
+        </div>
+      ) : null}
       <div className="absolute top-1 right-1 z-10">
         <DeltaBadge delta={stat.deltaWinRate} />
       </div>
@@ -42,7 +46,7 @@ export function TierTile({ stat, meta, version, href }: Props) {
         championId={meta.id}
         name={meta.name}
         version={version}
-        tier={stat.tier}
+        tier={unranked ? undefined : stat.tier}
         size={76}
         className={`h-[60px] w-[60px] sm:h-[76px] sm:w-[76px] ${confidenceClass(stat.games)}`}
       />

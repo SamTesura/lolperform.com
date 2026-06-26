@@ -78,8 +78,13 @@ import Base from '../layouts/Base.astro';
       </ul>
       <p>
         Bands are calibrated to the real ranked win-rate distribution (champions cluster near 50%, the
-        strongest reach ~52–53%). A champion must also clear <strong class="text-text-primary">200
-        games</strong> before it can be tiered above D− — so a tiny lucky sample never shows up as S+.
+        strongest reach ~52–53%). A champion must clear <strong class="text-text-primary">50 games</strong>
+        this patch before it earns a grade at all; below that it sits in <strong
+          class="text-text-primary">Unranked</strong> rather than being mislabelled D−, because a
+        40-game win rate is noise, not a ranking. That floor is deliberately provisional — we're a
+        sampled site building volume, so we pool the current and previous patch and let grades firm up
+        as games accumulate. Every tile shows its sample size, so a 60-game grade is visibly less
+        trustworthy than a 6,000-game one.
       </p>
     </section>
 
