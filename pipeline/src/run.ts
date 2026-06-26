@@ -15,20 +15,15 @@ async function writeJson(name: string, data: unknown): Promise<void> {
   await writeFile(new URL(name, DATA_DIR), `${JSON.stringify(data)}\n`, 'utf8');
 }
 
-/** The patch the most crawled matches are actually on (Data Dragon's CDN
- *  version is an unreliable proxy for the live game patch). */
-function pickDominantPatch(matches: NormMatch[]): string | null {
+/** The `n` patches the most crawled matches are on, most common first.
+ *  Data Dragon's CDN version is an unreliable proxy for the live game patch. */
+function topPatches(matches: NormMatch[], n: number): string[] {
   const counts = new Map<string, number>();
   for (const m of matches) counts.set(m.patch, (counts.get(m.patch) ?? 0) + 1);
-  let best: string | null = null;
-  let bestN = 0;
-  for (const [patch, n] of counts) {
-    if (n > bestN) {
-      best = patch;
-      bestN = n;
-    }
-  }
-  return best;
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, n)
+    .map(([patch]) => patch);
 }
 
 async function main(): Promise<void> {
@@ -41,13 +36,19 @@ async function main(): Promise<void> {
   const client = new RiotClient(config.riotApiKey, config.riotRps);
   const crawled = await crawl(client, config);
 
-  // Trust the data over Data Dragon: tag the dataset with the patch the most
-  // matches are actually on, not the (often out-of-sync) CDN version.
-  const dominantPatch = pickDominantPatch(crawled) ?? latestPatch;
-  const matches = crawled.filter((m) => m.patch === dominantPatch);
+  // Trust the data over Data Dragon, and don't throw away half the crawl to a
+  // patch boundary: keep the two most common recent patches and label them as
+  // the current (dominant) one. Meta is ~stable across adjacent patches, and a
+  // sampled site needs the volume more than single-patch purity.
+  const [dominantPatch = latestPatch, priorPatch] = topPatches(crawled, 2);
+  const keep = new Set([dominantPatch, priorPatch].filter(Boolean) as string[]);
+  const matches = crawled
+    .filter((m) => keep.has(m.patch))
+    .map((m) => (m.patch === dominantPatch ? m : { ...m, patch: dominantPatch }));
   console.info(
-    `[run] aggregating ${matches.length}/${crawled.length} matches on patch ${dominantPatch}` +
-      (dominantPatch !== latestPatch ? ` (ddragon reported ${latestPatch})` : ''),
+    `[run] aggregating ${matches.length}/${crawled.length} matches as patch ${dominantPatch}` +
+      (priorPatch ? ` (folded in ${priorPatch})` : '') +
+      (dominantPatch !== latestPatch ? `; ddragon reported ${latestPatch}` : ''),
   );
 
   const result = aggregate(matches);
