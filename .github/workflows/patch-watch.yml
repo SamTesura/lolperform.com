@@ -65,6 +65,19 @@ jobs:
             echo "Patch ${{ steps.ddragon.outputs.patch }} already loaded — nothing to do."
           fi
 
+      # Pull the accumulated match store so this crawl compounds on prior runs.
+      # Non-fatal: a missing object or insufficient R2 token scope = fresh start.
+      - name: Restore match store
+        if: steps.decide.outputs.run == 'true'
+        run: |
+          mkdir -p pipeline/data/store
+          if pnpm exec wrangler r2 object get lolperform-matches/matches.ndjson \
+               --file pipeline/data/store/matches.ndjson --remote 2>/dev/null; then
+            echo "Restored $(wc -l < pipeline/data/store/matches.ndjson) stored matches."
+          else
+            echo "No prior store (fresh start)."
+          fi
+
       - name: Crawl + aggregate
         if: steps.decide.outputs.run == 'true'
         env:
@@ -78,6 +91,17 @@ jobs:
       - name: Load into D1
         if: steps.decide.outputs.run == 'true'
         run: pnpm exec wrangler d1 execute lolperform --remote --file db/.generated/load.sql
+
+      # Persist the grown store back to R2 for the next run. Non-fatal.
+      - name: Save match store
+        if: steps.decide.outputs.run == 'true'
+        run: |
+          if pnpm exec wrangler r2 object put lolperform-matches/matches.ndjson \
+               --file pipeline/data/store/matches.ndjson --remote 2>/dev/null; then
+            echo "Saved $(wc -l < pipeline/data/store/matches.ndjson) matches to the store."
+          else
+            echo "Store save skipped (check CLOUDFLARE_API_TOKEN has R2 read/write)."
+          fi
 
       - name: Summary
         if: steps.decide.outputs.run == 'true'

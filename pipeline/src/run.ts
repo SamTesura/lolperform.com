@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { ACTIVE_REGIONS, RANK_BRACKETS } from '@lolperform/shared';
 import { assertApiKey, loadConfig } from './config.js';
 import { detectPatch } from './detect-patch.js';
@@ -6,24 +6,35 @@ import { getChampionMeta } from './ddragon.js';
 import { RiotClient } from './riot/client.js';
 import { crawl } from './crawl.js';
 import { aggregate } from './aggregate.js';
+import { accumulate } from './accumulate.js';
 import { writeState } from './state.js';
 import type { NormMatch } from './riot/types.js';
 
 const DATA_DIR = new URL('../data/latest/', import.meta.url);
+const STORE_DIR = new URL('../data/store/', import.meta.url);
+const STORE_FILE = new URL('matches.ndjson', STORE_DIR);
 
 async function writeJson(name: string, data: unknown): Promise<void> {
   await writeFile(new URL(name, DATA_DIR), `${JSON.stringify(data)}\n`, 'utf8');
 }
 
-/** The `n` patches the most crawled matches are on, most common first.
- *  Data Dragon's CDN version is an unreliable proxy for the live game patch. */
-function topPatches(matches: NormMatch[], n: number): string[] {
-  const counts = new Map<string, number>();
-  for (const m of matches) counts.set(m.patch, (counts.get(m.patch) ?? 0) + 1);
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, n)
-    .map(([patch]) => patch);
+/** Read the accumulated match store (NDJSON). Missing/corrupt → empty (fresh start). */
+async function readStore(): Promise<NormMatch[]> {
+  try {
+    const text = await readFile(STORE_FILE, 'utf8');
+    return text
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as NormMatch);
+  } catch {
+    return [];
+  }
+}
+
+/** Persist the accumulated store back to NDJSON (the workflow syncs it to R2). */
+async function writeStore(matches: NormMatch[]): Promise<void> {
+  await mkdir(STORE_DIR, { recursive: true });
+  await writeFile(STORE_FILE, matches.map((m) => JSON.stringify(m)).join('\n') + '\n', 'utf8');
 }
 
 async function main(): Promise<void> {
@@ -36,17 +47,16 @@ async function main(): Promise<void> {
   const client = new RiotClient(config.riotApiKey, config.riotRps);
   const crawled = await crawl(client, config);
 
-  // Trust the data over Data Dragon, and don't throw away half the crawl to a
-  // patch boundary: keep the two most common recent patches and label them as
-  // the current (dominant) one. Meta is ~stable across adjacent patches, and a
-  // sampled site needs the volume more than single-patch purity.
-  const [dominantPatch = latestPatch, priorPatch] = topPatches(crawled, 2);
-  const keep = new Set([dominantPatch, priorPatch].filter(Boolean) as string[]);
-  const matches = crawled
-    .filter((m) => keep.has(m.patch))
-    .map((m) => (m.patch === dominantPatch ? m : { ...m, patch: dominantPatch }));
+  // Compound volume across runs: merge this crawl into the accumulated store
+  // (dedup by matchId), prune to the two most common recent patches, and tag the
+  // dataset with the dominant one. Lets a rate-limited key build a credible
+  // sample over time, and fills far faster once a production key lands.
+  const prior = await readStore();
+  const { store, matches, dominantPatch, priorPatch } = accumulate(prior, crawled, latestPatch);
+  await writeStore(store);
   console.info(
-    `[run] aggregating ${matches.length}/${crawled.length} matches as patch ${dominantPatch}` +
+    `[run] crawl ${crawled.length} + stored ${prior.length} -> ${store.length} accumulated; ` +
+      `aggregating ${matches.length} as patch ${dominantPatch}` +
       (priorPatch ? ` (folded in ${priorPatch})` : '') +
       (dominantPatch !== latestPatch ? `; ddragon reported ${latestPatch}` : ''),
   );
