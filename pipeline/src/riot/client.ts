@@ -17,23 +17,48 @@ const APEX_PATH: Record<ApexKind, string> = {
   master: 'masterleagues',
 };
 
-/** Thin, rate-limited Riot API client. Holds the key in memory only. */
+/**
+ * Thin, rate-limited Riot API client. Holds the key in memory only.
+ *
+ * Riot limits each *method* separately on top of the app-wide limit, and the
+ * gaps are huge: match-v5 allows 2000 req/10s while the apex-league methods
+ * allow only 30 req/10s + 500 req/10min. One global limiter is therefore both
+ * too slow for matches and too fast for league seeding, so each method family
+ * gets its own limiter sized just under its documented ceiling.
+ */
 export class RiotClient {
-  private readonly limiter: RateLimiter;
+  /** match-v5 (ids + detail): 2000 req/10s per method — in practice bounded by
+   *  the app-wide limit, which `rps` models (raise RIOT_RPS on a bigger key). */
+  private readonly matchLimiter: RateLimiter;
+  /** league-v4 challenger/grandmaster/master: 30 req/10s + 500 req/10min. */
+  private readonly apexLimiter: RateLimiter;
+  /** league-v4 entries/{queue}/{tier}/{division}: 50 req/10s. */
+  private readonly entriesLimiter: RateLimiter;
 
   constructor(
     private readonly apiKey: string,
     rps = 20,
   ) {
-    // One per-second window; the 429/Retry-After handler is the backstop if the
-    // key's app-rate limit is tighter than `rps`.
-    this.limiter = new RateLimiter([{ limit: rps, intervalMs: 1000 }]);
+    // Sized ~10% under each documented method ceiling; the 429/Retry-After
+    // handler is the backstop for the app-wide limit, which varies by key tier.
+    this.matchLimiter = new RateLimiter([{ limit: rps, intervalMs: 1000 }]);
+    this.apexLimiter = new RateLimiter([
+      { limit: 27, intervalMs: 10_000 },
+      { limit: 450, intervalMs: 600_000 },
+    ]);
+    this.entriesLimiter = new RateLimiter([{ limit: 45, intervalMs: 10_000 }]);
+  }
+
+  private limiterFor(path: string): RateLimiter {
+    if (path.includes('leagues/by-queue')) return this.apexLimiter;
+    if (path.includes('/league/v4/entries')) return this.entriesLimiter;
+    return this.matchLimiter;
   }
 
   private async request<T>(host: string, path: string): Promise<T | null> {
     const url = `https://${host}.api.riotgames.com${path}`;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      await this.limiter.acquire();
+      await this.limiterFor(path).acquire();
       const res = await fetch(url, { headers: { 'X-Riot-Token': this.apiKey } });
 
       if (res.ok) return (await res.json()) as T;
