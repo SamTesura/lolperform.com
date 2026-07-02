@@ -20,9 +20,16 @@ import { QueryProvider } from './QueryProvider';
 import { AWAITING_DATA, EmptyState, Loading } from './States';
 import { formatPercent } from '../../lib/format';
 
+/**
+ * "Best" holds only matchups the champion actually wins (>50%), "toughest" only
+ * ones it loses (<50%), so the two lists are disjoint by construction — with a
+ * thin matchup set, a plain sort-and-take-6 from both ends put the same
+ * opponents (even favored ones) on both sides. Exactly-even matchups appear in
+ * neither.
+ */
 function topMatchups(matchups: Matchup[], favored: boolean, n = 6): Matchup[] {
   return matchups
-    .slice()
+    .filter((m) => (favored ? m.winRate > 0.5 : m.winRate < 0.5))
     .sort((a, b) => (favored ? b.winRate - a.winRate : a.winRate - b.winRate))
     .slice(0, n);
 }
@@ -48,6 +55,8 @@ function Detail({ championId }: { championId: string }) {
   // primary role = most games
   const primary = stats.slice().sort((a, b) => b.games - a.games)[0];
   const roleMatchups = primary ? matchups.filter((m) => m.role === primary.role) : matchups;
+  const bestMatchups = topMatchups(roleMatchups, true);
+  const toughMatchups = topMatchups(roleMatchups, false);
   const champBuild = builds.find((b) => b.opponentKey === null) ?? builds[0];
 
   return (
@@ -79,28 +88,32 @@ function Detail({ championId }: { championId: string }) {
         </section>
       )}
 
-      {roleMatchups.length > 0 ? (
+      {bestMatchups.length > 0 || toughMatchups.length > 0 ? (
         <div className="grid gap-6 lg:grid-cols-2">
-          <section className="space-y-2">
-            <h3>Best matchups</h3>
-            <div className="overflow-hidden rounded-lg border border-border-default">
-              {topMatchups(roleMatchups, true).map((m, i) => {
-                const opp = index.get(m.opponentKey);
-                if (!opp) return null;
-                return <MatchupRow key={m.opponentKey} matchup={m} self={self} opponent={opp} version={version} striped={i % 2 === 1} />;
-              })}
-            </div>
-          </section>
-          <section className="space-y-2">
-            <h3>Toughest matchups</h3>
-            <div className="overflow-hidden rounded-lg border border-border-default">
-              {topMatchups(roleMatchups, false).map((m, i) => {
-                const opp = index.get(m.opponentKey);
-                if (!opp) return null;
-                return <MatchupRow key={m.opponentKey} matchup={m} self={self} opponent={opp} version={version} striped={i % 2 === 1} />;
-              })}
-            </div>
-          </section>
+          {bestMatchups.length > 0 ? (
+            <section className="space-y-2">
+              <h3>Best matchups</h3>
+              <div className="overflow-hidden rounded-lg border border-border-default">
+                {bestMatchups.map((m, i) => {
+                  const opp = index.get(m.opponentKey);
+                  if (!opp) return null;
+                  return <MatchupRow key={m.opponentKey} matchup={m} self={self} opponent={opp} version={version} striped={i % 2 === 1} />;
+                })}
+              </div>
+            </section>
+          ) : null}
+          {toughMatchups.length > 0 ? (
+            <section className="space-y-2">
+              <h3>Toughest matchups</h3>
+              <div className="overflow-hidden rounded-lg border border-border-default">
+                {toughMatchups.map((m, i) => {
+                  const opp = index.get(m.opponentKey);
+                  if (!opp) return null;
+                  return <MatchupRow key={m.opponentKey} matchup={m} self={self} opponent={opp} version={version} striped={i % 2 === 1} />;
+                })}
+              </div>
+            </section>
+          ) : null}
         </div>
       ) : null}
 
