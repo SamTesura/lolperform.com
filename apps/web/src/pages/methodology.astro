@@ -16,8 +16,8 @@ import Base from '../layouts/Base.astro';
     <section class="space-y-2">
       <h2>What this is — and isn't</h2>
       <p>
-        LolPerform is a <strong class="text-text-primary">readable, bot-lane-first, transparent</strong>
-        stats tool. It optimises for three things scale doesn't buy: a UI you can scan in seconds,
+        LolPerform is a <strong class="text-text-primary">readable, bot-lane-first, transparent</strong> stats tool.
+        It optimises for three things scale doesn't buy: a UI you can scan in seconds,
         genuine depth on bottom lane (ADC matchups, ADC + Support synergy, counters), and honesty
         about every number's confidence.
       </p>
@@ -33,8 +33,8 @@ import Base from '../layouts/Base.astro';
       <h2>Where the data comes from</h2>
       <p>
         Riot's API has no "tier list" endpoint. Like every stats site, we build it ourselves: we
-        crawl ranked Solo/Duo ladders (the <code class="text-text-primary">league-v4</code> and
-        <code class="text-text-primary">match-v5</code> APIs), then aggregate the matches. Champion
+        crawl ranked Solo/Duo ladders (the <code class="text-text-primary">league-v4</code> and <code class="text-text-primary">match-v5</code> APIs),
+        then aggregate the matches. Champion
         art and item icons come from Riot's Data Dragon CDN.
       </p>
     </section>
@@ -44,8 +44,8 @@ import Base from '../layouts/Base.astro';
       <p>
         We don't claim to read every game. We sample ranked matches across eight regions — <strong
           class="text-text-primary">NA, EUW, EUNE, KR, JP, BR, OCE, and VN</strong> — weighted toward
-        the larger rank populations so the sample isn't skewed toward the apex few. The default
-        <strong class="text-text-primary">All Regions</strong> view pools every region into one
+        the larger rank populations so the sample isn't skewed toward the apex few. The
+        default <strong class="text-text-primary">All Regions</strong> view pools every region into one
         sample (the largest and steadiest); you can also filter to any single region. We're a sampled
         dataset, not a full-ladder one like the largest sites — which is exactly why <strong
           class="text-text-primary">every statistic shows its sample size</strong>. A win rate over 40
@@ -66,8 +66,8 @@ import Base from '../layouts/Base.astro';
     <section class="space-y-2">
       <h2>Tiers</h2>
       <p>
-        The grade is deliberately simple and explainable: a champion is placed on a fine
-        <strong class="text-text-primary">S+ → D−</strong> scale by its win rate. The base letter sets
+        The grade is deliberately simple and explainable: a champion is placed on a
+        fine <strong class="text-text-primary">S+ → D−</strong> scale by its win rate. The base letter sets
         the colour and the row; the <strong class="text-text-primary">+ / −</strong> shows where it
         sits inside that band.
       </p>
@@ -78,8 +78,8 @@ import Base from '../layouts/Base.astro';
       </ul>
       <p>
         Bands are calibrated to the real ranked win-rate distribution (champions cluster near 50%, the
-        strongest reach ~52–53%). A champion must clear <strong class="text-text-primary">50 games</strong>
-        this patch before it earns a grade at all; below that it sits in <strong
+        strongest reach ~52–53%). A champion must clear <strong class="text-text-primary">50 games</strong> this patch
+        before it earns a grade at all; below that it sits in <strong
           class="text-text-primary">Unranked</strong> rather than being mislabelled D−, because a
         40-game win rate is noise, not a ranking. That floor is deliberately provisional — we're a
         sampled site building volume, so we pool the current and previous patch and let grades firm up

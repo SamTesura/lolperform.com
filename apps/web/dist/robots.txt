@@ -1,5 +1,0 @@
-User-agent: *
-Allow: /
-Disallow: /styleguide
-
-Sitemap: https://lolperform.com/sitemap-index.xml
