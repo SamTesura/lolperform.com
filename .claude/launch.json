@@ -4,7 +4,7 @@
     {
       "name": "web",
       "runtimeExecutable": "corepack",
-      "runtimeArgs": ["pnpm", "--filter", "@lolperform/web", "dev", "--", "--port", "4321"],
+      "runtimeArgs": ["pnpm", "--filter", "@lolperform/web", "exec", "astro", "dev", "--port", "4321"],
       "port": 4321
     },
     {

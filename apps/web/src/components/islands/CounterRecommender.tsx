@@ -67,7 +67,7 @@ function Recommender() {
           <select
             value={enemyId}
             onChange={(e) => setEnemyId(e.target.value)}
-            className="min-h-11 min-w-56 rounded-sm border border-border-default bg-bg-elevated px-2 py-1.5 text-sm text-text-primary"
+            className="select min-h-11 min-w-56 rounded-sm border border-border-default bg-bg-elevated px-2 py-1.5 text-sm text-text-primary"
           >
             <option value="">Select a champion…</option>
             {enemyOptions.map((c) => (
