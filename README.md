@@ -10,6 +10,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/SamTesura/lolperform.com/ci.yml?style=for-the-badge&label=CI)](https://github.com/SamTesura/lolperform.com/actions/workflows/ci.yml)
 [![Riot API](https://img.shields.io/badge/Powered_by-Riot_API-eb0029?style=for-the-badge&logo=riotgames)](https://developer.riotgames.com/)
 [![Cloudflare](https://img.shields.io/badge/Edge-Cloudflare_Workers-f38020?style=for-the-badge&logo=cloudflare)](https://workers.cloudflare.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
 
 **Developed by [Samuel Mendieta](https://samuelmendieta.com/)** · Sister project: **[ADC Threat](https://adcthreat.app)**
 
