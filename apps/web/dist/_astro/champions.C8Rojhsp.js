@@ -1,1 +1,0 @@
-function e(e){return new Map(e.map(e=>[e.key,e]))}export{e as t};
