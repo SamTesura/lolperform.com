@@ -155,7 +155,7 @@ export function mapBuild(r: BuildRow): BuildPath {
     championKey: r.champion_key,
     opponentKey: r.opponent_key === '-' ? null : r.opponent_key,
     items: safeJsonArray(r.items),
-    runes: JSON.parse(r.runes) as RunePage,
+    runes: safeRunes(r.runes),
     games: r.games,
     wins: r.wins,
     winRate: r.win_rate,
@@ -178,6 +178,25 @@ function safeJsonArray(value: string): number[] {
     return Array.isArray(parsed) ? (parsed as number[]) : [];
   } catch {
     return [];
+  }
+}
+
+const EMPTY_RUNES: RunePage = {
+  keystone: 0,
+  primaryStyle: 0,
+  subStyle: 0,
+  primary: [],
+  secondary: [],
+  shards: [],
+};
+
+/** One corrupt runes row must not 500 the whole champion response. */
+function safeRunes(value: string): RunePage {
+  try {
+    const parsed = JSON.parse(value) as RunePage;
+    return parsed && typeof parsed === 'object' ? parsed : EMPTY_RUNES;
+  } catch {
+    return EMPTY_RUNES;
   }
 }
 

@@ -26,8 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 22
       - run: corepack enable
@@ -38,6 +38,11 @@ jobs:
         id: ddragon
         run: |
           latest=$(curl -fsSL https://ddragon.leagueoflegends.com/api/versions.json | jq -r '.[0]' | cut -d. -f1,2)
+          # Never let an unvalidated remote string reach $GITHUB_OUTPUT — later
+          # steps would interpolate it into shell (classic Actions injection).
+          case "$latest" in
+            ''|*[!0-9.]*) echo "Refusing suspicious ddragon patch string: $latest" >&2; exit 1;;
+          esac
           echo "patch=$latest" >> "$GITHUB_OUTPUT"
           echo "Latest ddragon patch: $latest"
 
@@ -52,15 +57,20 @@ jobs:
 
       - name: Decide
         id: decide
+        env:
+          # Consume step outputs via env, not ${{ }} inline in the script —
+          # env values can't be interpreted as shell syntax.
+          DD_PATCH: ${{ steps.ddragon.outputs.patch }}
+          DB_PATCH: ${{ steps.loaded.outputs.patch }}
         run: |
           # Always crawl: accumulation makes same-patch runs valuable (the store
           # only grows), and the repo is public so Actions minutes are not the
           # constraint. The patch comparison above stays for observability.
           echo "run=true" >> "$GITHUB_OUTPUT"
-          if [ "${{ steps.ddragon.outputs.patch }}" != "${{ steps.loaded.outputs.patch }}" ]; then
-            echo "New patch ${{ steps.ddragon.outputs.patch }} (was ${{ steps.loaded.outputs.patch }}) — store will roll over."
+          if [ "$DD_PATCH" != "$DB_PATCH" ]; then
+            echo "New patch $DD_PATCH (was $DB_PATCH) — store will roll over."
           else
-            echo "Patch ${{ steps.ddragon.outputs.patch }} unchanged — compounding the sample."
+            echo "Patch $DD_PATCH unchanged — compounding the sample."
           fi
 
       # Pull the accumulated match store so this crawl compounds on prior runs.
@@ -103,4 +113,6 @@ jobs:
 
       - name: Summary
         if: steps.decide.outputs.run == 'true'
-        run: echo "Loaded patch ${{ steps.ddragon.outputs.patch }} into D1. Live API updates within the 10-min KV TTL."
+        env:
+          DD_PATCH: ${{ steps.ddragon.outputs.patch }}
+        run: echo "Loaded patch $DD_PATCH into D1. Live API updates within the 10-min KV TTL."

@@ -62,7 +62,7 @@ function Grid() {
       ) : ranked.length === 0 ? (
         <EmptyState
           title="Building the sample"
-          detail={`Only champions with ${TIER_LIST_MIN_GAMES.toLocaleString('en-US')}+ games this patch are ranked — none have crossed that yet on this slice. The crawler runs every few hours; the list fills in as the sample grows.`}
+          detail={`Only champions with ${TIER_LIST_MIN_GAMES.toLocaleString('en-US')}+ games this patch are ranked. The largest sample on this slice is ${Math.max(...champions.map((c) => c.games)).toLocaleString('en-US')} games so far — single regions fill slowly; All Regions pools every ladder and fills first.`}
         />
       ) : (
         <div className="space-y-2">

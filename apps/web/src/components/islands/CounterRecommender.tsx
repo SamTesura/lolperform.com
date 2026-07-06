@@ -146,10 +146,16 @@ function Recommender() {
               );
             })}
           </ul>
-          <p className="mt-2 text-2xs text-text-muted">
-            Curated lane counters. Win rate is each pick's overall {REGION_LABELS[region]} record this
-            patch, shown where we have enough games.
-          </p>
+          {roleList.isError ? (
+            <p className="mt-2 text-2xs text-negative">
+              Live win rates are unavailable right now — the curated picks above still apply.
+            </p>
+          ) : (
+            <p className="mt-2 text-2xs text-text-muted">
+              Curated lane counters. Win rate is each pick's overall {REGION_LABELS[region]} record
+              this patch, shown where we have enough games.
+            </p>
+          )}
         </div>
       )}
     </div>

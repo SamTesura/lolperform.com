@@ -109,6 +109,9 @@ export class RiotClient {
 
   /** Recent ranked-solo match ids for a player. */
   getMatchIds(region: Platform, puuid: string, count = 20): Promise<string[] | null> {
+    // Riot-returned ids are interpolated into request paths — keep them shaped
+    // like ids so a malformed value can't redirect the request to another path.
+    if (!/^[A-Za-z0-9_-]+$/.test(puuid)) return Promise.resolve(null);
     const route = REGION_ROUTE[region];
     return this.request<string[]>(
       route,
@@ -118,6 +121,7 @@ export class RiotClient {
 
   /** Full match detail. */
   getMatch(region: Platform, matchId: string): Promise<MatchDTO | null> {
+    if (!/^[A-Za-z0-9_-]+$/.test(matchId)) return Promise.resolve(null);
     const route = REGION_ROUTE[region];
     return this.request<MatchDTO>(route, `/lol/match/v5/matches/${matchId}`);
   }
