@@ -26,8 +26,18 @@ const sliceQuerySchema = z.object({ region: regionSchema, rank: rankBracketSchem
 
 type Handler = (request: Request, env: Env) => Promise<Response>;
 
-function cacheKey(url: URL): string {
-  return `${url.pathname}${url.search}`;
+/**
+ * Cache keys are built only from the route path and *validated* params — never
+ * from the raw query string. Zod strips unknown keys, so `?x=<random>` would
+ * otherwise mint a fresh KV entry per request: a cheap way for an attacker to
+ * burn the KV write quota and hammer D1 behind every cache miss.
+ */
+function cacheKey(pathname: string, params: Record<string, string> = {}): string {
+  const qs = Object.keys(params)
+    .sort()
+    .map((k) => `${k}=${params[k]}`)
+    .join('&');
+  return qs ? `${pathname}?${qs}` : pathname;
 }
 
 /** Latest patch is the implicit slice dimension; 503 until the first load lands. */
@@ -38,7 +48,7 @@ async function resolvePatch(env: Env): Promise<string | null> {
 
 export const meta: Handler = async (request, env) => {
   const url = new URL(request.url);
-  return cachedJson(env, cacheKey(url), async () => {
+  return cachedJson(env, cacheKey(url.pathname), async () => {
     const patch = await getLatestPatch(env);
     if (!patch) return { patch: null, champions: [] };
     const champions = await getChampions(env);
@@ -60,7 +70,7 @@ export const tierlist: Handler = async (request, env) => {
   const patch = await resolvePatch(env);
   if (!patch) return error(503, 'dataset not loaded yet');
 
-  return cachedJson(env, cacheKey(url), async () => {
+  return cachedJson(env, cacheKey(url.pathname, parsed.data), async () => {
     const slice: Slice = { patch, region: parsed.data.region, rank: parsed.data.rank };
     const champions = await getTierList(env, slice, parsed.data.role);
     return {
@@ -87,7 +97,7 @@ export const champion: Handler = async (request, env) => {
   const meta = await getChampionById(env, id);
   if (!meta) return error(404, 'champion not found');
 
-  return cachedJson(env, cacheKey(url), async () => {
+  return cachedJson(env, cacheKey(url.pathname, parsed.data), async () => {
     const slice: Slice = { patch, region: parsed.data.region, rank: parsed.data.rank };
     const [stats, matchups, synergies, builds] = await Promise.all([
       getRoleStatsForChampion(env, slice, meta.key),
@@ -107,7 +117,7 @@ export const counters: Handler = async (request, env) => {
   const patch = await resolvePatch(env);
   if (!patch) return error(503, 'dataset not loaded yet');
 
-  return cachedJson(env, cacheKey(url), async () => {
+  return cachedJson(env, cacheKey(url.pathname, parsed.data), async () => {
     const slice: Slice = { patch, region: parsed.data.region, rank: parsed.data.rank };
     const list = await getCounters(env, slice, parsed.data.role, parsed.data.opponentKey);
     return { opponentKey: parsed.data.opponentKey, role: parsed.data.role, counters: list };
@@ -122,7 +132,7 @@ export const duos: Handler = async (request, env) => {
   const patch = await resolvePatch(env);
   if (!patch) return error(503, 'dataset not loaded yet');
 
-  return cachedJson(env, cacheKey(url), async () => {
+  return cachedJson(env, cacheKey(url.pathname, parsed.data), async () => {
     const slice: Slice = { patch, region: parsed.data.region, rank: parsed.data.rank };
     return { patch, ...parsed.data, duos: await getDuos(env, slice) };
   });

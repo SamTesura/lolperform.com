@@ -102,6 +102,9 @@ function Matchup() {
   const m =
     rows.find((r) => r.opponentKey === oppMeta.key && (!role || r.role === role)) ??
     rows.find((r) => r.opponentKey === oppMeta.key);
+  // If the URL didn't pin a valid role, we fell back to the biggest-sample row —
+  // say so instead of letting it read like the user's chosen lane.
+  const roleInferred = Boolean(m && m.role !== role);
 
   if (!m) {
     return (
@@ -115,15 +118,18 @@ function Matchup() {
     );
   }
 
+  // Same game pool, opposite perspective — computed from the stored counts so
+  // it's exact, rather than 1 - winRate off a possibly-rounded REAL.
   const selfWr = m.winRate;
-  const oppWr = 1 - m.winRate; // same game pool, opposite perspective
+  const oppWr = m.games > 0 ? (m.games - m.wins) / m.games : 0;
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <RegionRankControls region={region} rank={rank} onRegion={setRegion} onRank={setRank} />
         <p className="text-xs text-text-muted">
-          {ROLE_LABELS[m.role]} · {m.games.toLocaleString('en-US')} games
+          {ROLE_LABELS[m.role]}
+          {roleInferred ? ' (largest sample)' : ''} · {m.games.toLocaleString('en-US')} games
         </p>
       </div>
 
