@@ -83,8 +83,9 @@ import Base from '../layouts/Base.astro';
         champions below it, and a champion's own page shows <strong class="text-text-primary">NR</strong> (not rated)
         for such lanes instead of a grade — so a lane can never read "S+" here while the
         champion is missing from that lane's tier list. Win, pick, and ban rates still display for
-        every lane with a meaningful sample, always next to their game count (we pool the current and
-        previous patch, and the sample compounds every few hours as the crawler runs).
+        every lane with a meaningful sample, always next to their game count. All numbers come from
+        the current patch only — balance changes make older games misleading — and the sample
+        compounds every few hours as the crawler runs.
       </p>
     </section>
 
@@ -118,9 +119,11 @@ import Base from '../layouts/Base.astro';
       <p>
         A crawler runs <strong class="text-text-primary">every six hours</strong> and each
         run <strong class="text-text-primary">adds to</strong> the sample instead of replacing it: new
-        matches merge into an accumulated store (deduplicated by match id, spanning the current and
-        previous patch), so every number on the site gets steadier through the patch. When a new patch
-        ships, the dataset rolls over automatically — no one presses a button.
+        matches merge into an accumulated store (deduplicated by match id), so every number on the
+        site gets steadier through the patch. When a new patch ships, the
+        sample <strong class="text-text-primary">resets</strong> — older games reflect a different balance
+        state, so they never bleed into the new patch's numbers. Expect thinner data for the first
+        day of a patch and a fast climb after; no one presses a button.
       </p>
     </section>
 
