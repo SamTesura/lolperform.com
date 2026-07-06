@@ -15,31 +15,47 @@ describe('accumulate', () => {
     expect(store.map((x) => x.matchId).sort()).toEqual(['a', 'b', 'c']);
   });
 
-  it('compounds volume across runs', () => {
+  it('compounds volume across runs within a patch', () => {
     const run1 = accumulate([], [m('a', '16.12'), m('b', '16.12')], '16.12');
     const run2 = accumulate(run1.store, [m('c', '16.12'), m('d', '16.12')], '16.12');
     expect(run2.store).toHaveLength(4);
-    expect(run2.matches).toHaveLength(4);
   });
 
-  it('keeps only the two most common patches and relabels to the dominant', () => {
-    const matches = [
-      ...Array.from({ length: 5 }, (_, i) => m(`new${i}`, '16.12')),
-      ...Array.from({ length: 3 }, (_, i) => m(`prev${i}`, '16.11')),
-      m('old0', '16.10'), // third patch — pruned
+  it('keeps only the current patch — stats never mix patches', () => {
+    const fresh = [
+      ...Array.from({ length: 5 }, (_, i) => m(`new${i}`, '16.13')),
+      ...Array.from({ length: 3 }, (_, i) => m(`hist${i}`, '16.12')), // players' recent history
     ];
-    const { store, matches: out, dominantPatch, priorPatch } = accumulate([], matches, '16.12');
-    expect(dominantPatch).toBe('16.12');
-    expect(priorPatch).toBe('16.11');
-    expect(store).toHaveLength(8); // 16.10 dropped
-    expect(store.some((x) => x.patch === '16.10')).toBe(false);
-    // everything aggregated is tagged as the dominant patch
-    expect(out.every((x) => x.patch === '16.12')).toBe(true);
+    const { store, dominantPatch } = accumulate([], fresh, '16.13');
+    expect(dominantPatch).toBe('16.13');
+    expect(store).toHaveLength(5);
+    expect(store.every((x) => x.patch === '16.13')).toBe(true);
   });
 
-  it('falls back to the given patch when there is no data', () => {
-    const { dominantPatch, store } = accumulate([], [], '16.13');
+  it('resets the store when a new patch ships, even against a large old store', () => {
+    // A big accumulated 16.13 store must not outvote the new patch: the current
+    // patch is judged from the FRESH crawl, then the store resets to it.
+    const prior = Array.from({ length: 100 }, (_, i) => m(`old${i}`, '16.13'));
+    const fresh = [
+      ...Array.from({ length: 30 }, (_, i) => m(`new${i}`, '16.14')),
+      ...Array.from({ length: 10 }, (_, i) => m(`tail${i}`, '16.13')),
+    ];
+    const { store, dominantPatch } = accumulate(prior, fresh, '16.14');
+    expect(dominantPatch).toBe('16.14');
+    expect(store).toHaveLength(30);
+    expect(store.every((x) => x.patch === '16.14')).toBe(true);
+  });
+
+  it('falls back to the stored patch on an empty crawl (store survives)', () => {
+    const prior = [m('a', '16.13'), m('b', '16.13')];
+    const { store, dominantPatch } = accumulate(prior, [], '16.14');
     expect(dominantPatch).toBe('16.13');
+    expect(store).toHaveLength(2);
+  });
+
+  it('falls back to the given patch when there is no data at all', () => {
+    const { dominantPatch, store } = accumulate([], [], '16.15');
+    expect(dominantPatch).toBe('16.15');
     expect(store).toHaveLength(0);
   });
 

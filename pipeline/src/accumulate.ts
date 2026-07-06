@@ -13,23 +13,22 @@ export function topPatches(matches: NormMatch[], n: number): string[] {
 }
 
 export interface AccumulateResult {
-  /** Deduped union, pruned to the kept patches — persist this back to the store. */
+  /** Deduped union pruned to the current patch — persist AND aggregate this. */
   store: NormMatch[];
-  /** Matches to aggregate now, relabelled to the dominant patch. */
-  matches: NormMatch[];
-  /** Patch the dataset is tagged with (the most common one present). */
+  /** Patch the dataset represents. */
   dominantPatch: string;
-  /** Second patch folded in for volume, if any. */
-  priorPatch?: string;
 }
 
 /**
- * Merge a fresh crawl into the prior accumulated store so volume compounds across
- * runs without a bigger API key:
- *  - dedup by matchId (a match re-seen in a later crawl is never double-counted),
- *  - prune to the two most common recent patches (bounds the store; meta is
- *    ~stable across adjacent patches), and
- *  - relabel everything kept to the dominant patch for a single-patch dataset.
+ * Merge a fresh crawl into the prior accumulated store, keeping ONLY the
+ * current patch. Balance changes make champion strength patch-specific, so
+ * stats never mix patches (the same policy the major stats sites use) — when a
+ * new patch ships, the store resets to it and the sample rebuilds.
+ *
+ * The current patch is read off the FRESH crawl (recent matches track the live
+ * patch within a crawl or two of release). Judging it from the union instead
+ * would let the old patch's stored volume outvote a new patch for days.
+ * Fallbacks: the union's dominant patch (empty crawl), then Data Dragon's.
  *
  * Pure + deterministic so it can be unit-tested without any I/O.
  */
@@ -43,10 +42,8 @@ export function accumulate(
   for (const m of fresh) byId.set(m.matchId, m); // fresh wins on conflict
   const union = [...byId.values()];
 
-  const [dominantPatch = fallbackPatch, priorPatch] = topPatches(union, 2);
-  const keep = new Set([dominantPatch, priorPatch].filter(Boolean) as string[]);
-  const store = union.filter((m) => keep.has(m.patch));
-  const matches = store.map((m) => (m.patch === dominantPatch ? m : { ...m, patch: dominantPatch }));
+  const dominantPatch = topPatches(fresh, 1)[0] ?? topPatches(union, 1)[0] ?? fallbackPatch;
+  const store = union.filter((m) => m.patch === dominantPatch);
 
-  return { store, matches, dominantPatch, priorPatch };
+  return { store, dominantPatch };
 }
