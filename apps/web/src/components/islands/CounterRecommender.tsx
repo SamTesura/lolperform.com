@@ -7,6 +7,7 @@ import {
   DEFAULT_REGION,
   isRanked,
   REGION_LABELS,
+  TIER_LIST_MIN_GAMES,
   type ChampionMeta,
   type RankBracket,
   type Region,
@@ -102,7 +103,11 @@ function Recommender() {
               const m = idToMeta.get(p.id);
               if (!m) return null;
               const stat = statByKey.get(m.key);
-              const ranked = stat && isRanked(stat.games);
+              // Same contract as everywhere else: a tier badge only past the
+              // 1,000-game tier-list floor; a bare win rate above the 50-game
+              // stats floor; a dash below that.
+              const hasStats = stat && isRanked(stat.games);
+              const tiered = stat && stat.games >= TIER_LIST_MIN_GAMES;
               return (
                 <li key={p.id}>
                   <a
@@ -116,13 +121,15 @@ function Recommender() {
                         <span className="block truncate text-2xs text-text-muted">{p.note}</span>
                       ) : null}
                     </span>
-                    {ranked ? (
+                    {hasStats ? (
                       <span className="flex items-center gap-2">
-                        <TierBadge
-                          tier={assignTier(stat!.winRate, stat!.games)}
-                          grade={assignFullTier(stat!.winRate, stat!.games)}
-                          size="sm"
-                        />
+                        {tiered ? (
+                          <TierBadge
+                            tier={assignTier(stat!.winRate, stat!.games)}
+                            grade={assignFullTier(stat!.winRate, stat!.games)}
+                            size="sm"
+                          />
+                        ) : null}
                         <span
                           className={`stat text-sm font-semibold ${stat!.winRate >= 0.5 ? 'text-positive' : 'text-negative'}`}
                         >

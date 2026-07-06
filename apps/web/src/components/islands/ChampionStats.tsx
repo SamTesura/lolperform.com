@@ -4,8 +4,8 @@ import {
   assignFullTier,
   DEFAULT_RANK_BRACKET,
   DEFAULT_REGION,
-  isRanked,
   ROLE_LABELS,
+  TIER_LIST_MIN_GAMES,
   type Matchup,
   type RankBracket,
   type Region,
@@ -75,12 +75,15 @@ function Detail({ championId }: { championId: string }) {
                 key={s.role}
                 className="flex w-full flex-wrap items-center gap-2 rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 sm:w-auto sm:gap-3"
               >
-                {isRanked(s.games) ? (
+                {/* Tiers only past the same 1,000-game floor the tier list uses —
+                    otherwise a lane could read "S+" here while the champion is
+                    absent from that lane's tier list. Win rate always shows. */}
+                {s.games >= TIER_LIST_MIN_GAMES ? (
                   <TierBadge tier={s.tier} grade={assignFullTier(s.winRate, s.games)} size="md" />
                 ) : (
                   <span
                     className="inline-flex items-center rounded-md border border-border-default px-2 py-1 text-xs font-semibold text-text-muted"
-                    title="Not enough games this patch to grade"
+                    title="Fewer than 1,000 games this patch — not tiered until then"
                   >
                     NR
                   </span>
