@@ -49,3 +49,22 @@ export const DEV_KEY_WINDOWS: RateWindow[] = [
   { limit: 20, intervalMs: 1000 },
   { limit: 100, intervalMs: 120_000 },
 ];
+
+/**
+ * Parse Riot's `X-App-Rate-Limit` header ("20:1,100:120" = 20 per 1s and 100
+ * per 120s) into limiter windows, so the crawler paces at exactly what the key
+ * actually allows — dev key today, production key tomorrow, no retuning.
+ * Returns [] for anything malformed (caller keeps its current windows).
+ */
+export function parseRateLimitHeader(value: string): RateWindow[] {
+  const windows: RateWindow[] = [];
+  for (const part of value.split(',')) {
+    const m = /^(\d+):(\d+)$/.exec(part.trim());
+    if (!m) return [];
+    const limit = Number(m[1]);
+    const seconds = Number(m[2]);
+    if (limit < 1 || seconds < 1) return [];
+    windows.push({ limit, intervalMs: seconds * 1000 });
+  }
+  return windows;
+}

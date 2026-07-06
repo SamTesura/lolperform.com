@@ -4,7 +4,7 @@ import {
   type LeagueDivision,
   type Platform,
 } from '@lolperform/shared';
-import { RateLimiter, sleep } from './rateLimiter.js';
+import { DEV_KEY_WINDOWS, parseRateLimitHeader, RateLimiter, sleep } from './rateLimiter.js';
 import type { LeagueEntryDTO, LeagueListDTO, MatchDTO } from './types.js';
 
 const MAX_RETRIES = 8;
@@ -20,16 +20,18 @@ const APEX_PATH: Record<ApexKind, string> = {
 /**
  * Thin, rate-limited Riot API client. Holds the key in memory only.
  *
- * Riot limits each *method* separately on top of the app-wide limit, and the
- * gaps are huge: match-v5 allows 2000 req/10s while the apex-league methods
- * allow only 30 req/10s + 500 req/10min. One global limiter is therefore both
- * too slow for matches and too fast for league seeding, so each method family
- * gets its own limiter sized just under its documented ceiling.
+ * Pacing has two layers:
+ * - The app-wide limit governs every request. It starts at the dev-key default
+ *   and re-tunes itself from Riot's own `X-App-Rate-Limit` response header, so
+ *   the crawler always runs at 100% of whatever the key actually allows — dev
+ *   key today, production key tomorrow, no config change.
+ * - The league-v4 methods have much tighter per-method ceilings (apex 30/10s +
+ *   500/10min, entries 50/10s) and get their own limiters on top.
  */
 export class RiotClient {
-  /** match-v5 (ids + detail): 2000 req/10s per method — in practice bounded by
-   *  the app-wide limit, which `rps` models (raise RIOT_RPS on a bigger key). */
-  private readonly matchLimiter: RateLimiter;
+  /** App-wide pacing — replaced by the advertised windows on first response. */
+  private appLimiter: RateLimiter;
+  private appLimitTuned = false;
   /** league-v4 challenger/grandmaster/master: 30 req/10s + 500 req/10min. */
   private readonly apexLimiter: RateLimiter;
   /** league-v4 entries/{queue}/{tier}/{division}: 50 req/10s. */
@@ -39,9 +41,12 @@ export class RiotClient {
     private readonly apiKey: string,
     rps = 20,
   ) {
-    // Sized ~10% under each documented method ceiling; the 429/Retry-After
-    // handler is the backstop for the app-wide limit, which varies by key tier.
-    this.matchLimiter = new RateLimiter([{ limit: rps, intervalMs: 1000 }]);
+    // Pre-tune default: the classic dev-key windows, with RIOT_RPS as the burst
+    // override. The header replaces all of this on the first response.
+    this.appLimiter = new RateLimiter([
+      { limit: rps, intervalMs: 1000 },
+      ...DEV_KEY_WINDOWS.filter((w) => w.intervalMs > 1000),
+    ]);
     this.apexLimiter = new RateLimiter([
       { limit: 27, intervalMs: 10_000 },
       { limit: 450, intervalMs: 600_000 },
@@ -49,17 +54,32 @@ export class RiotClient {
     this.entriesLimiter = new RateLimiter([{ limit: 45, intervalMs: 10_000 }]);
   }
 
-  private limiterFor(path: string): RateLimiter {
+  private methodLimiterFor(path: string): RateLimiter | null {
     if (path.includes('leagues/by-queue')) return this.apexLimiter;
     if (path.includes('/league/v4/entries')) return this.entriesLimiter;
-    return this.matchLimiter;
+    return null;
+  }
+
+  /** Adopt the key's real app windows the first time Riot advertises them. */
+  private tuneFromHeaders(res: Response): void {
+    if (this.appLimitTuned) return;
+    const header = res.headers.get('x-app-rate-limit');
+    if (!header) return;
+    const windows = parseRateLimitHeader(header);
+    if (windows.length === 0) return;
+    this.appLimiter = new RateLimiter(windows);
+    this.appLimitTuned = true;
+    console.info(`[riot] pacing at the key's advertised app limit: ${header}`);
   }
 
   private async request<T>(host: string, path: string): Promise<T | null> {
     const url = `https://${host}.api.riotgames.com${path}`;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      await this.limiterFor(path).acquire();
+      // Method ceiling first (scarcer), then the app-wide budget.
+      await this.methodLimiterFor(path)?.acquire();
+      await this.appLimiter.acquire();
       const res = await fetch(url, { headers: { 'X-Riot-Token': this.apiKey } });
+      this.tuneFromHeaders(res);
 
       if (res.ok) return (await res.json()) as T;
       if (res.status === 404) return null;

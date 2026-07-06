@@ -35,7 +35,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PipelineConfig
     matchesPerPlayer: Number(env.MATCHES_PER_PLAYER ?? 8),
     maxMatchesPerRegion: Number(env.MAX_MATCHES_PER_REGION ?? 25000),
     riotRps: Number(env.RIOT_RPS ?? 20),
-    maxRuntimeMinutes: Number(env.MAX_RUNTIME_MINUTES ?? 95),
+    // Fill (almost) the whole 6h cron window: Riot's app limit is a rolling
+    // 2-minute budget, so unused wall-clock time is unrecoverable request
+    // budget. ~5.5h crawling + install/aggregate/load fits GitHub's 6h job cap.
+    maxRuntimeMinutes: Number(env.MAX_RUNTIME_MINUTES ?? 330),
   };
 }
 
