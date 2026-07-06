@@ -17,6 +17,16 @@ import type { TierGrade } from './constants.js';
 export const MIN_TIER_GAMES = 50;
 
 /**
+ * Minimum games before a champion is *listed on the tier list*. Much higher than
+ * the grading floor: the tier list is a ranking, and ranking a champion off a
+ * few dozen games is noise, not signal. Champions below this are omitted from the
+ * tier list entirely (not shown as "Unranked") until they accumulate enough. The
+ * per-champion page still grades anything past MIN_TIER_GAMES, with its sample
+ * size on show.
+ */
+export const TIER_LIST_MIN_GAMES = 1000;
+
+/**
  * Fine-grained win-rate floors, highest first. Base letter = first character.
  * Calibrated to the real ranked win-rate distribution: champions cluster around
  * 50%, the strongest sit ~52–53%, so S+ starts at 53.5% rather than an
