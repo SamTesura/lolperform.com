@@ -80,8 +80,8 @@ import Base from '../layouts/Base.astro';
         Bands are calibrated to the real ranked win-rate distribution (champions cluster near 50%, the
         strongest reach ~52–53%). One floor governs tiers everywhere: <strong class="text-text-primary">a
         grade only exists past 1,000 games</strong> in that lane this patch. The tier list omits
-        champions below it, and a champion's own page shows <strong class="text-text-primary">NR</strong>
-        (not rated) for such lanes instead of a grade — so a lane can never read "S+" here while the
+        champions below it, and a champion's own page shows <strong class="text-text-primary">NR</strong> (not rated)
+        for such lanes instead of a grade — so a lane can never read "S+" here while the
         champion is missing from that lane's tier list. Win, pick, and ban rates still display for
         every lane with a meaningful sample, always next to their game count (we pool the current and
         previous patch, and the sample compounds every few hours as the crawler runs).
@@ -104,8 +104,8 @@ import Base from '../layouts/Base.astro';
       <p>
         Every champion page shows its <strong class="text-text-primary">most common build</strong> for
         the champion's primary role: the items players actually finish with, ranked by how often they
-        appear across all of that champion's sampled games this patch, laid out as
-        <strong class="text-text-primary">six item slots</strong> — <strong class="text-text-primary">seven
+        appear across all of that champion's sampled games this patch, laid
+        out as <strong class="text-text-primary">six item slots</strong> — <strong class="text-text-primary">seven
         for bot-lane roles</strong>, where the support quest item occupies a slot. Slots without a
         consistent pick yet render empty rather than guessing, and the build always carries its win
         rate and sample size. This is a frequency picture, not a curated guide: it shows what the
@@ -116,8 +116,8 @@ import Base from '../layouts/Base.astro';
     <section class="space-y-2">
       <h2>How fresh it is</h2>
       <p>
-        A crawler runs <strong class="text-text-primary">every six hours</strong> and each run
-        <strong class="text-text-primary">adds to</strong> the sample instead of replacing it: new
+        A crawler runs <strong class="text-text-primary">every six hours</strong> and each
+        run <strong class="text-text-primary">adds to</strong> the sample instead of replacing it: new
         matches merge into an accumulated store (deduplicated by match id, spanning the current and
         previous patch), so every number on the site gets steadier through the patch. When a new patch
         ships, the dataset rolls over automatically — no one presses a button.
