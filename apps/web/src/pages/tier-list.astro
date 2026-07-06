@@ -11,12 +11,12 @@ import TierGrid from '../components/islands/TierGrid';
     <header class="space-y-1">
       <h1>Tier List</h1>
       <p class="text-text-secondary">
-        Champions ranked within each lane. Tiles dim when the sample is thin — hover for the numbers.
+        Champions ranked within each lane. Only champions with a reliable sample are listed.
       </p>
       <p class="text-xs text-text-muted">
         Sampled high-elo data across eight regions (All Regions pooled by default), not a full-ladder
-        dataset. Champions under the games floor sit in Unranked until the sample grows. Win rates are
-        ranked by a small-sample-corrected score. <a href="/methodology">How this works →</a>
+        dataset. Only champions with 1,000+ games this patch are ranked; the rest are omitted until
+        they reach that. Win rates use a small-sample-corrected score. <a href="/methodology">How this works →</a>
       </p>
     </header>
     <TierGrid client:load />

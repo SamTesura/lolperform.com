@@ -4,9 +4,8 @@ import {
   assignTier,
   DEFAULT_RANK_BRACKET,
   DEFAULT_REGION,
-  isRanked,
-  MIN_TIER_GAMES,
   TIER_GRADES,
+  TIER_LIST_MIN_GAMES,
   type RankBracket,
   type Region,
   type Role,
@@ -35,15 +34,14 @@ function Grid() {
   const version = meta.data?.version;
   const champions = tiers.data?.champions ?? [];
 
-  // Group by a tier derived from win rate + sample (the single source of truth in
-  // shared/tier.ts), not the stored letter — so logic changes show on existing
-  // data, and champions below the games floor go to "Unranked" instead of D−.
+  // Only rank champions with a trustworthy sample. A ranking off a few dozen
+  // games is noise, so anything under TIER_LIST_MIN_GAMES is omitted entirely
+  // (not shown as "Unranked") until it accumulates enough. Grouped by a tier
+  // derived from win rate (the shared source of truth), so logic shows on
+  // existing data.
   const ranked = champions
-    .filter((c) => isRanked(c.games))
+    .filter((c) => c.games >= TIER_LIST_MIN_GAMES)
     .sort((a, b) => b.score - a.score);
-  const unranked = champions
-    .filter((c) => !isRanked(c.games))
-    .sort((a, b) => b.games - a.games);
 
   return (
     <div className="space-y-4">
@@ -61,6 +59,11 @@ function Grid() {
         <Loading label="Loading tier list…" />
       ) : tiers.isError || champions.length === 0 ? (
         <EmptyState {...AWAITING_DATA} />
+      ) : ranked.length === 0 ? (
+        <EmptyState
+          title="Building the sample"
+          detail={`Only champions with ${TIER_LIST_MIN_GAMES.toLocaleString('en-US')}+ games this patch are ranked — none have crossed that yet on this slice. The crawler runs every few hours; the list fills in as the sample grows.`}
+        />
       ) : (
         <div className="space-y-2">
           {TIER_GRADES.map((grade) => {
@@ -84,31 +87,6 @@ function Grid() {
               </section>
             );
           })}
-
-          {unranked.length > 0 ? (
-            <section className="flex flex-col gap-2 rounded-lg border border-dashed border-border-subtle bg-bg-surface/60 p-3 sm:flex-row sm:gap-3">
-              <div className="shrink-0 sm:w-12 sm:pt-1">
-                <span className="inline-flex items-center rounded-md border border-border-default px-2 py-1 text-xs font-semibold text-text-muted">
-                  NR
-                </span>
-              </div>
-              <div className="min-w-0">
-                <p className="mb-2 text-xs text-text-muted">
-                  Unranked — under {MIN_TIER_GAMES} games this patch. Win rates here are too
-                  small to grade; they fill in as the sample grows.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {unranked.map((stat) => {
-                    const m = index.get(stat.championKey);
-                    if (!m) return null;
-                    return (
-                      <TierTile key={stat.championKey} stat={stat} meta={m} version={version} unranked />
-                    );
-                  })}
-                </div>
-              </div>
-            </section>
-          ) : null}
         </div>
       )}
     </div>
