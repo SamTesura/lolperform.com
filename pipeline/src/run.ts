@@ -52,16 +52,16 @@ async function main(): Promise<void> {
   // dataset with the dominant one. Lets a rate-limited key build a credible
   // sample over time, and fills far faster once a production key lands.
   const prior = await readStore();
-  const { store, matches, dominantPatch, priorPatch } = accumulate(prior, crawled, latestPatch);
+  const { store, dominantPatch } = accumulate(prior, crawled, latestPatch);
   await writeStore(store);
+  const dropped = prior.length + crawled.length - store.length;
   console.info(
-    `[run] crawl ${crawled.length} + stored ${prior.length} -> ${store.length} accumulated; ` +
-      `aggregating ${matches.length} as patch ${dominantPatch}` +
-      (priorPatch ? ` (folded in ${priorPatch})` : '') +
+    `[run] crawl ${crawled.length} + stored ${prior.length} -> ${store.length} on patch ` +
+      `${dominantPatch} (${dropped} duplicate/off-patch dropped — stats never mix patches)` +
       (dominantPatch !== latestPatch ? `; ddragon reported ${latestPatch}` : ''),
   );
 
-  const result = aggregate(matches);
+  const result = aggregate(store);
   const champions = [...(await getChampionMeta(latestVersion)).values()];
 
   await mkdir(DATA_DIR, { recursive: true });
@@ -71,7 +71,7 @@ async function main(): Promise<void> {
     generatedAt: new Date().toISOString(),
     regions: [...ACTIVE_REGIONS],
     ranks: [...RANK_BRACKETS],
-    totalMatches: matches.length,
+    totalMatches: store.length,
     counts: {
       roleStats: result.roleStats.length,
       matchups: result.matchups.length,

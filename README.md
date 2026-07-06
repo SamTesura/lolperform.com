@@ -93,7 +93,7 @@
 ```
 GitHub Actions (every 6h)
   restore store (R2) → crawl 8 regions (league-v4 → match-v5, Emerald+)
-    → accumulate (dedup by match id, dominant-patch tagging)
+    → accumulate (dedup by match id, current patch only — resets each patch)
       → aggregate (WR/PR/BR, matchups, duos, builds, Wilson, tiers)
         → load D1 + KV  →  save store (R2)
 
@@ -116,7 +116,7 @@ push to main → Cloudflare Workers Builds → Astro build → live site
 1. **Scheduled crawl**: GitHub Actions fires every 6 hours (plus manual dispatch)
 2. **Store restore**: the accumulated match set is pulled from R2 — every prior run's matches carry forward
 3. **Representative sampling**: apex ladders + weighted Emerald/Diamond entries across all 8 regions, so the sample resembles the real Emerald+ population
-4. **Accumulate & tag**: new matches merge in (dedup by match ID), the two newest patches are kept, and the dataset is labeled by the dominant patch present
+4. **Accumulate & reset**: new matches merge in (dedup by match ID); only the current patch is kept — balance changes make champion strength patch-specific, so stats never mix patches, and the sample resets when a patch ships
 5. **Aggregate & load**: win/pick/ban rates, matchups, duos, builds, and tiers land in D1; KV caches go hot within 10 minutes
 6. **Persist**: the grown store saves back to R2 for the next run — the sample only gets bigger
 
