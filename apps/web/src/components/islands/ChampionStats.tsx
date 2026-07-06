@@ -4,6 +4,7 @@ import {
   assignFullTier,
   DEFAULT_RANK_BRACKET,
   DEFAULT_REGION,
+  isRanked,
   ROLE_LABELS,
   type Matchup,
   type RankBracket,
@@ -74,7 +75,16 @@ function Detail({ championId }: { championId: string }) {
                 key={s.role}
                 className="flex w-full flex-wrap items-center gap-2 rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 sm:w-auto sm:gap-3"
               >
-                <TierBadge tier={s.tier} grade={assignFullTier(s.winRate, s.games)} size="md" />
+                {isRanked(s.games) ? (
+                  <TierBadge tier={s.tier} grade={assignFullTier(s.winRate, s.games)} size="md" />
+                ) : (
+                  <span
+                    className="inline-flex items-center rounded-md border border-border-default px-2 py-1 text-xs font-semibold text-text-muted"
+                    title="Not enough games this patch to grade"
+                  >
+                    NR
+                  </span>
+                )}
                 <span className="text-sm font-medium text-text-secondary">{ROLE_LABELS[s.role]}</span>
                 <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:gap-3">
                   <StatBadge label="Win" value={formatPercent(s.winRate)} tone={s.winRate >= 0.5 ? 'positive' : 'negative'} />
@@ -140,25 +150,47 @@ function Detail({ championId }: { championId: string }) {
         </section>
       ) : null}
 
-      {champBuild ? (
-        <section className="space-y-2">
-          <h3>Most common build</h3>
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border-subtle bg-bg-surface p-3">
-            {champBuild.items.map((id, i) => (
-              <img
-                key={`${id}-${i}`}
-                src={itemIcon(id, version)}
-                alt={`Item ${id}`}
-                width={40}
-                height={40}
-                loading="lazy"
-                className="rounded-sm bg-bg-inset"
-              />
-            ))}
-            <span className="stat ml-2 text-sm text-text-muted">{formatPercent(champBuild.winRate)} win · {champBuild.games.toLocaleString('en-US')} games</span>
+      <section className="space-y-2">
+        <h3>Most common build</h3>
+        {champBuild ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border-subtle bg-bg-surface p-3">
+            <div className="flex flex-wrap gap-2">
+              {Array.from({
+                // Six item slots, seven for bot lane — the support quest item
+                // occupies one down there.
+                length: champBuild.role === 'BOTTOM' || champBuild.role === 'UTILITY' ? 7 : 6,
+              }).map((_, i) => {
+                const id = champBuild.items[i];
+                return id ? (
+                  <img
+                    key={`${id}-${i}`}
+                    src={itemIcon(id, version)}
+                    alt={`Item slot ${i + 1}`}
+                    width={40}
+                    height={40}
+                    loading="lazy"
+                    className="rounded-sm bg-bg-inset"
+                  />
+                ) : (
+                  <div
+                    key={`empty-${i}`}
+                    title="No consistent pick for this slot yet"
+                    className="h-10 w-10 rounded-sm border border-dashed border-border-subtle bg-bg-inset/50"
+                    aria-label={`Item slot ${i + 1}: no consistent pick yet`}
+                  />
+                );
+              })}
+            </div>
+            <span className="stat text-sm text-text-muted">
+              {formatPercent(champBuild.winRate)} win · {champBuild.games.toLocaleString('en-US')} games
+            </span>
           </div>
-        </section>
-      ) : null}
+        ) : (
+          <p className="rounded-lg border border-dashed border-border-subtle bg-bg-surface/60 p-3 text-sm text-text-muted">
+            Build data lands as the sample grows — the crawler refreshes it every few hours.
+          </p>
+        )}
+      </section>
     </div>
   );
 }

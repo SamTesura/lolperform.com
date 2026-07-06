@@ -64,7 +64,10 @@ describe('aggregate', () => {
     const tiny = aggregate(botLaneMatches(5, 3));
     expect(tiny.matchups).toHaveLength(0); // 5 < MIN_MATCHUP_GAMES
     expect(tiny.duos).toHaveLength(0);
-    expect(tiny.builds).toHaveLength(0); // 5 < MIN_BUILD_GAMES
+    // vs-opponent builds need MIN_BUILD_GAMES of one exact signature…
+    expect(tiny.builds.filter((b) => b.opponentKey !== null)).toHaveLength(0);
+    // …but every champion always gets its frequency-based own build.
+    expect(tiny.builds.some((b) => b.championKey === '51' && b.opponentKey === null)).toBe(true);
     // role stats are still emitted (confidence handled at display time)
     expect(tiny.roleStats.some((r) => r.championKey === '51')).toBe(true);
   });

@@ -93,6 +93,7 @@ function aggregateSlice(
   const matchupAgg = new Map<string, Tally>(); // `${champ}|${opp}|${role}`
   const duoAgg = new Map<string, Tally>(); // `${adc}|${sup}`
   const buildAgg = new Map<string, Map<string, BuildTally>>(); // `${champ}|${role}|${opp|-}` -> sig -> tally
+  const itemFreq = new Map<string, Map<number, number>>(); // `${champ}|${role}` -> item id -> times bought
 
   const getTally = (map: Map<string, Tally>, key: string): Tally => {
     let t = map.get(key);
@@ -129,6 +130,15 @@ function aggregateSlice(
       team[p.teamId][p.role] = p;
       add(getTally(roleAgg, `${p.role}|${p.championKey}`), p.win);
       addBuild(p.championKey, p.role, null, p);
+      if (p.items.length > 0) {
+        const fKey = `${p.championKey}|${p.role}`;
+        let f = itemFreq.get(fKey);
+        if (!f) {
+          f = new Map();
+          itemFreq.set(fKey, f);
+        }
+        for (const id of new Set(p.items)) f.set(id, (f.get(id) ?? 0) + 1);
+      }
     }
 
     for (const role of ROLES) {
@@ -206,26 +216,66 @@ function aggregateSlice(
     });
   }
 
-  // --- emit builds (most frequent signature per key) ---
+  // --- emit vs-opponent builds (most frequent exact signature, floor-gated) ---
   for (const [key, sigs] of buildAgg) {
+    const [championKey, role, opp] = key.split('|') as [string, Role, string];
+    if (opp === '-') continue; // champion's own build is frequency-based below
     let top: BuildTally | null = null;
     for (const bt of sigs.values()) {
       if (!top || bt.games > top.games) top = bt;
     }
     if (!top || top.games < MIN_BUILD_GAMES) continue;
-    const [championKey, role, opp] = key.split('|') as [string, Role, string];
     out.builds.push({
       patch,
       region,
       rank,
       role,
       championKey,
-      opponentKey: opp === '-' ? null : opp,
+      opponentKey: opp,
       items: top.items,
       runes: top.runes,
       games: top.games,
       wins: top.wins,
       winRate: top.wins / top.games,
+    });
+  }
+
+  // --- emit the champion's own "most common build": per-item frequency ---
+  // Requiring 20+ games of an *identical* full item set almost never triggers on
+  // sampled volume, which left most champions buildless. Instead, rank the items
+  // a champion actually buys by how often they appear across all its games and
+  // take the top slots (7 for bot-lane roles — the support quest occupies one —
+  // 6 everywhere else). Runes come from the most common rune page. The sample
+  // behind it is the champion's full game count for the role.
+  for (const [key, t] of roleAgg) {
+    const [role, championKey] = key.split('|') as [Role, string];
+    const freq = itemFreq.get(`${championKey}|${role}`);
+    if (!freq || freq.size === 0) continue;
+    const slotCount = role === 'BOTTOM' || role === 'UTILITY' ? 7 : 6;
+    const items = [...freq.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, slotCount)
+      .map(([id]) => id);
+    const sigs = buildAgg.get(`${championKey}|${role}|-`);
+    let top: BuildTally | null = null;
+    if (sigs) {
+      for (const bt of sigs.values()) {
+        if (!top || bt.games > top.games) top = bt;
+      }
+    }
+    if (!top) continue;
+    out.builds.push({
+      patch,
+      region,
+      rank,
+      role,
+      championKey,
+      opponentKey: null,
+      items,
+      runes: top.runes,
+      games: t.games,
+      wins: t.wins,
+      winRate: t.wins / t.games,
     });
   }
 }
