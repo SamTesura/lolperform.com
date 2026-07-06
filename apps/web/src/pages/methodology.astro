@@ -78,12 +78,13 @@ import Base from '../layouts/Base.astro';
       </ul>
       <p>
         Bands are calibrated to the real ranked win-rate distribution (champions cluster near 50%, the
-        strongest reach ~52–53%). The <strong class="text-text-primary">tier list only ranks champions
-        with 1,000+ games</strong> this patch — a ranking built on a few dozen games is noise, not
-        signal, so anything below that is simply left off until it accumulates enough (we pool the
-        current and previous patch, and the sample compounds every few hours as the crawler runs). A
-        champion's own page still shows a grade past 50 games, always next to its sample size, so a
-        60-game number reads as visibly less trustworthy than a 6,000-game one.
+        strongest reach ~52–53%). One floor governs tiers everywhere: <strong class="text-text-primary">a
+        grade only exists past 1,000 games</strong> in that lane this patch. The tier list omits
+        champions below it, and a champion's own page shows <strong class="text-text-primary">NR</strong>
+        (not rated) for such lanes instead of a grade — so a lane can never read "S+" here while the
+        champion is missing from that lane's tier list. Win, pick, and ban rates still display for
+        every lane with a meaningful sample, always next to their game count (we pool the current and
+        previous patch, and the sample compounds every few hours as the crawler runs).
       </p>
     </section>
 
@@ -127,9 +128,10 @@ import Base from '../layouts/Base.astro';
       <h2>Recent changes</h2>
       <ul class="list-inside list-disc space-y-1 text-text-muted">
         <li>
-          <strong class="text-text-primary">1,000-game tier-list floor</strong> — the tier list now
-          ranks only champions with 1,000+ games this patch; everything below is omitted until it
-          accumulates enough. Low-sample win rates are noise, not rankings.
+          <strong class="text-text-primary">1,000-game tier floor, everywhere</strong> — the tier
+          list ranks only champions with 1,000+ games this patch, and no tier badge appears anywhere
+          on the site below that floor (lanes show NR + raw win rate instead). Low-sample win rates
+          are noise, not rankings.
         </li>
         <li>
           <strong class="text-text-primary">Most common build for every champion</strong> —
