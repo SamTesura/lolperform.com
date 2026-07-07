@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ROLES, RANK_BRACKETS, REGIONS, TIER_GRADES } from './constants.js';
+import { FULL_TIER_GRADES } from './tier.js';
 
 /* ------------------------------------------------------------------ *
  * Primitive enums (derived from the canonical constant tuples)
@@ -9,6 +10,8 @@ export const roleSchema = z.enum(ROLES);
 export const rankBracketSchema = z.enum(RANK_BRACKETS);
 export const regionSchema = z.enum(REGIONS);
 export const tierGradeSchema = z.enum(TIER_GRADES);
+/** Fine sub-graded tier ("S+" … "D-") — what the pipeline stores per slice. */
+export const fullTierGradeSchema = z.enum(FULL_TIER_GRADES);
 
 /** Patch label as `major.minor`, e.g. "14.12". */
 export const patchSchema = z.string().regex(/^\d{1,2}\.\d{1,2}$/, 'patch must look like "14.12"');
@@ -52,9 +55,9 @@ export const roleStatsSchema = z.object({
   banRate: z.number().min(0).max(1),
   /** Wilson lower bound used for ranking/tiering. */
   wilsonLower: z.number().min(0).max(1),
-  /** Composite score that drives the tier grade. */
+  /** Rank-derived sort score (higher = better; sub-floor rows are negative). */
   score: z.number(),
-  tier: tierGradeSchema,
+  tier: fullTierGradeSchema,
   /** Win-rate change vs the previous patch, in absolute proportion (e.g. +0.012). */
   deltaWinRate: z.number().nullable().default(null),
   /** Tier movement vs the previous patch. */
@@ -149,7 +152,7 @@ export const counterPickSchema = z.object({
   winRate: z.number().min(0).max(1),
   wilsonLower: z.number().min(0).max(1),
   games: z.number().int().nonnegative(),
-  tier: tierGradeSchema,
+  tier: fullTierGradeSchema,
 });
 export type CounterPick = z.infer<typeof counterPickSchema>;
 

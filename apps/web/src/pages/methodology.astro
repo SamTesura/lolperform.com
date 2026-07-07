@@ -54,33 +54,46 @@ import Base from '../layouts/Base.astro';
     </section>
 
     <section class="space-y-2">
-      <h2>Ranking: Wilson lower bound, not raw win rate</h2>
+      <h2>Ranking: two signals, combined by rank</h2>
       <p>
-        Champions are ordered by the <strong class="text-text-primary">Wilson score interval lower
-        bound</strong>, not their raw win rate. This penalises small samples: a 60% win rate over 10
-        games will not outrank a 53% win rate over 5,000. It's the same math used to sort “best
-        rated” lists — reward certainty, not luck.
+        Champions in a lane are ranked by two signals and the tier comes from the combined ranking —
+        the same family of method the biggest tier lists use, not fixed win-rate cutoffs:
+      </p>
+      <ul class="list-inside list-disc space-y-1 text-text-muted">
+        <li>
+          <strong class="text-text-primary">Wilson win rate</strong> — the win rate's lower
+          confidence bound, so a 60% win rate over 10 games never outranks a 53% over 5,000. Reward
+          certainty, not luck.
+        </li>
+        <li>
+          <strong class="text-text-primary">PBI (pick-ban influence)</strong> — win rate above
+          average × pick rate ÷ (1 − ban rate). A contested, frequently banned champion that still
+          wins is shaping the meta; a fringe pick with a shiny win rate is not.
+        </li>
+      </ul>
+      <p>
+        Each champion gets a rank on both signals; the sum of the two ranks orders the lane. This is
+        the lolalytics grading recipe adapted to our data — of its four factors we implement the two
+        a sampled, privacy-preserving pipeline can support. The other two (best-player win rate and
+        best-player Elo) require tracking individual players across months, and this site stores no
+        player identifiers by design.
       </p>
     </section>
 
     <section class="space-y-2">
       <h2>Tiers</h2>
       <p>
-        The grade is deliberately simple and explainable: a champion is placed on a
-        fine <strong class="text-text-primary">S+ → D−</strong> scale by its win rate. The base letter sets
-        the colour and the row; the <strong class="text-text-primary">+ / −</strong> shows where it
-        sits inside that band.
+        Grades are cut at fixed percentiles of the lane's ranking, so
+        an <strong class="text-text-primary">S+</strong> always means "top of this patch's meta" no
+        matter how compressed the win rates are: roughly the top 4% of a lane's pool is S+, the top
+        14% reaches S−, the middle lands in B, and the bottom tail is D. The base letter sets the
+        colour and the row; the <strong class="text-text-primary">+ / −</strong> shows where the
+        champion sits inside the band.
       </p>
-      <ul class="list-inside list-disc space-y-1 text-text-muted">
-        <li><span class="text-tier-s">S</span> tier ≥ 51.5% win rate (S+ ≥ 53.5%, S ≥ 52.5%, S− ≥ 51.5%)</li>
-        <li><span class="text-tier-a">A</span> tier ≥ 50% &nbsp;·&nbsp; <span class="text-tier-b">B</span> tier ≥ 48.5%</li>
-        <li><span class="text-tier-c">C</span> tier ≥ 46% &nbsp;·&nbsp; <span class="text-tier-d">D</span> tier below that</li>
-      </ul>
       <p>
-        Bands are calibrated to the real ranked win-rate distribution (champions cluster near 50%, the
-        strongest reach ~52–53%). One floor governs tiers everywhere: <strong class="text-text-primary">a
-        grade only exists past 1,000 games</strong> in that lane this patch. The tier list omits
-        champions below it, and a champion's own page shows <strong class="text-text-primary">NR</strong> (not rated)
+        One floor governs tiers everywhere: <strong class="text-text-primary">a grade only exists
+        past 1,000 games</strong> in that lane this patch. The tier list omits champions below it,
+        and a champion's own page shows <strong class="text-text-primary">NR</strong> (not rated)
         for such lanes instead of a grade — so a lane can never read "S+" here while the
         champion is missing from that lane's tier list. Win, pick, and ban rates still display for
         every lane with a meaningful sample, always next to their game count. All numbers come from
@@ -130,6 +143,11 @@ import Base from '../layouts/Base.astro';
     <section class="space-y-2">
       <h2>Recent changes</h2>
       <ul class="list-inside list-disc space-y-1 text-text-muted">
+        <li>
+          <strong class="text-text-primary">Rank-based grading (lolalytics-style)</strong> — tiers
+          now come from each lane's combined Wilson + PBI ranking, cut at fixed percentiles, instead
+          of fixed win-rate thresholds. S+ means "top of the meta", every patch, by construction.
+        </li>
         <li>
           <strong class="text-text-primary">1,000-game tier floor, everywhere</strong> — the tier
           list ranks only champions with 1,000+ games this patch, and no tier badge appears anywhere

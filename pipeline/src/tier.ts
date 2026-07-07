@@ -1,2 +1,2 @@
 // Tier logic lives in @lolperform/shared so the pipeline and the UI agree.
-export { assignTier, assignFullTier, baseTier, MIN_TIER_GAMES, FULL_TIER_BANDS } from '@lolperform/shared';
+export { gradeSlice, pbi, baseTier, MIN_TIER_GAMES, TIER_LIST_MIN_GAMES } from '@lolperform/shared';

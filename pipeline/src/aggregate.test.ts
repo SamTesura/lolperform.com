@@ -4,21 +4,27 @@ import { aggregate } from './aggregate.js';
 import { botLaneMatches } from './__fixtures__/matches.js';
 
 describe('aggregate', () => {
-  const matches = botLaneMatches(250, 150); // Caitlyn bot wins 150/250 = 60% (>= min-tier games)
+  const matches = botLaneMatches(1250, 750); // Caitlyn bot wins 750/1250 = 60% (>= tier-list floor)
 
-  it('computes per-role win/pick rates and tiers', () => {
+  it('computes per-role win/pick rates and rank-based tiers', () => {
     const result = aggregate(matches);
     const cait = result.roleStats.filter(
       (r) => r.championKey === '51' && r.role === 'BOTTOM' && r.rank === 'emerald_plus',
     );
     expect(cait).toHaveLength(1);
     const c = cait[0]!;
-    expect(c.games).toBe(250);
-    expect(c.wins).toBe(150);
+    expect(c.games).toBe(1250);
+    expect(c.wins).toBe(750);
     expect(c.winRate).toBeCloseTo(0.6, 5);
     expect(c.pickRate).toBeCloseTo(1, 5); // present in every game on team 100
-    expect(c.tier).toBe('S'); // 60% over 100 games
+    expect(c.tier).toBe('S+'); // top of the bot-lane ranking pool
     expect(c.wilsonLower).toBeLessThan(c.winRate);
+    // the losing side of the pool grades below the winner
+    const jhin = result.roleStats.find(
+      (r) => r.championKey === '202' && r.role === 'BOTTOM' && r.rank === 'emerald_plus',
+    )!;
+    expect(c.score).toBeGreaterThan(jhin.score);
+    expect(jhin.tier).not.toBe('S+');
   });
 
   it('emits each cumulative rank bracket for a Challenger-seeded slice', () => {
@@ -46,7 +52,7 @@ describe('aggregate', () => {
     const duo = result.duos.find(
       (d) => d.adcKey === '51' && d.supportKey === '412' && d.rank === 'emerald_plus',
     );
-    expect(duo?.games).toBe(250);
+    expect(duo?.games).toBe(1250);
     expect(duo?.winRate).toBeCloseTo(0.6, 5);
   });
 

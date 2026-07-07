@@ -13,7 +13,7 @@ import {
   type RunePage,
 } from '@lolperform/shared';
 import type { NormMatch, NormParticipant } from './riot/types.js';
-import { assignTier } from './tier.js';
+import { gradeSlice } from './tier.js';
 
 export interface AggregateResult {
   roleStats: RoleStats[];
@@ -158,11 +158,12 @@ function aggregateSlice(
     }
   }
 
-  // --- emit role stats ---
+  // --- emit role stats (graded per role pool, lolalytics-style ranking) ---
+  const sliceRows: RoleStats[] = [];
   for (const [key, t] of roleAgg) {
     const [role, championKey] = key.split('|') as [Role, string];
     const winRate = t.wins / t.games;
-    out.roleStats.push({
+    sliceRows.push({
       patch,
       region,
       rank,
@@ -174,12 +175,23 @@ function aggregateSlice(
       pickRate: t.games / totalMatches,
       banRate: (bans.get(championKey) ?? 0) / totalMatches,
       wilsonLower: wilsonLowerBound(t.wins, t.games),
-      score: wilsonLowerBound(t.wins, t.games),
-      tier: assignTier(winRate, t.games),
+      score: 0, // set by gradeSlice below
+      tier: 'D-', // placeholder; set by gradeSlice below
       deltaWinRate: null,
       deltaTier: null,
     });
   }
+  // Grades are relative to the role's pool in this slice, so grading must see
+  // the whole role at once — a per-champion function can't rank.
+  for (const role of ROLES) {
+    const rows = sliceRows.filter((r) => r.role === role);
+    const graded = gradeSlice(rows);
+    rows.forEach((r, i) => {
+      r.tier = graded[i]!.grade;
+      r.score = graded[i]!.score;
+    });
+  }
+  out.roleStats.push(...sliceRows);
 
   // --- emit matchups ---
   for (const [key, t] of matchupAgg) {
