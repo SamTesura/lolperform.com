@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  assignFullTier,
+  baseTier,
   DEFAULT_RANK_BRACKET,
   DEFAULT_REGION,
   ROLE_LABELS,
@@ -79,7 +79,7 @@ function Detail({ championId }: { championId: string }) {
                     otherwise a lane could read "S+" here while the champion is
                     absent from that lane's tier list. Win rate always shows. */}
                 {s.games >= TIER_LIST_MIN_GAMES ? (
-                  <TierBadge tier={s.tier} grade={assignFullTier(s.winRate, s.games)} size="md" />
+                  <TierBadge tier={baseTier(s.tier)} grade={s.tier} size="md" />
                 ) : (
                   <span
                     className="inline-flex items-center rounded-md border border-border-default px-2 py-1 text-xs font-semibold text-text-muted"
