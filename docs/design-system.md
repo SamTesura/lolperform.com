@@ -20,7 +20,7 @@ levers drive the choice:
    instinctively skeptical of any site claiming to know "the best" anything.
    A cool, low-saturation base + tabular numerals + a methodology page
    visible in the nav reads as *peer-reviewed*, not *engagement-bait*.
-2. **Cognitive load = bounce.** The reference site (lolalytics) stacks every
+2. **Cognitive load = bounce.** Incumbent stats sites stack every
    variable at once. Broadcast Obsidian uses background elevation (5 layers)
    and a single accent hue to create unambiguous hierarchy — a tier-tile reads
    as one glance, drill-in reads as a deliberate click.

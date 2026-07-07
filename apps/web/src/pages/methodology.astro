@@ -72,11 +72,11 @@ import Base from '../layouts/Base.astro';
         </li>
       </ul>
       <p>
-        Each champion gets a rank on both signals; the sum of the two ranks orders the lane. This is
-        the lolalytics grading recipe adapted to our data — of its four factors we implement the two
-        a sampled, privacy-preserving pipeline can support. The other two (best-player win rate and
-        best-player Elo) require tracking individual players across months, and this site stores no
-        player identifiers by design.
+        Each champion gets a rank on both signals; the sum of the two ranks orders the lane. Some
+        sites also factor in per-player signals such as best-player win rate or best-player Elo —
+        those require tracking individual players across months, and this site stores no player
+        identifiers by design, so our grading uses the two signals a sampled, privacy-preserving
+        pipeline can support.
       </p>
     </section>
 
@@ -144,7 +144,7 @@ import Base from '../layouts/Base.astro';
       <h2>Recent changes</h2>
       <ul class="list-inside list-disc space-y-1 text-text-muted">
         <li>
-          <strong class="text-text-primary">Rank-based grading (lolalytics-style)</strong> — tiers
+          <strong class="text-text-primary">Rank-based grading</strong> — tiers
           now come from each lane's combined Wilson + PBI ranking, cut at fixed percentiles, instead
           of fixed win-rate thresholds. S+ means "top of the meta", every patch, by construction.
         </li>
