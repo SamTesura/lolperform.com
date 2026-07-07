@@ -31,8 +31,8 @@
 ## ✨ Key Features
 
 ### 📊 A Tier List You Can Actually Read
-- Fine-grained **S+ → D−** grades calibrated to the real ranked win-rate distribution
-- Champions ranked by the **Wilson score lower bound** — a 60%-over-10-games champion never outranks a 53%-over-5,000-games one
+- Fine-grained **S+ → D−** grades assigned by **rank percentile** within each lane (lolalytics-style), not fixed win-rate cutoffs — S+ always means "top of this patch's meta"
+- Champions ranked by two combined signals: the **Wilson score lower bound** (a 60%-over-10-games champion never outranks a 53%-over-5,000-games one) and **PBI** (pick-ban influence — contested picks that win shape the meta; fringe picks with shiny win rates don't)
 - **50-game floor**: below it a champion is *Unranked*, never mislabeled D−
 - Confidence dimming + sample-size chips on every tile; three levels of disclosure (grid → champion → matchup)
 

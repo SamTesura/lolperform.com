@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  assignTier,
+  baseTier,
   DEFAULT_RANK_BRACKET,
   DEFAULT_REGION,
   TIER_GRADES,
@@ -67,7 +67,7 @@ function Grid() {
       ) : (
         <div className="space-y-2">
           {TIER_GRADES.map((grade) => {
-            const rows = ranked.filter((c) => assignTier(c.winRate, c.games) === grade);
+            const rows = ranked.filter((c) => baseTier(c.tier) === grade);
             if (rows.length === 0) return null;
             return (
               <section

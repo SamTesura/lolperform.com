@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  assignFullTier,
-  assignTier,
+  baseTier,
   DEFAULT_RANK_BRACKET,
   DEFAULT_REGION,
   isRanked,
@@ -125,8 +124,8 @@ function Recommender() {
                       <span className="flex items-center gap-2">
                         {tiered ? (
                           <TierBadge
-                            tier={assignTier(stat!.winRate, stat!.games)}
-                            grade={assignFullTier(stat!.winRate, stat!.games)}
+                            tier={baseTier(stat!.tier)}
+                            grade={stat!.tier}
                             size="sm"
                           />
                         ) : null}

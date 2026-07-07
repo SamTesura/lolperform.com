@@ -1,4 +1,4 @@
-import { assignFullTier, confidenceLevel, type ChampionMeta, type RoleStats } from '@lolperform/shared';
+import { baseTier, confidenceLevel, type ChampionMeta, type RoleStats } from '@lolperform/shared';
 import { ChampionPortrait } from './ChampionPortrait';
 import { DeltaBadge } from './DeltaBadge';
 import { TierBadge } from './TierBadge';
@@ -35,7 +35,7 @@ export function TierTile({ stat, meta, version, href, unranked }: Props) {
     >
       {!unranked ? (
         <div className="absolute top-1 left-1 z-10">
-          <TierBadge tier={stat.tier} grade={assignFullTier(stat.winRate, stat.games)} size="sm" />
+          <TierBadge tier={baseTier(stat.tier)} grade={stat.tier} size="sm" />
         </div>
       ) : null}
       <div className="absolute top-1 right-1 z-10">
@@ -46,7 +46,7 @@ export function TierTile({ stat, meta, version, href, unranked }: Props) {
         championId={meta.id}
         name={meta.name}
         version={version}
-        tier={unranked ? undefined : stat.tier}
+        tier={unranked ? undefined : baseTier(stat.tier)}
         size={76}
         className={`h-[60px] w-[60px] sm:h-[76px] sm:w-[76px] ${confidenceClass(stat.games)}`}
       />

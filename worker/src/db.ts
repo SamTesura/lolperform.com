@@ -9,7 +9,7 @@ import type {
   Role,
   RoleStats,
   RunePage,
-  TierGrade,
+  FullTierGrade,
 } from '@lolperform/shared';
 import type { Env } from './env.js';
 
@@ -111,7 +111,7 @@ export function mapRoleStats(r: RoleStatsRow): RoleStats {
     banRate: r.ban_rate,
     wilsonLower: r.wilson_lower,
     score: r.score,
-    tier: r.tier as TierGrade,
+    tier: r.tier as FullTierGrade,
     deltaWinRate: null,
     deltaTier: null,
   };
@@ -168,7 +168,7 @@ export function mapCounter(r: CounterRow): CounterPick {
     winRate: r.win_rate,
     wilsonLower: r.wilson_lower,
     games: r.games,
-    tier: r.tier as TierGrade,
+    tier: r.tier as FullTierGrade,
   };
 }
 

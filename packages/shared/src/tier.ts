@@ -1,77 +1,131 @@
 import type { TierGrade } from './constants.js';
 
 /**
- * Tiering policy — deliberately simple and explainable (published on /methodology).
- * A champion is graded by its observed win rate on a fine S+ … D− scale, but only
- * once it clears a minimum game count. Below that it is "Unranked" (not graded at
- * all) rather than dumped into D−, so a tiny lucky/unlucky sample never shows up
- * as a real grade — and a 100%-win-rate / 40-game champion isn't mislabelled D−.
+ * Tiering policy — lolalytics-style ranking, adapted to our data (published on
+ * /methodology). Tiers are NOT fixed win-rate cutoffs: champions in a role are
+ * ranked by two signals — Wilson-corrected win rate and PBI (pick-ban
+ * influence) — and grades are cut at fixed percentiles of that ranking, so "S+"
+ * always means "top of this patch's meta", exactly like the big sites.
  *
- * Lives in shared so the pipeline (which stores the base letter) and the UI
- * (which derives the +/− sub-grade from the same win rate) never disagree.
+ * Of lolalytics' four grading factors we implement the two our data supports
+ * (win rate, PBI). The other two — best-player win rate and best-player Elo —
+ * require tracking individual players across 90 days, which this pipeline
+ * deliberately never does (no player identifiers are stored, by design).
  *
- * The floor is intentionally provisional (a sampled site building volume), not
- * the tens-of-thousands a full-ladder site uses. Sample size is shown on every
- * tile, so a 60-game grade is visibly less trustworthy than a 6,000-game one.
+ * Lives in shared so the pipeline (which computes and stores grades at slice
+ * level) and every UI surface stay in agreement.
  */
+
+/** Stats-display floor: below this we show a dash instead of a win rate. */
 export const MIN_TIER_GAMES = 50;
 
 /**
- * Minimum games before a champion is *listed on the tier list*. Much higher than
- * the grading floor: the tier list is a ranking, and ranking a champion off a
- * few dozen games is noise, not signal. Champions below this are omitted from the
- * tier list entirely (not shown as "Unranked") until they accumulate enough. The
- * per-champion page still grades anything past MIN_TIER_GAMES, with its sample
- * size on show.
+ * Grading floor: a champion enters a role's ranking pool only past this many
+ * games this patch. Below it there is no grade at all — the tier list omits
+ * the champion and its page shows NR — because ranking a champion off a few
+ * dozen games is noise, not signal.
  */
 export const TIER_LIST_MIN_GAMES = 1000;
 
-/**
- * Fine-grained win-rate floors, highest first. Base letter = first character.
- * Calibrated to the real ranked win-rate distribution: champions cluster around
- * 50%, the strongest sit ~52–53%, so S+ starts at 53.5% rather than an
- * unreachable 55%. Centered on 50% = B/A boundary.
- */
-export const FULL_TIER_BANDS = [
-  { grade: 'S+', min: 0.535 },
-  { grade: 'S', min: 0.525 },
-  { grade: 'S-', min: 0.515 },
-  { grade: 'A+', min: 0.51 },
-  { grade: 'A', min: 0.505 },
-  { grade: 'A-', min: 0.5 },
-  { grade: 'B+', min: 0.495 },
-  { grade: 'B', min: 0.49 },
-  { grade: 'B-', min: 0.485 },
-  { grade: 'C+', min: 0.48 },
-  { grade: 'C', min: 0.47 },
-  { grade: 'C-', min: 0.46 },
-  { grade: 'D+', min: 0.45 },
-  { grade: 'D', min: 0.44 },
-  { grade: 'D-', min: Number.NEGATIVE_INFINITY },
+/** Fine grades, best first. */
+export const FULL_TIER_GRADES = [
+  'S+', 'S', 'S-',
+  'A+', 'A', 'A-',
+  'B+', 'B', 'B-',
+  'C+', 'C', 'C-',
+  'D+', 'D', 'D-',
 ] as const;
 
-export type FullTierGrade = (typeof FULL_TIER_BANDS)[number]['grade'];
+export type FullTierGrade = (typeof FULL_TIER_GRADES)[number];
 
-/** Whether a champion has enough games to earn a real tier (else "Unranked"). */
+/**
+ * Cumulative rank-percentile ceiling per grade. A champion whose combined-rank
+ * percentile falls under `upTo` earns that grade — e.g. the top 4% of a role's
+ * pool is S+. Shaped like the distribution the major tier lists produce: a few
+ * S/S+, a broad middle, a thin tail.
+ */
+export const TIER_PERCENTILES: readonly { grade: FullTierGrade; upTo: number }[] = [
+  { grade: 'S+', upTo: 0.04 },
+  { grade: 'S', upTo: 0.09 },
+  { grade: 'S-', upTo: 0.14 },
+  { grade: 'A+', upTo: 0.21 },
+  { grade: 'A', upTo: 0.28 },
+  { grade: 'A-', upTo: 0.36 },
+  { grade: 'B+', upTo: 0.45 },
+  { grade: 'B', upTo: 0.55 },
+  { grade: 'B-', upTo: 0.64 },
+  { grade: 'C+', upTo: 0.73 },
+  { grade: 'C', upTo: 0.81 },
+  { grade: 'C-', upTo: 0.88 },
+  { grade: 'D+', upTo: 0.93 },
+  { grade: 'D', upTo: 0.97 },
+  { grade: 'D-', upTo: 1.01 },
+] as const;
+
+/** Whether a champion has enough games for its stats to be displayed. */
 export function isRanked(games: number): boolean {
   return games >= MIN_TIER_GAMES;
 }
 
-/** Full sub-graded tier, e.g. "S+". Low-sample champions are capped at D−. */
-export function assignFullTier(winRate: number, games: number): FullTierGrade {
-  if (games < MIN_TIER_GAMES) return 'D-';
-  for (const band of FULL_TIER_BANDS) {
-    if (winRate >= band.min) return band.grade;
-  }
-  return 'D-';
-}
-
-/** Base letter of a full grade ("S+" → "S"). */
+/** Base letter of a full grade ("S+" → "S") — drives row grouping and colour. */
 export function baseTier(full: FullTierGrade): TierGrade {
   return full[0] as TierGrade;
 }
 
-/** Base tier letter (what the pipeline stores / the grid groups + colours by). */
-export function assignTier(winRate: number, games: number): TierGrade {
-  return baseTier(assignFullTier(winRate, games));
+export interface GradeInput {
+  winRate: number;
+  pickRate: number;
+  banRate: number;
+  games: number;
+  wilsonLower: number;
+}
+
+/**
+ * lolalytics' PBI (Pick Ban Influence): (win − tierAvg) · pick / (1 − ban).
+ * High = contested, meta-defining pick. Our whole-game sampling makes the
+ * slice's average win rate 0.5 by construction, so tierAvg is the constant 0.5.
+ */
+export function pbi(r: Pick<GradeInput, 'winRate' | 'pickRate' | 'banRate'>): number {
+  return ((r.winRate - 0.5) * r.pickRate) / Math.max(1e-9, 1 - r.banRate);
+}
+
+export interface GradeResult {
+  grade: FullTierGrade;
+  /** Sort key, higher = better. Ranked rows land in (0, 1]; sub-floor rows are
+   *  negative so they always sort after every ranked champion. */
+  score: number;
+}
+
+/**
+ * Grade one role's slice. Champions past TIER_LIST_MIN_GAMES are ranked twice —
+ * by Wilson win rate and by PBI — then ordered by the sum of the two ranks
+ * (rank-sum is scale-free, so neither signal drowns the other) and cut into
+ * grades at TIER_PERCENTILES. Rows below the floor get a 'D-' placeholder that
+ * no UI surfaces (the tier list omits them; pages show NR).
+ * Result is aligned with the input order.
+ */
+export function gradeSlice(rows: readonly GradeInput[]): GradeResult[] {
+  const out: GradeResult[] = rows.map((r) => ({ grade: 'D-', score: r.wilsonLower - 1 }));
+  const pool = rows.map((r, i) => ({ i, r })).filter((x) => x.r.games >= TIER_LIST_MIN_GAMES);
+  if (pool.length === 0) return out;
+
+  const rankOf = (key: (x: (typeof pool)[number]) => number): Map<number, number> => {
+    const sorted = [...pool].sort((a, b) => key(b) - key(a));
+    return new Map(sorted.map((x, rank) => [x.i, rank]));
+  };
+  const byWilson = rankOf((x) => x.r.wilsonLower);
+  const byPbi = rankOf((x) => pbi(x.r));
+
+  const combined = [...pool].sort((a, b) => {
+    const ra = byWilson.get(a.i)! + byPbi.get(a.i)!;
+    const rb = byWilson.get(b.i)! + byPbi.get(b.i)!;
+    return ra - rb || b.r.wilsonLower - a.r.wilsonLower;
+  });
+
+  combined.forEach((x, idx) => {
+    const pct = idx / pool.length;
+    const band = TIER_PERCENTILES.find((t) => pct < t.upTo)!;
+    out[x.i] = { grade: band.grade, score: 1 - idx / pool.length };
+  });
+  return out;
 }
