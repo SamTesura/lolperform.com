@@ -1,16 +1,15 @@
 import type { TierGrade } from './constants.js';
 
 /**
- * Tiering policy — lolalytics-style ranking, adapted to our data (published on
- * /methodology). Tiers are NOT fixed win-rate cutoffs: champions in a role are
- * ranked by two signals — Wilson-corrected win rate and PBI (pick-ban
- * influence) — and grades are cut at fixed percentiles of that ranking, so "S+"
- * always means "top of this patch's meta", exactly like the big sites.
+ * Tiering policy — rank-based grading (published on /methodology). Tiers are
+ * NOT fixed win-rate cutoffs: champions in a role are ranked by two signals —
+ * Wilson-corrected win rate and PBI (pick-ban influence) — and grades are cut
+ * at fixed percentiles of that ranking, so "S+" always means "top of this
+ * patch's meta", the same convention the major tier lists follow.
  *
- * Of lolalytics' four grading factors we implement the two our data supports
- * (win rate, PBI). The other two — best-player win rate and best-player Elo —
- * require tracking individual players across 90 days, which this pipeline
- * deliberately never does (no player identifiers are stored, by design).
+ * Per-player signals (best-player win rate / best-player Elo) are deliberately
+ * out of scope: they require tracking individual players across months, and
+ * this pipeline stores no player identifiers by design.
  *
  * Lives in shared so the pipeline (which computes and stores grades at slice
  * level) and every UI surface stay in agreement.
@@ -81,7 +80,7 @@ export interface GradeInput {
 }
 
 /**
- * lolalytics' PBI (Pick Ban Influence): (win − tierAvg) · pick / (1 − ban).
+ * PBI (Pick Ban Influence): (win − tierAvg) · pick / (1 − ban).
  * High = contested, meta-defining pick. Our whole-game sampling makes the
  * slice's average win rate 0.5 by construction, so tierAvg is the constant 0.5.
  */

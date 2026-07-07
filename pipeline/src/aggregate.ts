@@ -158,7 +158,7 @@ function aggregateSlice(
     }
   }
 
-  // --- emit role stats (graded per role pool, lolalytics-style ranking) ---
+  // --- emit role stats (graded per role pool by combined ranking) ---
   const sliceRows: RoleStats[] = [];
   for (const [key, t] of roleAgg) {
     const [role, championKey] = key.split('|') as [Role, string];
