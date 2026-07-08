@@ -94,15 +94,8 @@ jobs:
           RIOT_API_KEY: ${{ secrets.RIOT_API_KEY }}
         run: pnpm --filter @lolperform/pipeline crawl
 
-      - name: Generate load SQL
-        if: steps.decide.outputs.run == 'true'
-        run: pnpm --filter @lolperform/pipeline load
-
-      - name: Load into D1
-        if: steps.decide.outputs.run == 'true'
-        run: pnpm exec wrangler d1 execute lolperform --remote --file db/.generated/load.sql
-
-      # Persist the grown store back to R2 for the next run. Non-fatal.
+      # Persist the grown store to R2 BEFORE the D1 load: hours of crawled
+      # matches must never be lost to a load failure. Non-fatal on its own.
       - name: Save match store
         if: steps.decide.outputs.run == 'true'
         run: |
@@ -112,6 +105,24 @@ jobs:
           else
             echo "Store save skipped (check CLOUDFLARE_API_TOKEN has R2 read/write)."
           fi
+
+      - name: Generate load SQL
+        if: steps.decide.outputs.run == 'true'
+        run: pnpm --filter @lolperform/pipeline load
+
+      # Retries ride out transient D1 import resets ({"D1_RESET_DO":true}).
+      - name: Load into D1
+        if: steps.decide.outputs.run == 'true'
+        run: |
+          for attempt in 1 2 3; do
+            if pnpm exec wrangler d1 execute lolperform --remote --file db/.generated/load.sql; then
+              exit 0
+            fi
+            echo "Load attempt $attempt failed; retrying in 30s…"
+            sleep 30
+          done
+          echo "Load failed after 3 attempts." >&2
+          exit 1
 
       - name: Summary
         if: steps.decide.outputs.run == 'true'
