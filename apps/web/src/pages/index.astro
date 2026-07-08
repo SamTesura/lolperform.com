@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import SampleCounter from '../components/islands/SampleCounter';
 import TopPicks from '../components/islands/TopPicks';
 
 const cards = [
@@ -36,7 +37,7 @@ const cards = [
     </h1>
     <p class="max-w-2xl text-lg text-text-secondary">
       ADC matchups, ADC + Support synergy, and counter picks, plus a clean tier list. Every number
-      carries its sample size and confidence — sampled high-elo data, refreshed each patch.
+      carries its sample size and confidence — sampled high-elo data, growing every few hours.
     </p>
     <div class="flex flex-wrap gap-3 pt-2">
       <a
@@ -52,9 +53,7 @@ const cards = [
         Tier list
       </a>
     </div>
-    <p class="text-xs text-text-muted">
-      Sampled, not full-ladder — and honest about it. <a href="/methodology">How the data works →</a>
-    </p>
+    <SampleCounter client:load />
   </section>
 
   <section class="space-y-3">
