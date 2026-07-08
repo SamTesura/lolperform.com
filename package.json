@@ -24,8 +24,8 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@types/node": "26.0.1",
-    "@vitest/coverage-v8": "4.1.9",
+    "@types/node": "26.1.0",
+    "@vitest/coverage-v8": "4.1.10",
     "eslint": "10.6.0",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-astro": "2.1.1",
@@ -33,9 +33,9 @@
     "prettier": "3.9.4",
     "prettier-plugin-astro": "0.14.1",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.62.1",
-    "vitest": "4.1.9",
-    "wrangler": "4.106.0"
+    "typescript-eslint": "8.63.0",
+    "vitest": "4.1.10",
+    "wrangler": "4.108.0"
   },
   "pnpm": {
     "overrides": {
