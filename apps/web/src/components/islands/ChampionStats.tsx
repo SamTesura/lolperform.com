@@ -253,6 +253,14 @@ function Detail({ championId }: { championId: string }) {
                             : { stats: [], sections: [] };
                           return (
                             <>
+                              {/* Items with no passive/active prose (e.g. Infinity
+                                  Edge) carry their one-liner in plaintext — show
+                                  it under the name like the big sites do. */}
+                              {parsed.sections.length === 0 && info.plaintext ? (
+                                <span className="mt-0.5 block text-2xs leading-snug text-text-muted">
+                                  {info.plaintext}
+                                </span>
+                              ) : null}
                               {parsed.stats.length > 0 ? (
                                 <span className="mt-1 block">
                                   {parsed.stats.map((line) => {
@@ -291,13 +299,6 @@ function Detail({ championId }: { championId: string }) {
                                   ) : null}
                                 </span>
                               ))}
-                              {parsed.stats.length === 0 &&
-                              parsed.sections.length === 0 &&
-                              info.plaintext ? (
-                                <span className="mt-1 block text-2xs leading-snug text-text-muted">
-                                  {info.plaintext}
-                                </span>
-                              ) : null}
                               {info.gold?.total ? (
                                 <span className="mt-1.5 block text-2xs text-text-muted">
                                   Cost:{' '}
