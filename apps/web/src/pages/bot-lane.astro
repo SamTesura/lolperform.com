@@ -2,6 +2,10 @@
 import Base from '../layouts/Base.astro';
 import CounterRecommender from '../components/islands/CounterRecommender';
 import BotLaneSynergy from '../components/islands/BotLaneSynergy';
+import { getBuildChampions } from '../lib/ddragonBuild';
+
+const { version, champions } = await getBuildChampions();
+const rosterChampions = champions.map((c) => ({ key: c.key, id: c.id, name: c.name }));
 ---
 
 <Base
@@ -20,7 +24,7 @@ import BotLaneSynergy from '../components/islands/BotLaneSynergy';
     <section class="space-y-3">
       <h2>Counter-pick recommender</h2>
       <p class="text-sm text-text-muted">Pick the enemy; get the champions with the best record into them.</p>
-      <CounterRecommender client:load />
+      <CounterRecommender champions={rosterChampions} version={version} client:load />
     </section>
 
     <section class="space-y-3">
