@@ -21,6 +21,54 @@ import { QueryProvider } from './QueryProvider';
 import { AWAITING_DATA, EmptyState, Loading } from './States';
 import { formatPercent } from '../../lib/format';
 
+interface ItemInfo {
+  name: string;
+  plaintext?: string;
+  description?: string;
+  gold?: { base: number; total: number };
+}
+
+/**
+ * Data Dragon item descriptions use light markup (<stats>, <attention>,
+ * <passive>, <br>, damage-type tags…). Parse it into plain-text structure and
+ * render with React — never as raw HTML.
+ */
+function stripTags(s: string): string {
+  return s
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+}
+
+function parseItemDescription(desc: string): {
+  stats: string[];
+  sections: { label?: string; text: string }[];
+} {
+  const statsMatch = /<stats>([\s\S]*?)<\/stats>/i.exec(desc);
+  const stats = statsMatch
+    ? statsMatch[1]!.split(/<br\s*\/?>/i).map(stripTags).filter(Boolean)
+    : [];
+  const rest = desc.replace(/<stats>[\s\S]*?<\/stats>/i, '');
+
+  const sections: { label?: string; text: string }[] = [];
+  let current: { label?: string; text: string } | null = null;
+  for (const rawLine of rest.split(/<br\s*\/?>/i)) {
+    const labelMatch = /<(?:passive|active)>([\s\S]*?)<\/(?:passive|active)>/i.exec(rawLine);
+    const text = stripTags(
+      rawLine.replace(/<(?:passive|active)>[\s\S]*?<\/(?:passive|active)>/i, ''),
+    );
+    if (labelMatch) {
+      if (current && (current.label || current.text)) sections.push(current);
+      current = { label: stripTags(labelMatch[1]!), text };
+    } else if (text) {
+      if (current) current.text = current.text ? `${current.text} ${text}` : text;
+      else current = { text };
+    }
+  }
+  if (current && (current.label || current.text)) sections.push(current);
+  return { stats, sections };
+}
+
 /**
  * "Best" holds only matchups the champion actually wins (>50%), "toughest" only
  * ones it loses (<50%), so the two lists are disjoint by construction — with a
@@ -57,14 +105,12 @@ function Detail({ championId }: { championId: string }) {
     enabled: Boolean(version),
     staleTime: Infinity,
     retry: 1,
-    queryFn: async (): Promise<Record<string, { name: string; plaintext?: string }>> => {
+    queryFn: async (): Promise<Record<string, ItemInfo>> => {
       const res = await fetch(
         `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/item.json`,
       );
       if (!res.ok) throw new Error(`item.json ${res.status}`);
-      const json = (await res.json()) as {
-        data: Record<string, { name: string; plaintext?: string }>;
-      };
+      const json = (await res.json()) as { data: Record<string, ItemInfo> };
       return json.data;
     },
   });
@@ -198,16 +244,72 @@ function Detail({ championId }: { championId: string }) {
                     {info ? (
                       <span
                         role="tooltip"
-                        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden w-48 -translate-x-1/2 rounded-md border border-border-default bg-bg-overlay p-2 text-left shadow-lg group-hover:block"
+                        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden w-60 -translate-x-1/2 rounded-md border border-border-default bg-bg-overlay p-2.5 text-left shadow-lg group-hover:block"
                       >
-                        <span className="block text-xs font-semibold text-text-primary">
-                          {info.name}
-                        </span>
-                        {info.plaintext ? (
-                          <span className="mt-0.5 block text-2xs leading-snug text-text-muted">
-                            {info.plaintext}
-                          </span>
-                        ) : null}
+                        <span className="block text-xs font-semibold text-tier-s">{info.name}</span>
+                        {(() => {
+                          const parsed = info.description
+                            ? parseItemDescription(info.description)
+                            : { stats: [], sections: [] };
+                          return (
+                            <>
+                              {parsed.stats.length > 0 ? (
+                                <span className="mt-1 block">
+                                  {parsed.stats.map((line) => {
+                                    const m = /^([\d.]+%?)\s*(.*)$/.exec(line);
+                                    return (
+                                      <span
+                                        key={line}
+                                        className="block text-2xs leading-snug text-text-secondary"
+                                      >
+                                        {m ? (
+                                          <>
+                                            <span className="stat font-semibold text-text-primary">
+                                              {m[1]}
+                                            </span>{' '}
+                                            {m[2]}
+                                          </>
+                                        ) : (
+                                          line
+                                        )}
+                                      </span>
+                                    );
+                                  })}
+                                </span>
+                              ) : null}
+                              {parsed.sections.map((s, si) => (
+                                <span key={si} className="mt-1.5 block">
+                                  {s.label ? (
+                                    <span className="block text-2xs font-semibold text-text-primary">
+                                      {s.label}
+                                    </span>
+                                  ) : null}
+                                  {s.text ? (
+                                    <span className="block text-2xs leading-snug text-text-muted">
+                                      {s.text}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              ))}
+                              {parsed.stats.length === 0 &&
+                              parsed.sections.length === 0 &&
+                              info.plaintext ? (
+                                <span className="mt-1 block text-2xs leading-snug text-text-muted">
+                                  {info.plaintext}
+                                </span>
+                              ) : null}
+                              {info.gold?.total ? (
+                                <span className="mt-1.5 block text-2xs text-text-muted">
+                                  Cost:{' '}
+                                  <span className="stat font-semibold text-tier-s">
+                                    {info.gold.total.toLocaleString('en-US')}
+                                  </span>
+                                  {typeof info.gold.base === 'number' ? ` (${info.gold.base})` : ''}
+                                </span>
+                              ) : null}
+                            </>
+                          );
+                        })()}
                       </span>
                     ) : null}
                   </span>
