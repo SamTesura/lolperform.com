@@ -63,10 +63,14 @@ function Recommender({ champions, version }: Props) {
     (roleList.data?.champions ?? []).map((s) => [s.championKey, s]),
   );
 
-  // Every champion actually played in this lane this patch, plus any enemy the
-  // curated list covers — the full roster, not just the hand-written entries.
+  // The lane's real roster: champions the tier list itself ranks here (the
+  // 1,000-game floor), plus any enemy the curated list covers. Deliberately
+  // NOT everyone who ever flexed into the lane — a 60-game Singed bot is not
+  // an enemy worth a dropdown slot.
   const enemyKeys = new Set<string>(
-    (roleList.data?.champions ?? []).filter((s) => isRanked(s.games)).map((s) => s.championKey),
+    (roleList.data?.champions ?? [])
+      .filter((s) => s.games >= TIER_LIST_MIN_GAMES)
+      .map((s) => s.championKey),
   );
   for (const id of enemiesWithCounters(role)) {
     const m = idToMeta.get(id);
