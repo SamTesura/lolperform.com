@@ -23,7 +23,10 @@ const CSP = [
   `script-src 'self' 'unsafe-inline' https://adservice.google.com https://*.googletagservices.com ${GOOGLE_ADS}`,
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
-  `connect-src 'self' ${GOOGLE_ADS}`,
+  // Data Dragon in connect-src: the item tooltips fetch item.json (names +
+  // short descriptions) client-side from the same read-only static CDN that
+  // already serves all champion/item art.
+  `connect-src 'self' https://ddragon.leagueoflegends.com ${GOOGLE_ADS}`,
   `frame-src ${GOOGLE_ADS}`,
   "form-action 'self'",
   "frame-ancestors 'none'",

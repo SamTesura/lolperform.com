@@ -49,6 +49,26 @@ function Detail({ championId }: { championId: string }) {
   const index = meta.data ? championIndex(meta.data.champions) : new Map();
   const version = meta.data?.version;
 
+  // Item names + one-line descriptions for build tooltips, straight from the
+  // same Data Dragon version the icons use. Cached for the session; the build
+  // renders fine without it (icons only) if the fetch fails.
+  const itemCatalog = useQuery({
+    queryKey: ['item-catalog', version],
+    enabled: Boolean(version),
+    staleTime: Infinity,
+    retry: 1,
+    queryFn: async (): Promise<Record<string, { name: string; plaintext?: string }>> => {
+      const res = await fetch(
+        `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/item.json`,
+      );
+      if (!res.ok) throw new Error(`item.json ${res.status}`);
+      const json = (await res.json()) as {
+        data: Record<string, { name: string; plaintext?: string }>;
+      };
+      return json.data;
+    },
+  });
+
   if (champ.isLoading) return <Loading label="Loading champion data…" />;
   if (champ.isError || !champ.data) return <EmptyState {...AWAITING_DATA} />;
 
@@ -164,16 +184,33 @@ function Detail({ championId }: { championId: string }) {
                 length: champBuild.role === 'BOTTOM' || champBuild.role === 'UTILITY' ? 7 : 6,
               }).map((_, i) => {
                 const id = champBuild.items[i];
+                const info = id ? itemCatalog.data?.[String(id)] : undefined;
                 return id ? (
-                  <img
-                    key={`${id}-${i}`}
-                    src={itemIcon(id, version)}
-                    alt={`Item slot ${i + 1}`}
-                    width={40}
-                    height={40}
-                    loading="lazy"
-                    className="rounded-sm bg-bg-inset"
-                  />
+                  <span key={`${id}-${i}`} className="group relative inline-block">
+                    <img
+                      src={itemIcon(id, version)}
+                      alt={info?.name ?? `Item slot ${i + 1}`}
+                      width={40}
+                      height={40}
+                      loading="lazy"
+                      className="rounded-sm bg-bg-inset"
+                    />
+                    {info ? (
+                      <span
+                        role="tooltip"
+                        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden w-48 -translate-x-1/2 rounded-md border border-border-default bg-bg-overlay p-2 text-left shadow-lg group-hover:block"
+                      >
+                        <span className="block text-xs font-semibold text-text-primary">
+                          {info.name}
+                        </span>
+                        {info.plaintext ? (
+                          <span className="mt-0.5 block text-2xs leading-snug text-text-muted">
+                            {info.plaintext}
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : null}
+                  </span>
                 ) : (
                   <div
                     key={`empty-${i}`}
