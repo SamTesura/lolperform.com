@@ -34,6 +34,11 @@ const FEATURES: { label: string; href: string; keywords: string }[] = [
 
 const MAX_RESULTS = 8;
 
+/** Punctuation/case-insensitive form: "K'Sante", "K´Sante", "ksante" all agree. */
+function norm(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 export default function ChampionSearch({ champions, version }: Props) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -41,15 +46,37 @@ export default function ChampionSearch({ champions, version }: Props) {
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const results = useMemo<Result[]>(() => {
-    const q = query.trim().toLowerCase();
+    const raw = query.trim().toLowerCase();
+    const q = norm(raw);
     if (!q) return [];
+
+    // Pages match only on label/keyword *prefixes* — a bare "k" must not drag
+    // in "Tier List" just because "ranking" contains a k.
     const features: Result[] = FEATURES.filter(
-      (f) => f.label.toLowerCase().includes(q) || f.keywords.includes(q),
+      (f) =>
+        f.label.toLowerCase().startsWith(raw) ||
+        f.keywords.split(' ').some((w) => w.startsWith(raw)),
     ).map((f) => ({ kind: 'feature', label: f.label, href: f.href }));
+
+    // Champions rank by match quality: whole-name prefix ("k" → K'Sante) beats
+    // word prefix ("sante" → K'Sante) beats substring ("k" → Akali).
     const champs: Result[] = champions
-      .filter((c) => c.name.toLowerCase().includes(q))
+      .flatMap((c) => {
+        const name = norm(c.name);
+        const words = c.name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(norm);
+        const score = name.startsWith(q)
+          ? 0
+          : words.some((w) => w.startsWith(q))
+            ? 1
+            : name.includes(q)
+              ? 2
+              : null;
+        return score === null ? [] : [{ c, score }];
+      })
+      .sort((a, b) => a.score - b.score || a.c.name.localeCompare(b.c.name))
       .slice(0, MAX_RESULTS)
-      .map((c) => ({ kind: 'champ', meta: c, href: `/champion/${c.id}` }));
+      .map(({ c }) => ({ kind: 'champ' as const, meta: c, href: `/champion/${c.id}` }));
+
     return [...features, ...champs].slice(0, MAX_RESULTS);
   }, [query, champions]);
 
