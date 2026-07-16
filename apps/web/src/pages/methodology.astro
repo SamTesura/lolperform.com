@@ -72,10 +72,18 @@ import Base from '../layouts/Base.astro';
         </li>
       </ul>
       <p>
+        Both signals then get a small <strong class="text-text-primary">skill-floor adjustment</strong> (at
+        most ±0.4% win-rate equivalent): a mechanically simple champion's win rate is repeatable
+        by nearly everyone who picks it, so it earns slightly more trust than the same number on a
+        champion whose ladder record is carried by specialists. The buckets are curated — Riot's own
+        difficulty ratings are too inconsistent to use — and deliberately small: they nudge boundary
+        cases, never rewrite a tier.
+      </p>
+      <p>
         Each champion gets a rank on both signals; the sum of the two ranks orders the lane. Some
         sites also factor in per-player signals such as best-player win rate or best-player Elo —
         those require tracking individual players across months, and this site stores no player
-        identifiers by design, so our grading uses the two signals a sampled, privacy-preserving
+        identifiers by design, so our grading uses the signals a sampled, privacy-preserving
         pipeline can support.
       </p>
     </section>
@@ -143,6 +151,12 @@ import Base from '../layouts/Base.astro';
     <section class="space-y-2">
       <h2>Recent changes</h2>
       <ul class="list-inside list-disc space-y-1 text-text-muted">
+        <li>
+          <strong class="text-text-primary">Skill-floor adjustment</strong> — grading gives a small,
+          bounded edge to mechanically simple champions (their win rate is repeatable by anyone) and
+          a matching discount to specialist champions. A dedicated patch-day crawl also fires right
+          after NA maintenance on Wednesdays, so new patches appear hours sooner.
+        </li>
         <li>
           <strong class="text-text-primary">Rank-based grading</strong> — tiers
           now come from each lane's combined Wilson + PBI ranking, cut at fixed percentiles, instead

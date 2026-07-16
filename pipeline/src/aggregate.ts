@@ -11,6 +11,7 @@ import {
   type Role,
   type RoleStats,
   type RunePage,
+  type SkillFloor,
 } from '@lolperform/shared';
 import type { NormMatch, NormParticipant } from './riot/types.js';
 import { gradeSlice } from './tier.js';
@@ -57,7 +58,10 @@ function buildSignature(p: NormParticipant): string {
  * cumulative (emerald_plus includes diamond+ and master+ matches), computed by
  * filtering on the seed tier each match was sampled from.
  */
-export function aggregate(matches: NormMatch[]): AggregateResult {
+export function aggregate(
+  matches: NormMatch[],
+  skillFloors?: ReadonlyMap<string, SkillFloor>,
+): AggregateResult {
   const out: AggregateResult = { roleStats: [], matchups: [], duos: [], builds: [] };
   const regions = [...new Set(matches.map((m) => m.region))];
   // "all" pools every region into the largest, steadiest sample. Only emit it
@@ -69,11 +73,11 @@ export function aggregate(matches: NormMatch[]): AggregateResult {
     const allowed = new Set(BRACKET_TIERS[bracket]);
     if (pool) {
       const pooled = matches.filter((m) => allowed.has(m.tier));
-      if (pooled.length > 0) aggregateSlice(pooled, bracket, 'all', out);
+      if (pooled.length > 0) aggregateSlice(pooled, bracket, 'all', out, skillFloors);
     }
     for (const region of regions) {
       const slice = matches.filter((m) => m.region === region && allowed.has(m.tier));
-      if (slice.length > 0) aggregateSlice(slice, bracket, region, out);
+      if (slice.length > 0) aggregateSlice(slice, bracket, region, out, skillFloors);
     }
   }
   return out;
@@ -84,6 +88,7 @@ function aggregateSlice(
   rank: RankBracket,
   region: Region,
   out: AggregateResult,
+  skillFloors?: ReadonlyMap<string, SkillFloor>,
 ): void {
   const patch = slice[0]!.patch;
   const totalMatches = slice.length;
@@ -185,7 +190,9 @@ function aggregateSlice(
   // the whole role at once — a per-champion function can't rank.
   for (const role of ROLES) {
     const rows = sliceRows.filter((r) => r.role === role);
-    const graded = gradeSlice(rows);
+    const graded = gradeSlice(
+      rows.map((r) => ({ ...r, skillFloor: skillFloors?.get(r.championKey) })),
+    );
     rows.forEach((r, i) => {
       r.tier = graded[i]!.grade;
       r.score = graded[i]!.score;
