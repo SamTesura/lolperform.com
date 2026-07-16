@@ -63,6 +63,35 @@ describe('gradeSlice', () => {
   });
 });
 
+describe('gradeSlice skill floor', () => {
+  it('breaks a dead-equal boundary in favor of the low-floor champion', () => {
+    const rows = [
+      { ...row(0.5, 0.1), skillFloor: 'high' as const },
+      { ...row(0.5, 0.1), skillFloor: 'low' as const },
+      ...Array.from({ length: 10 }, (_, i) => row(0.53 - i * 0.006, 0.1)),
+    ];
+    const graded = gradeSlice(rows);
+    expect(graded[1]!.score).toBeGreaterThan(graded[0]!.score);
+  });
+
+  it('is bounded: a clearly better champion is never overtaken on ease alone', () => {
+    const rows = [
+      { ...row(0.53, 0.1), skillFloor: 'high' as const }, // 1pp ahead, hard
+      { ...row(0.52, 0.1), skillFloor: 'low' as const }, // easy, but behind
+      ...Array.from({ length: 10 }, (_, i) => row(0.5 - i * 0.005, 0.1)),
+    ];
+    const graded = gradeSlice(rows);
+    expect(graded[0]!.score).toBeGreaterThan(graded[1]!.score);
+  });
+
+  it('no skillFloor means neutral (unchanged ordering)', () => {
+    const rows = [row(0.52, 0.1), row(0.51, 0.1), row(0.5, 0.1)];
+    const graded = gradeSlice(rows);
+    expect(graded[0]!.score).toBeGreaterThan(graded[1]!.score);
+    expect(graded[1]!.score).toBeGreaterThan(graded[2]!.score);
+  });
+});
+
 describe('baseTier', () => {
   it('is the first character of the full grade', () => {
     expect(baseTier('S+')).toBe('S');

@@ -8,6 +8,12 @@ name: Patch Watch
 on:
   schedule:
     - cron: '0 */6 * * *'
+    # Patch-day sweep: Riot ships patches every two weeks on Wednesdays, with
+    # NA deploying ~3–6 AM PT. 15:00 UTC ≈ 7–8 AM PT lands right after NA
+    # maintenance, so the site rolls to the new patch hours sooner than the
+    # next 6h slot would. Cron can't express "biweekly", so this fires every
+    # Wednesday — off-week runs are just ordinary crawls.
+    - cron: '0 15 * * 3'
   workflow_dispatch:
 
 permissions:

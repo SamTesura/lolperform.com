@@ -1,4 +1,5 @@
 import type { TierGrade } from './constants.js';
+import { skillFloorOffset, type SkillFloor } from './skillFloor.js';
 
 /**
  * Tiering policy — rank-based grading (published on /methodology). Tiers are
@@ -77,6 +78,8 @@ export interface GradeInput {
   banRate: number;
   games: number;
   wilsonLower: number;
+  /** Curated mechanical-demand bucket; undefined = neutral. See skillFloor.ts. */
+  skillFloor?: SkillFloor;
 }
 
 /**
@@ -101,6 +104,13 @@ export interface GradeResult {
  * (rank-sum is scale-free, so neither signal drowns the other) and cut into
  * grades at TIER_PERCENTILES. Rows below the floor get a 'D-' placeholder that
  * no UI surfaces (the tier list omits them; pages show NR).
+ *
+ * Both signals see a skill-floor adjustment (±SKILL_FLOOR_OFFSET win-rate
+ * equivalent): a low-floor champion's win rate is repeatable by anyone who
+ * picks it, so it earns slightly more trust than the same number on a
+ * mechanically demanding champion. Small by design — it nudges boundary
+ * cases, never rewrites a tier.
+ *
  * Result is aligned with the input order.
  */
 export function gradeSlice(rows: readonly GradeInput[]): GradeResult[] {
@@ -112,8 +122,9 @@ export function gradeSlice(rows: readonly GradeInput[]): GradeResult[] {
     const sorted = [...pool].sort((a, b) => key(b) - key(a));
     return new Map(sorted.map((x, rank) => [x.i, rank]));
   };
-  const byWilson = rankOf((x) => x.r.wilsonLower);
-  const byPbi = rankOf((x) => pbi(x.r));
+  const adj = (x: (typeof pool)[number]): number => skillFloorOffset(x.r.skillFloor);
+  const byWilson = rankOf((x) => x.r.wilsonLower + adj(x));
+  const byPbi = rankOf((x) => pbi({ ...x.r, winRate: x.r.winRate + adj(x) }));
 
   const combined = [...pool].sort((a, b) => {
     const ra = byWilson.get(a.i)! + byPbi.get(a.i)!;

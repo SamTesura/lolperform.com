@@ -1,5 +1,5 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { ACTIVE_REGIONS, RANK_BRACKETS } from '@lolperform/shared';
+import { ACTIVE_REGIONS, RANK_BRACKETS, skillFloorFor } from '@lolperform/shared';
 import { assertApiKey, loadConfig } from './config.js';
 import { detectPatch } from './detect-patch.js';
 import { getChampionMeta } from './ddragon.js';
@@ -61,8 +61,10 @@ async function main(): Promise<void> {
       (dominantPatch !== latestPatch ? `; ddragon reported ${latestPatch}` : ''),
   );
 
-  const result = aggregate(store);
+  // Champion meta first: grading needs each champion's curated skill floor.
   const champions = [...(await getChampionMeta(latestVersion)).values()];
+  const skillFloors = new Map(champions.map((c) => [c.key, skillFloorFor(c.id)]));
+  const result = aggregate(store, skillFloors);
 
   await mkdir(DATA_DIR, { recursive: true });
   await writeJson('dataset-meta.json', {
