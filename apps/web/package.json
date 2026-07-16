@@ -10,17 +10,17 @@
     "typecheck": "astro check"
   },
   "dependencies": {
-    "@astrojs/mdx": "7.0.2",
+    "@astrojs/mdx": "7.0.3",
     "@astrojs/react": "6.0.1",
     "@astrojs/sitemap": "3.7.3",
     "@lolperform/shared": "workspace:*",
-    "@tailwindcss/vite": "4.3.2",
+    "@tailwindcss/vite": "4.3.3",
     "@tanstack/react-query": "5.101.2",
-    "astro": "7.0.6",
-    "lucide-react": "1.23.0",
+    "astro": "7.1.0",
+    "lucide-react": "1.24.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "tailwindcss": "4.3.2"
+    "tailwindcss": "4.3.3"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.9",
