@@ -35,8 +35,11 @@ jobs:
       # on the rendered page — scan every built page so it can't ship again.
       - name: Check rendered whitespace
         run: node scripts/check-inline-whitespace.mjs
-      - name: Audit (production deps, high+)
-        run: pnpm audit --prod --audit-level high
+      # `pnpm audit` is retired-upstream for now: npm shut off the classic audit
+      # endpoints (HTTP 410, July 2026) and no pnpm release speaks the bulk
+      # advisory API yet. Vulnerability coverage continues via GitHub Dependabot
+      # security updates (enabled on the repo; same GHSA advisory source).
+      # TODO: restore a lockfile audit step once pnpm ships bulk-endpoint support.
 
   secret-scan:
     runs-on: ubuntu-latest
