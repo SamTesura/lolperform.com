@@ -46,6 +46,36 @@ describe('accumulate', () => {
     expect(store.every((x) => x.patch === '16.14')).toBe(true);
   });
 
+  it('flips early: the announced patch wins at a fifth of the fresh crawl', () => {
+    // Match histories keep old-patch games in every crawl for ~2 weeks, so a
+    // raw majority would delay the rollover for days. Prior runs retained the
+    // ramping patch, so the flipped dataset starts with that depth.
+    const prior = [
+      ...Array.from({ length: 100 }, (_, i) => m(`old${i}`, '16.13')),
+      ...Array.from({ length: 15 }, (_, i) => m(`ramp${i}`, '16.14')),
+    ];
+    const fresh = [
+      ...Array.from({ length: 8 }, (_, i) => m(`hist${i}`, '16.13')),
+      ...Array.from({ length: 2 }, (_, i) => m(`new${i}`, '16.14')), // exactly 20%
+    ];
+    const { store, dominantPatch } = accumulate(prior, fresh, '16.14');
+    expect(dominantPatch).toBe('16.14');
+    expect(store).toHaveLength(17);
+    expect(store.every((x) => x.patch === '16.14')).toBe(true);
+  });
+
+  it('retains the announced patch in the store before the flip', () => {
+    const prior = Array.from({ length: 100 }, (_, i) => m(`old${i}`, '16.13'));
+    const fresh = [
+      ...Array.from({ length: 9 }, (_, i) => m(`hist${i}`, '16.13')),
+      m('early', '16.14'), // 10% — below the flip threshold
+    ];
+    const { store, dominantPatch } = accumulate(prior, fresh, '16.14');
+    expect(dominantPatch).toBe('16.13'); // dataset stays on the live majority
+    expect(store.some((x) => x.patch === '16.14')).toBe(true); // but nothing is thrown away
+    expect(store).toHaveLength(110);
+  });
+
   it('falls back to the stored patch on an empty crawl (store survives)', () => {
     const prior = [m('a', '16.13'), m('b', '16.13')];
     const { store, dominantPatch } = accumulate(prior, [], '16.14');

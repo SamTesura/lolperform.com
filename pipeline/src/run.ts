@@ -54,17 +54,22 @@ async function main(): Promise<void> {
   const prior = await readStore();
   const { store, dominantPatch } = accumulate(prior, crawled, latestPatch);
   await writeStore(store);
+  // The store may carry a ramping next patch; the dataset is dominant-only.
+  const dataset = store.filter((m) => m.patch === dominantPatch);
+  const ramping = store.length - dataset.length;
   const dropped = prior.length + crawled.length - store.length;
   console.info(
-    `[run] crawl ${crawled.length} + stored ${prior.length} -> ${store.length} on patch ` +
-      `${dominantPatch} (${dropped} duplicate/off-patch dropped — stats never mix patches)` +
+    `[run] crawl ${crawled.length} + stored ${prior.length} -> ${dataset.length} on patch ` +
+      `${dominantPatch}` +
+      (ramping > 0 ? ` (+${ramping} accumulating on ${latestPatch})` : '') +
+      ` (${dropped} duplicate/off-patch dropped — stats never mix patches)` +
       (dominantPatch !== latestPatch ? `; ddragon reported ${latestPatch}` : ''),
   );
 
   // Champion meta first: grading needs each champion's curated skill floor.
   const champions = [...(await getChampionMeta(latestVersion)).values()];
   const skillFloors = new Map(champions.map((c) => [c.key, skillFloorFor(c.id)]));
-  const result = aggregate(store, skillFloors);
+  const result = aggregate(dataset, skillFloors);
 
   await mkdir(DATA_DIR, { recursive: true });
   await writeJson('dataset-meta.json', {
@@ -73,7 +78,7 @@ async function main(): Promise<void> {
     generatedAt: new Date().toISOString(),
     regions: [...ACTIVE_REGIONS],
     ranks: [...RANK_BRACKETS],
-    totalMatches: store.length,
+    totalMatches: dataset.length,
     counts: {
       roleStats: result.roleStats.length,
       matchups: result.matchups.length,
