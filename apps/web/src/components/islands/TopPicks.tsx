@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { DEFAULT_RANK_BRACKET, DEFAULT_REGION, TIER_LIST_MIN_GAMES } from '@lolperform/shared';
+import { DEFAULT_RANK_BRACKET, DEFAULT_REGION } from '@lolperform/shared';
 import { fetchMeta, fetchTierList } from '../../lib/api';
 import { championIndex } from '../../lib/champions';
 import { TierTile } from '../primitives/TierTile';
@@ -16,9 +16,7 @@ function Picks() {
 
   const index = meta.data ? championIndex(meta.data.champions) : new Map();
   const version = meta.data?.version;
-  const top = (tiers.data?.champions ?? [])
-    .filter((c) => c.games >= TIER_LIST_MIN_GAMES)
-    .slice(0, 8);
+  const top = (tiers.data?.champions ?? []).filter((c) => c.score > 0).slice(0, 8);
 
   if (tiers.isLoading) return <Loading label="Loading top picks…" />;
   if (tiers.isError || top.length === 0) return <EmptyState {...AWAITING_DATA} />;

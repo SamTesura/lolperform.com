@@ -15,7 +15,7 @@ const input: LoadInput = {
     {
       patch: '16.12', region: 'na1', rank: 'emerald_plus', role: 'BOTTOM', championKey: '145',
       games: 800, wins: 420, winRate: 0.525, pickRate: 0.2, banRate: 0.05,
-      wilsonLower: 0.49, score: 0.49, tier: 'S', deltaWinRate: null, deltaTier: null,
+      wilsonLower: 0.49, score: 0.49, tier: 'S', provisional: false, deltaWinRate: null, deltaTier: null,
     },
   ],
   matchups: [

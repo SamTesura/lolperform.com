@@ -182,12 +182,15 @@ function aggregateSlice(
       wilsonLower: wilsonLowerBound(t.wins, t.games),
       score: 0, // set by gradeSlice below
       tier: 'D-', // placeholder; set by gradeSlice below
+      provisional: false, // set by gradeSlice below
       deltaWinRate: null,
       deltaTier: null,
     });
   }
   // Grades are relative to the role's pool in this slice, so grading must see
-  // the whole role at once — a per-champion function can't rank.
+  // the whole role at once — a per-champion function can't rank. The pipeline
+  // grades one patch in isolation (no priorPatch input), so provisional is
+  // always false here; the worker recomputes live with prior-patch blending.
   for (const role of ROLES) {
     const rows = sliceRows.filter((r) => r.role === role);
     const graded = gradeSlice(
@@ -196,6 +199,7 @@ function aggregateSlice(
     rows.forEach((r, i) => {
       r.tier = graded[i]!.grade;
       r.score = graded[i]!.score;
+      r.provisional = graded[i]!.provisional;
     });
   }
   out.roleStats.push(...sliceRows);

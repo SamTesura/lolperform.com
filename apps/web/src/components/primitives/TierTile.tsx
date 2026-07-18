@@ -35,7 +35,7 @@ export function TierTile({ stat, meta, version, href, unranked }: Props) {
     >
       {!unranked ? (
         <div className="absolute top-1 left-1 z-10">
-          <TierBadge tier={baseTier(stat.tier)} grade={stat.tier} size="sm" />
+          <TierBadge tier={baseTier(stat.tier)} grade={stat.tier} size="sm" provisional={stat.provisional} />
         </div>
       ) : null}
       <div className="absolute top-1 right-1 z-10">
