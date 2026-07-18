@@ -6,7 +6,6 @@ import {
   DEFAULT_REGION,
   isRanked,
   REGION_LABELS,
-  TIER_LIST_MIN_GAMES,
   type RankBracket,
   type Region,
   type Role,
@@ -63,13 +62,14 @@ function Recommender({ champions, version }: Props) {
     (roleList.data?.champions ?? []).map((s) => [s.championKey, s]),
   );
 
-  // The lane's real roster: champions the tier list itself ranks here (the
-  // 1,000-game floor), plus any enemy the curated list covers. Deliberately
-  // NOT everyone who ever flexed into the lane — a 60-game Singed bot is not
-  // an enemy worth a dropdown slot.
+  // The lane's real roster: champions the tier list itself ranks here (score
+  // > 0 — past the games floor, or provisional off a blended prior patch),
+  // plus any enemy the curated list covers. Deliberately NOT everyone who
+  // ever flexed into the lane — a 60-game Singed bot is not an enemy worth a
+  // dropdown slot.
   const enemyKeys = new Set<string>(
     (roleList.data?.champions ?? [])
-      .filter((s) => s.games >= TIER_LIST_MIN_GAMES)
+      .filter((s) => s.score > 0)
       .map((s) => s.championKey),
   );
   for (const id of enemiesWithCounters(role)) {
@@ -132,11 +132,11 @@ function Recommender({ champions, version }: Props) {
                   const m = idToMeta.get(p.id);
                   if (!m) return null;
                   const stat = statByKey.get(m.key);
-                  // Same contract as everywhere else: a tier badge only past
-                  // the 1,000-game floor; a bare win rate above 50 games; a
-                  // dash below that.
+                  // Same contract as everywhere else: a tier badge only for
+                  // graded rows (score > 0 — past the floor, or provisional);
+                  // a bare win rate above 50 games; a dash below that.
                   const hasStats = stat && isRanked(stat.games);
-                  const tiered = stat && stat.games >= TIER_LIST_MIN_GAMES;
+                  const tiered = stat && stat.score > 0;
                   return (
                     <li key={p.id}>
                       <a
@@ -153,7 +153,12 @@ function Recommender({ champions, version }: Props) {
                         {hasStats ? (
                           <span className="flex items-center gap-2">
                             {tiered ? (
-                              <TierBadge tier={baseTier(stat!.tier)} grade={stat!.tier} size="sm" />
+                              <TierBadge
+                                tier={baseTier(stat!.tier)}
+                                grade={stat!.tier}
+                                size="sm"
+                                provisional={stat!.provisional}
+                              />
                             ) : null}
                             <span
                               className={`stat text-sm font-semibold ${stat!.winRate >= 0.5 ? 'text-positive' : 'text-negative'}`}

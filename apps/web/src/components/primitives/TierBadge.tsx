@@ -20,15 +20,18 @@ interface Props {
   /** Full grade to display, e.g. "S+". Defaults to the base letter. */
   grade?: string;
   size?: keyof typeof SIZES;
+  /** Blended with the prior patch because this patch's sample hasn't matured yet. */
+  provisional?: boolean;
 }
 
 /** The tier grade on its tier fill. Letter is the primary channel; hue reinforces. */
-export function TierBadge({ tier, grade, size = 'md' }: Props) {
+export function TierBadge({ tier, grade, size = 'md', provisional }: Props) {
   const label = grade ?? tier;
   return (
     <span
-      className={`inline-flex items-center justify-center rounded-md font-display font-bold ${TIER_BG[tier]} ${SIZES[size]}`}
-      aria-label={`Tier ${label}`}
+      className={`inline-flex items-center justify-center rounded-md font-display font-bold ${TIER_BG[tier]} ${SIZES[size]} ${provisional ? 'border border-dashed border-current' : ''}`}
+      aria-label={`Tier ${label}${provisional ? ' (provisional — early data)' : ''}`}
+      title={provisional ? 'Provisional: this patch’s sample is still small, blended with the prior patch' : undefined}
     >
       {label}
     </span>

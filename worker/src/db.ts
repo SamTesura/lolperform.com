@@ -1,15 +1,18 @@
-import type {
-  BuildPath,
-  ChampionMeta,
-  CounterPick,
-  DuoSynergy,
-  Matchup,
-  RankBracket,
-  Region,
-  Role,
-  RoleStats,
-  RunePage,
-  FullTierGrade,
+import {
+  gradeSlice,
+  skillFloorFor,
+  type BuildPath,
+  type ChampionMeta,
+  type CounterPick,
+  type DuoSynergy,
+  type GradeInput,
+  type Matchup,
+  type RankBracket,
+  type Region,
+  type Role,
+  type RoleStats,
+  type RunePage,
+  type FullTierGrade,
 } from '@lolperform/shared';
 import type { Env } from './env.js';
 
@@ -112,6 +115,10 @@ export function mapRoleStats(r: RoleStatsRow): RoleStats {
     wilsonLower: r.wilson_lower,
     score: r.score,
     tier: r.tier as FullTierGrade,
+    // Recomputed live by getGradedRoleStats, which blends in the prior patch
+    // for under-threshold champions; a bare mapRoleStats call has no prior to
+    // check against, so it defaults to false.
+    provisional: false,
     deltaWinRate: null,
     deltaTier: null,
   };
@@ -214,6 +221,79 @@ export async function getLatestPatch(env: Env): Promise<PatchRow | null> {
   return env.DB.prepare('SELECT * FROM patches ORDER BY generated_at DESC LIMIT 1').first<PatchRow>();
 }
 
+/** The patch immediately before `patch`, if one is still on hand (old-patch
+ *  rows aren't deleted on flip — see buildLoadSql). Null once none remains. */
+async function getPreviousPatch(env: Env, patch: string): Promise<string | null> {
+  const row = await env.DB.prepare(
+    'SELECT patch FROM patches WHERE patch != ? ORDER BY generated_at DESC LIMIT 1',
+  )
+    .bind(patch)
+    .first<{ patch: string }>();
+  return row?.patch ?? null;
+}
+
+async function fetchRoleStatsRows(
+  env: Env,
+  patch: string,
+  region: Region,
+  rank: RankBracket,
+  role: Role,
+): Promise<RoleStatsRow[]> {
+  const { results } = await env.DB.prepare(
+    'SELECT * FROM role_stats WHERE patch = ? AND region = ? AND rank = ? AND role = ?',
+  )
+    .bind(patch, region, rank, role)
+    .all<RoleStatsRow>();
+  return results;
+}
+
+/**
+ * One role's slice, graded live: current-patch rows below TIER_LIST_MIN_GAMES
+ * are blended with their prior-patch counterpart (see tier.ts) instead of
+ * sitting out as NR while the new patch's sample fills up. Displayed games/
+ * win rate/etc. stay the champion's real current-patch numbers — only the
+ * ranking inputs and resulting tier/score/provisional are blended.
+ */
+async function getGradedRoleStats(env: Env, slice: Slice, role: Role): Promise<RoleStats[]> {
+  const current = await fetchRoleStatsRows(env, slice.patch, slice.region, slice.rank, role);
+  if (current.length === 0) return [];
+
+  const priorPatch = await getPreviousPatch(env, slice.patch);
+  const priorByChamp = new Map<string, RoleStatsRow>();
+  if (priorPatch) {
+    const prior = await fetchRoleStatsRows(env, priorPatch, slice.region, slice.rank, role);
+    for (const row of prior) priorByChamp.set(row.champion_key, row);
+  }
+
+  const champions = await getChampions(env);
+  const idByKey = new Map(champions.map((c) => [c.key, c.id]));
+
+  const inputs: GradeInput[] = current.map((r) => {
+    const prior = priorByChamp.get(r.champion_key);
+    return {
+      winRate: r.win_rate,
+      pickRate: r.pick_rate,
+      banRate: r.ban_rate,
+      games: r.games,
+      wilsonLower: r.wilson_lower,
+      skillFloor: skillFloorFor(idByKey.get(r.champion_key) ?? ''),
+      priorPatch: prior
+        ? { winRate: prior.win_rate, pickRate: prior.pick_rate, banRate: prior.ban_rate, wilsonLower: prior.wilson_lower }
+        : undefined,
+    };
+  });
+
+  const graded = gradeSlice(inputs);
+  return current
+    .map((r, i) => ({
+      ...mapRoleStats(r),
+      tier: graded[i]!.grade,
+      score: graded[i]!.score,
+      provisional: graded[i]!.provisional,
+    }))
+    .sort((a, b) => b.score - a.score);
+}
+
 export async function getChampions(env: Env): Promise<ChampionMeta[]> {
   const { results } = await env.DB.prepare(
     'SELECT * FROM champions ORDER BY name',
@@ -233,14 +313,7 @@ export async function getTierList(
   slice: Slice,
   role: Role,
 ): Promise<RoleStats[]> {
-  const { results } = await env.DB.prepare(
-    `SELECT * FROM role_stats
-     WHERE patch = ? AND region = ? AND rank = ? AND role = ?
-     ORDER BY score DESC`,
-  )
-    .bind(slice.patch, slice.region, slice.rank, role)
-    .all<RoleStatsRow>();
-  return results.map(mapRoleStats);
+  return getGradedRoleStats(env, slice, role);
 }
 
 export async function getRoleStatsForChampion(
@@ -249,13 +322,18 @@ export async function getRoleStatsForChampion(
   championKey: string,
 ): Promise<RoleStats[]> {
   const { results } = await env.DB.prepare(
-    `SELECT * FROM role_stats
-     WHERE patch = ? AND region = ? AND rank = ? AND champion_key = ?
-     ORDER BY games DESC`,
+    `SELECT DISTINCT role FROM role_stats
+     WHERE patch = ? AND region = ? AND rank = ? AND champion_key = ?`,
   )
     .bind(slice.patch, slice.region, slice.rank, championKey)
-    .all<RoleStatsRow>();
-  return results.map(mapRoleStats);
+    .all<{ role: string }>();
+  const roles = results.map((r) => r.role as Role);
+
+  const graded = await Promise.all(roles.map((role) => getGradedRoleStats(env, slice, role)));
+  return graded
+    .flat()
+    .filter((r) => r.championKey === championKey)
+    .sort((a, b) => b.games - a.games);
 }
 
 export async function getMatchupsForChampion(

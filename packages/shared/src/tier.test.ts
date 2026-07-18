@@ -92,6 +92,66 @@ describe('gradeSlice skill floor', () => {
   });
 });
 
+describe('gradeSlice provisional (prior-patch blending)', () => {
+  it('a sub-floor row with a prior patch enters the pool as provisional', () => {
+    const rows: GradeInput[] = [
+      ...Array.from({ length: 10 }, (_, i) => row(0.52 - i * 0.005, 0.12)),
+      {
+        ...row(0.55, 0.12, 0.05, 100), // only 100 games this patch
+        priorPatch: { winRate: 0.55, pickRate: 0.12, banRate: 0.05, wilsonLower: 0.54 },
+      },
+    ];
+    const graded = gradeSlice(rows);
+    expect(graded[10]!.grade).not.toBe('D-');
+    expect(graded[10]!.provisional).toBe(true);
+    expect(graded[10]!.score).toBeGreaterThan(0);
+  });
+
+  it('a sub-floor row without a prior patch stays unranked regardless of skill floor', () => {
+    const rows: GradeInput[] = [row(0.52), { ...row(0.6), games: 100 }];
+    const graded = gradeSlice(rows);
+    expect(graded[1]!.grade).toBe('D-');
+    expect(graded[1]!.provisional).toBe(false);
+    expect(graded[1]!.score).toBeLessThan(0);
+  });
+
+  it('a prior below MIN_TIER_GAMES is still too thin to blend into a grade', () => {
+    const rows: GradeInput[] = [
+      row(0.52),
+      {
+        ...row(0.9, 0.12, 0.05, 10), // 10 games — under MIN_TIER_GAMES
+        priorPatch: { winRate: 0.9, pickRate: 0.12, banRate: 0.05, wilsonLower: 0.85 },
+      },
+    ];
+    const graded = gradeSlice(rows);
+    expect(graded[1]!.grade).toBe('D-');
+    expect(graded[1]!.provisional).toBe(false);
+  });
+
+  it('a row past TIER_LIST_MIN_GAMES ignores its prior and is never marked provisional', () => {
+    const rows: GradeInput[] = [
+      ...Array.from({ length: 10 }, (_, i) => row(0.52 - i * 0.005, 0.12)),
+      {
+        ...row(0.55, 0.12, 0.05, TIER_LIST_MIN_GAMES),
+        priorPatch: { winRate: 0.3, pickRate: 0.12, banRate: 0.05, wilsonLower: 0.25 }, // wildly different prior
+      },
+    ];
+    const graded = gradeSlice(rows);
+    expect(graded[10]!.provisional).toBe(false);
+    expect(graded[10]!.grade).toBe('S+'); // ranks purely on its own current-patch stats
+  });
+
+  it('blend weight scales with current-patch games: more current games trusts the prior less', () => {
+    const priorPatch = { winRate: 0.65, pickRate: 0.12, banRate: 0.05, wilsonLower: 0.6 };
+    const early: GradeInput = { ...row(0.5, 0.12, 0.05, 100), priorPatch }; // mostly prior (strong)
+    const later: GradeInput = { ...row(0.5, 0.12, 0.05, 900), priorPatch }; // mostly current (weak)
+    const pool = Array.from({ length: 10 }, (_, i) => row(0.52 - i * 0.005, 0.12));
+    const gradedEarly = gradeSlice([...pool, early]);
+    const gradedLater = gradeSlice([...pool, later]);
+    expect(gradedEarly[10]!.score).toBeGreaterThan(gradedLater[10]!.score);
+  });
+});
+
 describe('baseTier', () => {
   it('is the first character of the full grade', () => {
     expect(baseTier('S+')).toBe('S');

@@ -99,14 +99,10 @@ import Base from '../layouts/Base.astro';
         champion sits inside the band.
       </p>
       <p>
-        One floor governs tiers everywhere: <strong class="text-text-primary">a grade only exists
-        past 1,000 games</strong> in that lane this patch. The tier list omits champions below it,
-        and a champion's own page shows <strong class="text-text-primary">NR</strong> (not rated)
-        for such lanes instead of a grade — so a lane can never read "S+" here while the
-        champion is missing from that lane's tier list. Win, pick, and ban rates still display for
-        every lane with a meaningful sample, always next to their game count. All numbers come from
-        the current patch only — balance changes make older games misleading — and the sample
-        compounds every few hours as the crawler runs.
+        A grade needs <strong class="text-text-primary">1,000 games</strong> in that lane this patch to stand fully on its own.
+        Below that — right after a patch flips, before the new sample has filled in — a champion is graded <strong class="text-text-primary">provisional</strong> (dashed tier badge) if it has a prior-patch grade to lean on: its ranking blends the two, weighted by how much of the 1,000-game floor this patch has filled, so the blend is almost entirely last patch's data at game one and entirely this patch's data at game 1,000.
+        A brand new champion or lane with no prior-patch history, and no games yet this patch, still shows <strong class="text-text-primary">NR</strong> (not rated) instead of a grade — so a lane can never read "S+" off pure guesswork.
+        Win, pick, and ban rates always display the current patch's real numbers next to their game count, whether or not the grade above them is provisional. All numbers come from the current patch only — balance changes make older games misleading — and the sample compounds every few hours as the crawler runs.
       </p>
     </section>
 

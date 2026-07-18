@@ -58,6 +58,9 @@ export const roleStatsSchema = z.object({
   /** Rank-derived sort score (higher = better; sub-floor rows are negative). */
   score: z.number(),
   tier: fullTierGradeSchema,
+  /** True when the grade leans on a shrinkage-blended prior-patch prior because
+   *  this champion hasn't reached TIER_LIST_MIN_GAMES yet this patch. */
+  provisional: z.boolean().default(false),
   /** Win-rate change vs the previous patch, in absolute proportion (e.g. +0.012). */
   deltaWinRate: z.number().nullable().default(null),
   /** Tier movement vs the previous patch. */

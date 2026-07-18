@@ -72,6 +72,14 @@ export function baseTier(full: FullTierGrade): TierGrade {
   return full[0] as TierGrade;
 }
 
+/** Same champion's fully-graded prior-patch stats, for provisional early grading. */
+export interface PriorPatchStats {
+  winRate: number;
+  pickRate: number;
+  banRate: number;
+  wilsonLower: number;
+}
+
 export interface GradeInput {
   winRate: number;
   pickRate: number;
@@ -80,6 +88,8 @@ export interface GradeInput {
   wilsonLower: number;
   /** Curated mechanical-demand bucket; undefined = neutral. See skillFloor.ts. */
   skillFloor?: SkillFloor;
+  /** Prior-patch counterpart, when this patch hasn't reached TIER_LIST_MIN_GAMES yet. */
+  priorPatch?: PriorPatchStats;
 }
 
 /**
@@ -96,6 +106,30 @@ export interface GradeResult {
   /** Sort key, higher = better. Ranked rows land in (0, 1]; sub-floor rows are
    *  negative so they always sort after every ranked champion. */
   score: number;
+  /** True when this patch hasn't reached TIER_LIST_MIN_GAMES yet and the grade
+   *  leans on a shrinkage-blended prior-patch prior instead. */
+  provisional: boolean;
+}
+
+/**
+ * Blend a row's stats toward its prior-patch counterpart, weighted linearly by
+ * how far this patch's sample has filled TIER_LIST_MIN_GAMES (0 games this
+ * patch = pure prior, TIER_LIST_MIN_GAMES+ = pure current — the prior fades
+ * out exactly as fast as real signal fades in). No prior, or already past the
+ * floor: current stats pass through unchanged.
+ */
+function blendWithPrior(r: GradeInput): PriorPatchStats {
+  if (!r.priorPatch || r.games >= TIER_LIST_MIN_GAMES) {
+    return { winRate: r.winRate, pickRate: r.pickRate, banRate: r.banRate, wilsonLower: r.wilsonLower };
+  }
+  const w = r.games / TIER_LIST_MIN_GAMES;
+  const p = r.priorPatch;
+  return {
+    winRate: r.winRate * w + p.winRate * (1 - w),
+    pickRate: r.pickRate * w + p.pickRate * (1 - w),
+    banRate: r.banRate * w + p.banRate * (1 - w),
+    wilsonLower: r.wilsonLower * w + p.wilsonLower * (1 - w),
+  };
 }
 
 /**
@@ -103,7 +137,9 @@ export interface GradeResult {
  * by Wilson win rate and by PBI — then ordered by the sum of the two ranks
  * (rank-sum is scale-free, so neither signal drowns the other) and cut into
  * grades at TIER_PERCENTILES. Rows below the floor get a 'D-' placeholder that
- * no UI surfaces (the tier list omits them; pages show NR).
+ * no UI surfaces (the tier list omits them; pages show NR) — unless a prior-patch
+ * counterpart exists, in which case the row enters the pool past MIN_TIER_GAMES
+ * using its prior-blended stats, flagged `provisional`.
  *
  * Both signals see a skill-floor adjustment (±SKILL_FLOOR_OFFSET win-rate
  * equivalent): a low-floor champion's win rate is repeatable by anyone who
@@ -114,28 +150,31 @@ export interface GradeResult {
  * Result is aligned with the input order.
  */
 export function gradeSlice(rows: readonly GradeInput[]): GradeResult[] {
-  const out: GradeResult[] = rows.map((r) => ({ grade: 'D-', score: r.wilsonLower - 1 }));
-  const pool = rows.map((r, i) => ({ i, r })).filter((x) => x.r.games >= TIER_LIST_MIN_GAMES);
+  const out: GradeResult[] = rows.map((r) => ({ grade: 'D-', score: r.wilsonLower - 1, provisional: false }));
+  const pool = rows
+    .map((r, i) => ({ i, r }))
+    .filter((x) => x.r.games >= TIER_LIST_MIN_GAMES || (x.r.priorPatch && x.r.games >= MIN_TIER_GAMES));
   if (pool.length === 0) return out;
 
+  const blended = new Map(pool.map((x) => [x.i, blendWithPrior(x.r)]));
   const rankOf = (key: (x: (typeof pool)[number]) => number): Map<number, number> => {
     const sorted = [...pool].sort((a, b) => key(b) - key(a));
     return new Map(sorted.map((x, rank) => [x.i, rank]));
   };
   const adj = (x: (typeof pool)[number]): number => skillFloorOffset(x.r.skillFloor);
-  const byWilson = rankOf((x) => x.r.wilsonLower + adj(x));
-  const byPbi = rankOf((x) => pbi({ ...x.r, winRate: x.r.winRate + adj(x) }));
+  const byWilson = rankOf((x) => blended.get(x.i)!.wilsonLower + adj(x));
+  const byPbi = rankOf((x) => pbi({ ...blended.get(x.i)!, winRate: blended.get(x.i)!.winRate + adj(x) }));
 
   const combined = [...pool].sort((a, b) => {
     const ra = byWilson.get(a.i)! + byPbi.get(a.i)!;
     const rb = byWilson.get(b.i)! + byPbi.get(b.i)!;
-    return ra - rb || b.r.wilsonLower - a.r.wilsonLower;
+    return ra - rb || blended.get(b.i)!.wilsonLower - blended.get(a.i)!.wilsonLower;
   });
 
   combined.forEach((x, idx) => {
     const pct = idx / pool.length;
     const band = TIER_PERCENTILES.find((t) => pct < t.upTo)!;
-    out[x.i] = { grade: band.grade, score: 1 - idx / pool.length };
+    out[x.i] = { grade: band.grade, score: 1 - idx / pool.length, provisional: x.r.games < TIER_LIST_MIN_GAMES };
   });
   return out;
 }

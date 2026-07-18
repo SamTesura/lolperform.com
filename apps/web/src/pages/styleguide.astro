@@ -31,6 +31,7 @@ const stat = (
   winRate: number,
   games: number,
   deltaWinRate: number | null,
+  provisional = false,
 ): RoleStats => ({
   patch: '15.13',
   region: 'na1',
@@ -45,6 +46,7 @@ const stat = (
   wilsonLower: winRate - 0.02,
   score: winRate,
   tier,
+  provisional,
   deltaWinRate,
   deltaTier: null,
 });
@@ -52,7 +54,7 @@ const stat = (
 const tierExamples: RoleStats[] = [
   stat(champs.caitlyn, 'S', 0.534, 14820, 0.008),
   stat(champs.jhin, 'A', 0.521, 9210, -0.004),
-  stat(champs.aphelios, 'B', 0.503, 640, 0.012),
+  stat(champs.aphelios, 'B', 0.503, 640, 0.012, true),
   stat(champs.missfortune, 'C', 0.491, 180, -0.011),
   stat(champs.lux, 'D', 0.472, 22, null),
 ];

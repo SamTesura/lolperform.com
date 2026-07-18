@@ -34,14 +34,11 @@ function Grid() {
   const version = meta.data?.version;
   const champions = tiers.data?.champions ?? [];
 
-  // Only rank champions with a trustworthy sample. A ranking off a few dozen
-  // games is noise, so anything under TIER_LIST_MIN_GAMES is omitted entirely
-  // (not shown as "Unranked") until it accumulates enough. Grouped by a tier
-  // derived from win rate (the shared source of truth), so logic shows on
-  // existing data.
-  const ranked = champions
-    .filter((c) => c.games >= TIER_LIST_MIN_GAMES)
-    .sort((a, b) => b.score - a.score);
+  // Only show champions the shared grader actually ranked. gradeSlice scores
+  // ranked rows in (0, 1] and everything else negative — that already accounts
+  // for provisional (prior-patch-blended) rows entering the pool early, so
+  // score > 0 is the single source of truth here, not a games threshold.
+  const ranked = champions.filter((c) => c.score > 0).sort((a, b) => b.score - a.score);
 
   return (
     <div className="space-y-4">
@@ -62,7 +59,7 @@ function Grid() {
       ) : ranked.length === 0 ? (
         <EmptyState
           title="Building the sample"
-          detail={`Only champions with ${TIER_LIST_MIN_GAMES.toLocaleString('en-US')}+ games this patch are ranked. The largest sample on this slice is ${Math.max(...champions.map((c) => c.games)).toLocaleString('en-US')} games so far — single regions fill slowly; All Regions pools every ladder and fills first.`}
+          detail={`Champions are ranked past ${TIER_LIST_MIN_GAMES.toLocaleString('en-US')} games this patch, or earlier once blended with the prior patch. Neither is ready yet on this slice — the largest sample so far is ${Math.max(...champions.map((c) => c.games)).toLocaleString('en-US')} games — single regions fill slowly; All Regions pools every ladder and fills first.`}
         />
       ) : (
         <div className="space-y-2">
