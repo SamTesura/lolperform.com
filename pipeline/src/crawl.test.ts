@@ -74,6 +74,7 @@ function fakeClient(behavior: FakeBehavior = {}): RiotClient {
 
 function config(regions: Platform[]): PipelineConfig {
   return {
+    riotApiKey: 'test-key',
     regions,
     riotRps: 4,
     maxRuntimeMinutes: 60,
