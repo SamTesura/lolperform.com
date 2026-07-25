@@ -98,6 +98,23 @@ describe('crawl resilience', () => {
     expect(new Set(matches.map((m) => m.region))).toEqual(new Set(['na1']));
   });
 
+  it('flushes progress after every region so an external kill loses at most one', async () => {
+    const flushed: number[] = [];
+    await crawl(fakeClient(), config(['na1', 'euw1']), async (soFar) => {
+      flushed.push(soFar.length);
+    });
+    expect(flushed).toHaveLength(2); // once per region
+    expect(flushed[0]!).toBeGreaterThan(0);
+    expect(flushed[1]!).toBeGreaterThan(flushed[0]!); // cumulative, not per-region
+  });
+
+  it('a failing flush is logged, never fatal', async () => {
+    const matches = await crawl(fakeClient(), config(['na1', 'euw1']), async () => {
+      throw new Error('disk full');
+    });
+    expect(matches.length).toBeGreaterThan(0);
+  });
+
   it('throws only when every region produced nothing', async () => {
     await expect(
       crawl(fakeClient({ allSeedsFail: new Set(['na1', 'euw1']) }), config(['na1', 'euw1'])),

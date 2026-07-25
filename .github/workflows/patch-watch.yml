@@ -102,9 +102,17 @@ jobs:
 
       # Persist the grown store to R2 BEFORE the D1 load: hours of crawled
       # matches must never be lost to a load failure. Non-fatal on its own.
+      # always(): the crawl flushes progress per region, so even a cancelled or
+      # failed crawl step (runner eviction, timeout, Riot outage mid-run) leaves
+      # a partial store worth uploading — run 30150582885 lost ~6k matches to a
+      # runner kill at region 6 of 6 before this.
       - name: Save match store
-        if: steps.decide.outputs.run == 'true'
+        if: always() && steps.decide.outputs.run == 'true'
         run: |
+          if [ ! -s pipeline/data/store/matches.ndjson ]; then
+            echo "No store file to save (crawl died before its first flush)."
+            exit 0
+          fi
           if pnpm exec wrangler r2 object put lolperform-matches/matches.ndjson \
                --file pipeline/data/store/matches.ndjson --remote 2>/dev/null; then
             echo "Saved $(wc -l < pipeline/data/store/matches.ndjson) matches to the store."

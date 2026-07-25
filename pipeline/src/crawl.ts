@@ -157,8 +157,16 @@ function interleave(seeds: Map<LeagueTier, string[]>): { puuid: string; tier: Le
  * Failures degrade instead of aborting: a dead seed endpoint skips its tier, a
  * failed region skips that region. Only a run that keeps zero matches overall
  * throws — hours of crawled matches must never die with someone else's outage.
+ *
+ * `onRegionDone` (best-effort, awaited between regions) lets the caller flush
+ * progress to disk, so an external kill — runner eviction, cancellation, the
+ * job timeout — costs at most the region in flight, not the whole crawl.
  */
-export async function crawl(client: RiotClient, config: PipelineConfig): Promise<NormMatch[]> {
+export async function crawl(
+  client: RiotClient,
+  config: PipelineConfig,
+  onRegionDone?: (matchesSoFar: readonly NormMatch[]) => Promise<void>,
+): Promise<NormMatch[]> {
   const all: NormMatch[] = [];
   // Split the wall-clock budget evenly across regions; reserve most of each
   // region's slice for match-fetch (the bulk) over id-discovery.
@@ -171,6 +179,11 @@ export async function crawl(client: RiotClient, config: PipelineConfig): Promise
       // Never let one region abort the run: the matches already crawled from
       // the other regions are hours of rate-limited work.
       console.error(`[crawl] ${region}: region failed, continuing — ${String(err)}`);
+    }
+    try {
+      await onRegionDone?.(all);
+    } catch (err) {
+      console.warn(`[crawl] progress flush after ${region} failed — ${String(err)}`);
     }
   }
 

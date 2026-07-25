@@ -45,13 +45,22 @@ async function main(): Promise<void> {
   console.info(`[run] target patch ${latestPatch} (ddragon ${latestVersion})`);
 
   const client = new RiotClient(config.riotApiKey, config.riotRps);
-  const crawled = await crawl(client, config);
+
+  const prior = await readStore();
+  // Cancellation insurance: after each region, persist the raw deduped union
+  // (no pruning — accumulate() does that on the next restore). A runner
+  // eviction or timeout then costs at most the region in flight; the workflow
+  // uploads this file to R2 even when the crawl step dies.
+  const crawled = await crawl(client, config, async (soFar) => {
+    const byId = new Map(prior.map((m) => [m.matchId, m]));
+    for (const m of soFar) byId.set(m.matchId, m);
+    await writeStore([...byId.values()]);
+  });
 
   // Compound volume across runs: merge this crawl into the accumulated store
   // (dedup by matchId), prune to the two most common recent patches, and tag the
   // dataset with the dominant one. Lets a rate-limited key build a credible
   // sample over time, and fills far faster once a production key lands.
-  const prior = await readStore();
   const { store, dominantPatch } = accumulate(prior, crawled, latestPatch);
   await writeStore(store);
   // The store may carry a ramping next patch; the dataset is dominant-only.
