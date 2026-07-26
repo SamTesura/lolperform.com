@@ -52,6 +52,43 @@ export const BRACKET_TIERS: Record<RankBracket, readonly LeagueTier[]> = {
 };
 
 /**
+ * Share of the ranked ladder in each crawled tier (percent of all ranked
+ * players, June 2026 solo-queue distribution — esportstales.com). Only the
+ * ratios matter: aggregation post-stratifies each bracket's sample to these,
+ * so a crawl that oversamples apex (deliberately, to keep the master_plus
+ * slice usable) still reports stats representative of the bracket's real
+ * population instead of an apex-skewed one. Champions whose win rate moves
+ * with elo (Caitlyn down, Vayne up) are exactly the ones a raw mix misgrades.
+ */
+export const TIER_POPULATION_SHARE: Record<LeagueTier, number> = {
+  EMERALD: 12,
+  DIAMOND: 4,
+  MASTER: 0.84,
+  GRANDMASTER: 0.062,
+  CHALLENGER: 0.025,
+};
+
+/**
+ * Ranked players per crawled server, in millions (Split 2 2024 ranked-API
+ * estimates — unrankedsmurfs.com; VN and JP are estimates, no published
+ * figures). Only the ratios matter: the pooled "all" view post-stratifies to
+ * these so it represents global ranked play by population, not by our
+ * equal-per-region crawl budget — which otherwise triples the influence of
+ * small servers (JP + OCE + VN were 31% of the crawl, ~2× their real share)
+ * and skews champions whose win rate varies by region.
+ */
+export const REGION_POPULATION_SHARE: Record<Platform, number> = {
+  kr: 2.57,
+  euw1: 2.31,
+  vn2: 1.8,
+  na1: 1.08,
+  eun1: 1.04,
+  br1: 0.87,
+  jp1: 0.3,
+  oc1: 0.13,
+};
+
+/**
  * Platform routing values we crawl — one ranked ladder each — mapped to the
  * regional routing host match-v5 uses. Add a platform here and it becomes
  * crawlable and selectable in the UI in one step.

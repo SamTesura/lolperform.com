@@ -84,6 +84,44 @@ function config(regions: Platform[]): PipelineConfig {
   } as PipelineConfig;
 }
 
+describe('crawl seed ordering', () => {
+  it('keeps the seed list head proportional to pool sizes, not tier-equalized', async () => {
+    // 90 emerald-range vs 10 apex-range seeds via a client whose ladder pools
+    // dwarf the apex pools. The crawled matches' tier mix must track the pool
+    // ratio — the old round-robin would have pushed apex to ~60%.
+    const big = (region: Platform, tag: string, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        puuid: `${region}-${tag}-${i}`,
+        leaguePoints: 0,
+        wins: 0,
+        losses: 0,
+      }));
+    const client = {
+      getApexLeague: async (region: Platform, kind: string) => ({
+        tier: kind,
+        entries: big(region, kind, 2),
+      }),
+      getLeagueEntries: async (region: Platform, tier: LeagueTier, division: string, page: number) =>
+        page > 1 ? [] : big(region, `${tier}-${division}`, 12),
+      getMatchIds: async (region: Platform, puuid: string) => [`${region}_${puuid}`],
+      getMatch: async (_region: Platform, id: string) => matchDto(id),
+    } as unknown as RiotClient;
+    // pools: EMERALD 48, DIAMOND 48, MASTER 2, GM 2, CHALLENGER 2 → apex 5.9%
+    const matches = await crawl(client, {
+      ...config(['na1']),
+      playersPerDivision: 100,
+      maxMatchesPerRegion: 60,
+      matchesPerPlayer: 1,
+    });
+    const apex = matches.filter((m) => ['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(m.tier));
+    // ≤ 6 apex matches exist at all; round-robin would have surfaced all 6 in
+    // the first 10 draws AND capped ladder at ~2/5 of the head.
+    expect(apex.length).toBeLessThanOrEqual(6);
+    expect(matches.length).toBeGreaterThanOrEqual(50);
+    expect(apex.length / matches.length).toBeLessThan(0.15);
+  });
+});
+
 describe('crawl resilience', () => {
   it('a dead apex endpoint skips the tier, not the region or the run', async () => {
     const matches = await crawl(fakeClient({ apexFails: new Set(['euw1']) }), config(['na1', 'euw1']));
