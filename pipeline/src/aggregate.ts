@@ -2,6 +2,8 @@ import {
   BRACKET_TIERS,
   RANK_BRACKETS,
   ROLES,
+  REGION_POPULATION_SHARE,
+  TIER_POPULATION_SHARE,
   wilsonLowerBound,
   type BuildPath,
   type DuoSynergy,
@@ -31,6 +33,10 @@ export const MIN_BUILD_GAMES = 20;
 interface Tally {
   games: number;
   wins: number;
+  /** Population-weighted counterparts (post-stratification); equal to the raw
+   *  counts wherever weighting isn't applied (matchups, duos, builds). */
+  wGames: number;
+  wWins: number;
 }
 
 interface BuildTally extends Tally {
@@ -38,11 +44,53 @@ interface BuildTally extends Tally {
   runes: RunePage;
 }
 
-const tally = (): Tally => ({ games: 0, wins: 0 });
-const add = (t: Tally, win: boolean) => {
+const tally = (): Tally => ({ games: 0, wins: 0, wGames: 0, wWins: 0 });
+const add = (t: Tally, win: boolean, weight = 1) => {
   t.games += 1;
   if (win) t.wins += 1;
+  t.wGames += weight;
+  if (win) t.wWins += weight;
 };
+
+/**
+ * Post-stratification weight per (seed tier × region) cell: reweights the
+ * slice to the bracket's real rank distribution (TIER_POPULATION_SHARE) and —
+ * for the pooled "all" view — to real server populations
+ * (REGION_POPULATION_SHARE), so neither the crawl's deliberately apex-heavy
+ * mix (kept for master_plus volume) nor its equal-per-region budget skews the
+ * stats of elo- or region-sensitive champions. Normalized so weights sum to
+ * the raw match count over the cells actually present — rates keep their
+ * scale.
+ */
+function matchWeights(slice: NormMatch[], pooled: boolean): Map<string, number> {
+  const counts = new Map<string, number>();
+  const targets = new Map<string, number>();
+  for (const m of slice) {
+    const key = `${m.tier}|${m.region}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+    if (!targets.has(key)) {
+      targets.set(
+        key,
+        TIER_POPULATION_SHARE[m.tier] *
+          (pooled ? ((REGION_POPULATION_SHARE as Record<string, number>)[m.region] ?? 1) : 1),
+      );
+    }
+  }
+  let presentShare = 0;
+  for (const t of targets.values()) presentShare += t;
+  const weights = new Map<string, number>();
+  for (const [key, n] of counts) {
+    // Trimmed to [1/4, 4]: an under-crawled cell with a big population target
+    // (say KR Emerald) would otherwise get a 40x weight and let a handful of
+    // lucky games swing a champion by several points — variance the correction
+    // isn't worth. Trimming keeps most of the bias correction, and as the
+    // crawl's own mix converges on the targets the weights approach 1 and the
+    // clamp stops binding.
+    const raw = (targets.get(key)! / presentShare) * (slice.length / n);
+    weights.set(key, Math.min(4, Math.max(0.25, raw)));
+  }
+  return weights;
+}
 
 function runeSignature(r: RunePage): string {
   return `${r.keystone}-${r.primaryStyle}-${r.subStyle}`;
@@ -92,6 +140,7 @@ function aggregateSlice(
 ): void {
   const patch = slice[0]!.patch;
   const totalMatches = slice.length;
+  const weights = matchWeights(slice, region === 'all');
 
   const roleAgg = new Map<string, Tally>(); // `${role}|${champ}`
   const bans = new Map<string, number>();
@@ -120,20 +169,21 @@ function aggregateSlice(
     const sig = buildSignature(p);
     let bt = sigs.get(sig);
     if (!bt) {
-      bt = { games: 0, wins: 0, items: [...p.items].sort((a, b) => a - b), runes: p.runes };
+      bt = { ...tally(), items: [...p.items].sort((a, b) => a - b), runes: p.runes };
       sigs.set(sig, bt);
     }
     add(bt, p.win);
   };
 
   for (const m of slice) {
+    const w = weights.get(`${m.tier}|${m.region}`) ?? 1;
     // Dedupe per match: a champion banned by both teams counts once.
-    for (const id of new Set(m.bans)) bans.set(String(id), (bans.get(String(id)) ?? 0) + 1);
+    for (const id of new Set(m.bans)) bans.set(String(id), (bans.get(String(id)) ?? 0) + w);
 
     const team: Record<100 | 200, Partial<Record<Role, NormParticipant>>> = { 100: {}, 200: {} };
     for (const p of m.participants) {
       team[p.teamId][p.role] = p;
-      add(getTally(roleAgg, `${p.role}|${p.championKey}`), p.win);
+      add(getTally(roleAgg, `${p.role}|${p.championKey}`), p.win, w);
       addBuild(p.championKey, p.role, null, p);
       if (p.items.length > 0) {
         const fKey = `${p.championKey}|${p.role}`;
@@ -164,10 +214,13 @@ function aggregateSlice(
   }
 
   // --- emit role stats (graded per role pool by combined ranking) ---
+  // Rates come from the population-weighted tallies; `games`/`wins` stay raw
+  // so displayed sample sizes and honesty floors reflect matches actually
+  // analyzed. `winRate` is therefore the estimator, not wins/games.
   const sliceRows: RoleStats[] = [];
   for (const [key, t] of roleAgg) {
     const [role, championKey] = key.split('|') as [Role, string];
-    const winRate = t.wins / t.games;
+    const winRate = t.wWins / t.wGames;
     sliceRows.push({
       patch,
       region,
@@ -177,9 +230,9 @@ function aggregateSlice(
       games: t.games,
       wins: t.wins,
       winRate,
-      pickRate: t.games / totalMatches,
+      pickRate: t.wGames / totalMatches,
       banRate: (bans.get(championKey) ?? 0) / totalMatches,
-      wilsonLower: wilsonLowerBound(t.wins, t.games),
+      wilsonLower: wilsonLowerBound(t.wWins, t.wGames),
       score: 0, // set by gradeSlice below
       tier: 'D-', // placeholder; set by gradeSlice below
       provisional: false, // set by gradeSlice below

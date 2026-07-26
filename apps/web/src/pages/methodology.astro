@@ -43,8 +43,14 @@ import Base from '../layouts/Base.astro';
       <h2>It's a sample, and we say so</h2>
       <p>
         We don't claim to read every game. We sample ranked matches across eight regions — <strong
-          class="text-text-primary">NA, EUW, EUNE, KR, JP, BR, OCE, and VN</strong> — weighted toward
-        the larger rank populations so the sample isn't skewed toward the apex few. The
+          class="text-text-primary">NA, EUW, EUNE, KR, JP, BR, OCE, and VN</strong> — and then weight
+        every statistic to the ladder's <strong class="text-text-primary">real rank distribution</strong> (post-stratification:
+        the crawl deliberately oversamples Master+ so high-elo views stay meaningful, and the published
+        numbers correct for it). A champion that's strong in Emerald but weak in Master is graded for
+        the rank mix that actually plays the bracket, not for whoever was easiest to crawl. The pooled
+        view is additionally weighted by <strong class="text-text-primary">server population</strong>, so
+        a small server never counts as much as KR or EUW, and extreme weights are trimmed to keep a
+        few lucky games from swinging a grade. The
         default <strong class="text-text-primary">All Regions</strong> view pools every region into one
         sample (the largest and steadiest); you can also filter to any single region. We're a sampled
         dataset, not a full-ladder one like the largest sites — which is exactly why <strong
@@ -147,6 +153,13 @@ import Base from '../layouts/Base.astro';
     <section class="space-y-2">
       <h2>Recent changes</h2>
       <ul class="list-inside list-disc space-y-1 text-text-muted">
+        <li>
+          <strong class="text-text-primary">Rank-mix and region-mix correction</strong> — stats are
+          now weighted to the ladder's real rank distribution, and the pooled view to real server
+          populations. The crawl's high-elo oversampling and equal-per-region budget had been
+          dragging down champions that shine below Master or on the big servers (and inflating the
+          opposite kind); win, pick, and ban rates now describe the population that actually plays.
+        </li>
         <li>
           <strong class="text-text-primary">Skill-floor adjustment</strong> — grading gives a small,
           bounded edge to mechanically simple champions (their win rate is repeatable by anyone) and

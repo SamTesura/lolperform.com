@@ -9,9 +9,11 @@ import type { RiotClient } from './riot/client.js';
 import { normalizeMatch, type NormMatch } from './riot/types.js';
 
 /**
- * Seed-tier weights (× playersPerDivision). Weighted toward the larger
- * populations so the sample resembles the real Emerald+ ladder instead of
- * over-representing apex — the bias that made the first dataset unusable.
+ * Seed-tier weights (× playersPerDivision). A deliberate compromise: apex is
+ * oversampled relative to its real ladder share (~5% of Emerald+) so the
+ * master_plus bracket keeps a usable sample, while aggregation post-stratifies
+ * every bracket back to TIER_POPULATION_SHARE so the published stats reflect
+ * the real rank mix, not the crawl's.
  */
 const APEX: { tier: LeagueTier; kind: 'challenger' | 'grandmaster' | 'master'; weight: number }[] =
   [
@@ -123,25 +125,19 @@ async function seedPuuids(
   return seeds;
 }
 
-/** Round-robin the per-tier puuid lists into one balanced, interleaved list. */
-function interleave(seeds: Map<LeagueTier, string[]>): { puuid: string; tier: LeagueTier }[] {
-  const queues = [...seeds.entries()].map(([tier, puuids]) => ({
-    tier,
-    puuids: shuffle([...puuids]),
-  }));
-  const out: { puuid: string; tier: LeagueTier }[] = [];
-  let added = true;
-  while (added) {
-    added = false;
-    for (const q of queues) {
-      const puuid = q.puuids.pop();
-      if (puuid) {
-        out.push({ puuid, tier: q.tier });
-        added = true;
-      }
-    }
-  }
-  return out;
+/**
+ * Flatten the per-tier seed lists into one uniformly shuffled list. A uniform
+ * shuffle keeps every prefix proportional to the pool sizes (in expectation),
+ * so the `slice(0, needPuuids)` cap preserves the intended tier mix. The old
+ * per-tier round-robin equalized tiers instead — one seed per tier per cycle
+ * made the three apex tiers ~60% of every crawl (measured 67% of the live
+ * store) and skewed every elo-sensitive champion's stats.
+ */
+function sampleOrder(seeds: Map<LeagueTier, string[]>): { puuid: string; tier: LeagueTier }[] {
+  const out = [...seeds.entries()].flatMap(([tier, puuids]) =>
+    puuids.map((puuid) => ({ puuid, tier })),
+  );
+  return shuffle(out);
 }
 
 /**
@@ -214,7 +210,7 @@ async function crawlRegion(
   // Only sample as many players as we need to reach the match cap (+buffer for
   // de-duplication and off-patch / non-soloq matches).
   const needPuuids = Math.ceil((config.maxMatchesPerRegion / config.matchesPerPlayer) * 1.5);
-  const seedList = interleave(seeds).slice(0, needPuuids);
+  const seedList = sampleOrder(seeds).slice(0, needPuuids);
 
   const idLists = await mapPool(seedList, concurrency, async (s) => {
     if (Date.now() > idDeadline) return { tier: s.tier, ids: [] as string[] };
