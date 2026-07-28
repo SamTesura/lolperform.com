@@ -55,6 +55,20 @@ export const roleStatsSchema = z.object({
   banRate: z.number().min(0).max(1),
   /** Wilson lower bound used for ranking/tiering. */
   wilsonLower: z.number().min(0).max(1),
+  /**
+   * Win rate with the champion's player pool held at average strength — the
+   * ranking signal. `winRate` says what happened; this estimates how much of
+   * it the champion is responsible for. Null when no player-baseline
+   * observations back this row yet, in which case ranking falls back to the
+   * raw rate. See playerSkill.ts.
+   */
+  adjustedWinRate: z.number().min(0).max(1).nullable().default(null),
+  /**
+   * How much stronger (positive) or weaker (negative) this champion's players
+   * are than the slice average, in win-rate points, after shrinkage. Published
+   * for transparency: it is the whole of the adjustment above.
+   */
+  playerPoolDelta: z.number().nullable().default(null),
   /** Rank-derived sort score (higher = better; sub-floor rows are negative). */
   score: z.number(),
   tier: fullTierGradeSchema,

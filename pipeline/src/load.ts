@@ -90,12 +90,14 @@ export function buildLoadSql(input: LoadInput): string {
       [
         'patch', 'region', 'rank', 'role', 'champion_key',
         'games', 'wins', 'win_rate', 'pick_rate', 'ban_rate',
-        'wilson_lower', 'score', 'tier',
+        'wilson_lower', 'score', 'tier', 'adjusted_win_rate', 'player_pool_delta',
       ],
       input.roleStats.map((r) => [
         s(r.patch), s(r.region), s(r.rank), s(r.role), s(r.championKey),
         n(r.games), n(r.wins), n(r.winRate), n(r.pickRate), n(r.banRate),
         n(r.wilsonLower), n(r.score), s(r.tier),
+        r.adjustedWinRate == null ? 'NULL' : n(r.adjustedWinRate),
+        r.playerPoolDelta == null ? 'NULL' : n(r.playerPoolDelta),
       ]),
     ),
   );

@@ -29,11 +29,21 @@ export const TIER_LIST_MIN_GAMES = 1000;
 
 /** Fine grades, best first. */
 export const FULL_TIER_GRADES = [
-  'S+', 'S', 'S-',
-  'A+', 'A', 'A-',
-  'B+', 'B', 'B-',
-  'C+', 'C', 'C-',
-  'D+', 'D', 'D-',
+  'S+',
+  'S',
+  'S-',
+  'A+',
+  'A',
+  'A-',
+  'B+',
+  'B',
+  'B-',
+  'C+',
+  'C',
+  'C-',
+  'D+',
+  'D',
+  'D-',
 ] as const;
 
 export type FullTierGrade = (typeof FULL_TIER_GRADES)[number];
@@ -82,6 +92,9 @@ export interface PriorPatchStats {
 
 export interface GradeInput {
   winRate: number;
+  /** Player-pool-corrected win rate; when set it replaces `winRate` as the
+   *  ranking signal. See playerSkill.ts. */
+  adjustedWinRate?: number | null;
   pickRate: number;
   banRate: number;
   games: number;
@@ -120,7 +133,12 @@ export interface GradeResult {
  */
 function blendWithPrior(r: GradeInput): PriorPatchStats {
   if (!r.priorPatch || r.games >= TIER_LIST_MIN_GAMES) {
-    return { winRate: r.winRate, pickRate: r.pickRate, banRate: r.banRate, wilsonLower: r.wilsonLower };
+    return {
+      winRate: r.winRate,
+      pickRate: r.pickRate,
+      banRate: r.banRate,
+      wilsonLower: r.wilsonLower,
+    };
   }
   const w = r.games / TIER_LIST_MIN_GAMES;
   const p = r.priorPatch;
@@ -150,10 +168,16 @@ function blendWithPrior(r: GradeInput): PriorPatchStats {
  * Result is aligned with the input order.
  */
 export function gradeSlice(rows: readonly GradeInput[]): GradeResult[] {
-  const out: GradeResult[] = rows.map((r) => ({ grade: 'D-', score: r.wilsonLower - 1, provisional: false }));
+  const out: GradeResult[] = rows.map((r) => ({
+    grade: 'D-',
+    score: r.wilsonLower - 1,
+    provisional: false,
+  }));
   const pool = rows
     .map((r, i) => ({ i, r }))
-    .filter((x) => x.r.games >= TIER_LIST_MIN_GAMES || (x.r.priorPatch && x.r.games >= MIN_TIER_GAMES));
+    .filter(
+      (x) => x.r.games >= TIER_LIST_MIN_GAMES || (x.r.priorPatch && x.r.games >= MIN_TIER_GAMES),
+    );
   if (pool.length === 0) return out;
 
   const blended = new Map(pool.map((x) => [x.i, blendWithPrior(x.r)]));
@@ -163,7 +187,9 @@ export function gradeSlice(rows: readonly GradeInput[]): GradeResult[] {
   };
   const adj = (x: (typeof pool)[number]): number => skillFloorOffset(x.r.skillFloor);
   const byWilson = rankOf((x) => blended.get(x.i)!.wilsonLower + adj(x));
-  const byPbi = rankOf((x) => pbi({ ...blended.get(x.i)!, winRate: blended.get(x.i)!.winRate + adj(x) }));
+  const byPbi = rankOf((x) =>
+    pbi({ ...blended.get(x.i)!, winRate: blended.get(x.i)!.winRate + adj(x) }),
+  );
 
   const combined = [...pool].sort((a, b) => {
     const ra = byWilson.get(a.i)! + byPbi.get(a.i)!;
@@ -174,7 +200,11 @@ export function gradeSlice(rows: readonly GradeInput[]): GradeResult[] {
   combined.forEach((x, idx) => {
     const pct = idx / pool.length;
     const band = TIER_PERCENTILES.find((t) => pct < t.upTo)!;
-    out[x.i] = { grade: band.grade, score: 1 - idx / pool.length, provisional: x.r.games < TIER_LIST_MIN_GAMES };
+    out[x.i] = {
+      grade: band.grade,
+      score: 1 - idx / pool.length,
+      provisional: x.r.games < TIER_LIST_MIN_GAMES,
+    };
   });
   return out;
 }
