@@ -6,6 +6,7 @@ import {
 } from '@lolperform/shared';
 import type { PipelineConfig } from './config.js';
 import type { RiotClient } from './riot/client.js';
+import type { LeagueEntryDTO } from './riot/types.js';
 import { normalizeMatch, type NormMatch } from './riot/types.js';
 
 /**
@@ -26,6 +27,33 @@ const LADDER: { tier: LeagueTier; weight: number }[] = [
   { tier: 'DIAMOND', weight: 3 },
   { tier: 'EMERALD', weight: 4 },
 ];
+
+/**
+ * A seed player: the PUUID we crawl from, plus their career ranked win rate
+ * this split (league-v4 hands us wins/losses for free with every entry). The
+ * win rate is the only player-strength signal available anywhere in the
+ * pipeline, and champion win rates are badly confounded without it. The PUUID
+ * is used to fetch match ids and to find the player inside a fetched match,
+ * then dropped — see normalizeMatch.
+ */
+export interface SeedPlayer {
+  puuid: string;
+  baselineWinRate: number;
+}
+
+/** Ignore seeds with too thin a record for their win rate to mean anything. */
+const MIN_BASELINE_GAMES = 20;
+
+function toSeedPlayers(entries: readonly LeagueEntryDTO[]): SeedPlayer[] {
+  const out: SeedPlayer[] = [];
+  for (const e of entries) {
+    if (typeof e.puuid !== 'string') continue;
+    const games = e.wins + e.losses;
+    if (!Number.isFinite(games) || games < MIN_BASELINE_GAMES) continue;
+    out.push({ puuid: e.puuid, baselineWinRate: e.wins / games });
+  }
+  return out;
+}
 
 function shuffle<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -64,12 +92,9 @@ async function apexPuuids(
   region: Platform,
   kind: 'challenger' | 'grandmaster' | 'master',
   target: number,
-): Promise<string[]> {
+): Promise<SeedPlayer[]> {
   const list = await client.getApexLeague(region, kind);
-  const puuids = (list?.entries ?? [])
-    .map((e) => e.puuid)
-    .filter((p): p is string => typeof p === 'string');
-  return shuffle(puuids).slice(0, target);
+  return shuffle(toSeedPlayers(list?.entries ?? [])).slice(0, target);
 }
 
 async function ladderPuuids(
@@ -77,19 +102,17 @@ async function ladderPuuids(
   region: Platform,
   tier: LeagueTier,
   target: number,
-): Promise<string[]> {
-  const out: string[] = [];
+): Promise<SeedPlayer[]> {
+  const out: SeedPlayer[] = [];
   const perDivision = Math.ceil(target / LEAGUE_DIVISIONS.length);
   for (const division of LEAGUE_DIVISIONS) {
     let got = 0;
     for (let page = 1; got < perDivision && page <= 5; page++) {
       const entries = await client.getLeagueEntries(region, tier, division, page);
       if (!entries || entries.length === 0) break;
-      for (const e of entries) {
-        if (typeof e.puuid === 'string') {
-          out.push(e.puuid);
-          got++;
-        }
+      for (const seed of toSeedPlayers(entries)) {
+        out.push(seed);
+        got++;
       }
     }
   }
@@ -100,9 +123,9 @@ async function seedPuuids(
   client: RiotClient,
   region: Platform,
   config: PipelineConfig,
-): Promise<Map<LeagueTier, string[]>> {
+): Promise<Map<LeagueTier, SeedPlayer[]>> {
   const p = config.playersPerDivision;
-  const seeds = new Map<LeagueTier, string[]>();
+  const seeds = new Map<LeagueTier, SeedPlayer[]>();
   // One dead league-v4 endpoint must not cost the region (or hours of crawled
   // matches from the regions before it): a failed tier seeds empty and the
   // remaining tiers still produce a usable, slightly less balanced sample.
@@ -133,9 +156,11 @@ async function seedPuuids(
  * made the three apex tiers ~60% of every crawl (measured 67% of the live
  * store) and skewed every elo-sensitive champion's stats.
  */
-function sampleOrder(seeds: Map<LeagueTier, string[]>): { puuid: string; tier: LeagueTier }[] {
-  const out = [...seeds.entries()].flatMap(([tier, puuids]) =>
-    puuids.map((puuid) => ({ puuid, tier })),
+function sampleOrder(
+  seeds: Map<LeagueTier, SeedPlayer[]>,
+): { seed: SeedPlayer; tier: LeagueTier }[] {
+  const out = [...seeds.entries()].flatMap(([tier, players]) =>
+    players.map((seed) => ({ seed, tier })),
   );
   return shuffle(out);
 }
@@ -213,42 +238,46 @@ async function crawlRegion(
   const seedList = sampleOrder(seeds).slice(0, needPuuids);
 
   const idLists = await mapPool(seedList, concurrency, async (s) => {
-    if (Date.now() > idDeadline) return { tier: s.tier, ids: [] as string[] };
+    if (Date.now() > idDeadline) return { ...s, ids: [] as string[] };
     try {
-      const ids = (await client.getMatchIds(region, s.puuid, config.matchesPerPlayer)) ?? [];
-      return { tier: s.tier, ids };
+      const ids = (await client.getMatchIds(region, s.seed.puuid, config.matchesPerPlayer)) ?? [];
+      return { ...s, ids };
     } catch {
       // A single rate-limited/failed request must not abort the whole crawl.
-      return { tier: s.tier, ids: [] as string[] };
+      return { ...s, ids: [] as string[] };
     }
   });
 
-  const matchTier = new Map<string, LeagueTier>();
-  for (const { tier, ids } of idLists) {
+  // Each match remembers the seed it was discovered from, so normalizeMatch can
+  // record that player's champion and career win rate.
+  const discovered = new Map<string, { tier: LeagueTier; seed: SeedPlayer }>();
+  for (const { tier, seed, ids } of idLists) {
     for (const id of ids) {
-      if (matchTier.size >= config.maxMatchesPerRegion) break;
-      if (!matchTier.has(id)) matchTier.set(id, tier);
+      if (discovered.size >= config.maxMatchesPerRegion) break;
+      if (!discovered.has(id)) discovered.set(id, { tier, seed });
     }
   }
 
-  const entries = [...matchTier.entries()];
-  const norms = await mapPool(entries, concurrency, async ([id, tier]) => {
+  const entries = [...discovered.entries()];
+  const norms = await mapPool(entries, concurrency, async ([id, { tier, seed }]) => {
     if (Date.now() > matchDeadline) return null;
     try {
       const dto = await client.getMatch(region, id);
       if (!dto || dto.info.queueId !== QUEUE_RANKED_SOLO) return null;
-      return normalizeMatch(dto, region, tier);
+      return normalizeMatch(dto, region, tier, seed);
     } catch {
       return null;
     }
   });
 
   let kept = 0;
+  let withSeed = 0;
   const byPatch = new Map<string, number>();
   for (const norm of norms) {
     if (!norm) continue;
     all.push(norm);
     kept += 1;
+    if (norm.seed) withSeed += 1;
     byPatch.set(norm.patch, (byPatch.get(norm.patch) ?? 0) + 1);
   }
   const top = [...byPatch.entries()]
@@ -257,6 +286,7 @@ async function crawlRegion(
     .map(([p, n]) => `${p}:${n}`)
     .join(' ');
   console.info(
-    `[crawl] ${region}: ${matchTier.size} ids discovered, ${kept} matches kept (patches ${top})`,
+    `[crawl] ${region}: ${discovered.size} ids discovered, ${kept} matches kept ` +
+      `(${withSeed} with a seed baseline) (patches ${top})`,
   );
 }
