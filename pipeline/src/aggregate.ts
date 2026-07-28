@@ -1,4 +1,6 @@
 import {
+  adjustWinRate,
+  playerPoolDelta,
   BRACKET_TIERS,
   RANK_BRACKETS,
   ROLES,
@@ -12,6 +14,7 @@ import {
   type Region,
   type Role,
   type RoleStats,
+  type LeagueTier,
   type RunePage,
   type SkillFloor,
 } from '@lolperform/shared';
@@ -131,6 +134,37 @@ export function aggregate(
   return out;
 }
 
+/**
+ * Career win rates of the seed players observed in this slice, centred within
+ * their own rank tier and grouped by the champion they were playing.
+ *
+ * Centring per tier matters: a Challenger player's career win rate is higher
+ * than an Emerald player's because they climbed, so a champion that skews
+ * apex would otherwise look like it had a strong player pool purely from the
+ * rank mix. Within-tier deviations carry only the part we want — how strong
+ * this champion's players are *for their rank*.
+ */
+function centredBaselines(slice: NormMatch[]): Map<string, number[]> {
+  const byTier = new Map<LeagueTier, { sum: number; n: number }>();
+  for (const m of slice) {
+    if (!m.seed) continue;
+    const t = byTier.get(m.tier) ?? { sum: 0, n: 0 };
+    t.sum += m.seed.baselineWinRate;
+    t.n += 1;
+    byTier.set(m.tier, t);
+  }
+  const out = new Map<string, number[]>();
+  for (const m of slice) {
+    if (!m.seed) continue;
+    const t = byTier.get(m.tier)!;
+    const key = `${m.seed.role}|${m.seed.championKey}`;
+    const list = out.get(key) ?? [];
+    list.push(m.seed.baselineWinRate - t.sum / t.n);
+    out.set(key, list);
+  }
+  return out;
+}
+
 function aggregateSlice(
   slice: NormMatch[],
   rank: RankBracket,
@@ -141,6 +175,7 @@ function aggregateSlice(
   const patch = slice[0]!.patch;
   const totalMatches = slice.length;
   const weights = matchWeights(slice, region === 'all');
+  const baselines = centredBaselines(slice);
 
   const roleAgg = new Map<string, Tally>(); // `${role}|${champ}`
   const bans = new Map<string, number>();
@@ -221,6 +256,8 @@ function aggregateSlice(
   for (const [key, t] of roleAgg) {
     const [role, championKey] = key.split('|') as [Role, string];
     const winRate = t.wWins / t.wGames;
+    // Deviations are already centred within tier, so the reference point is 0.
+    const pool = playerPoolDelta({ baselines: baselines.get(key) ?? [], poolMean: 0 });
     sliceRows.push({
       patch,
       region,
@@ -233,6 +270,8 @@ function aggregateSlice(
       pickRate: t.wGames / totalMatches,
       banRate: (bans.get(championKey) ?? 0) / totalMatches,
       wilsonLower: wilsonLowerBound(t.wWins, t.wGames),
+      adjustedWinRate: pool.observations > 0 ? adjustWinRate(winRate, pool.delta) : null,
+      playerPoolDelta: pool.observations > 0 ? pool.delta : null,
       score: 0, // set by gradeSlice below
       tier: 'D-', // placeholder; set by gradeSlice below
       provisional: false, // set by gradeSlice below

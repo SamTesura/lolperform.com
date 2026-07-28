@@ -163,8 +163,11 @@ describe('crawl seed baseline capture', () => {
   it('never persists a player identifier anywhere in the stored match', async () => {
     const matches = await crawl(fakeClient(), config(['na1']));
     const serialized = JSON.stringify(matches);
-    // no seed puuid the fake handed out, and no other participant's, survives
-    expect(serialized).not.toMatch(/challenger|grandmaster|EMERALD-I/i);
+    // The fake's puuids all look like `na1-<tag>-<n>`; none may survive. (The
+    // `tier` field legitimately contains rank names, so match the puuid shape,
+    // not the words.)
+    expect(serialized).not.toMatch(/na1-/);
+    expect(serialized).not.toContain('other-');
     expect(serialized).not.toContain('puuid');
     expect(serialized).not.toContain('other-100');
     // the useful part did survive

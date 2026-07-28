@@ -47,6 +47,8 @@ interface RoleStatsRow {
   wilson_lower: number;
   score: number;
   tier: string;
+  adjusted_win_rate: number | null;
+  player_pool_delta: number | null;
 }
 interface MatchupRow {
   patch: string;
@@ -113,6 +115,8 @@ export function mapRoleStats(r: RoleStatsRow): RoleStats {
     pickRate: r.pick_rate,
     banRate: r.ban_rate,
     wilsonLower: r.wilson_lower,
+    adjustedWinRate: r.adjusted_win_rate,
+    playerPoolDelta: r.player_pool_delta,
     score: r.score,
     tier: r.tier as FullTierGrade,
     // Recomputed live by getGradedRoleStats, which blends in the prior patch
@@ -276,6 +280,7 @@ async function getGradedRoleStats(env: Env, slice: Slice, role: Role): Promise<R
       banRate: r.ban_rate,
       games: r.games,
       wilsonLower: r.wilson_lower,
+      adjustedWinRate: r.adjusted_win_rate,
       skillFloor: skillFloorFor(idByKey.get(r.champion_key) ?? ''),
       priorPatch: prior
         ? { winRate: prior.win_rate, pickRate: prior.pick_rate, banRate: prior.ban_rate, wilsonLower: prior.wilson_lower }
