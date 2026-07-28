@@ -7,9 +7,11 @@ import type { LeagueListDTO, MatchDTO } from './riot/types.js';
 
 const ROLES = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'] as const;
 
-function matchDto(matchId: string): MatchDTO {
+function matchDto(matchId: string, seedPuuid?: string): MatchDTO {
   const participants = ([100, 200] as const).flatMap((teamId, t) =>
     ROLES.map((role, i) => ({
+      // the seed always sits in the first slot when one is supplied
+      puuid: t === 0 && i === 0 && seedPuuid ? seedPuuid : `other-${teamId}-${role}`,
       championId: t * 5 + i + 1,
       championName: `Champ${t * 5 + i + 1}`,
       teamId,
@@ -44,15 +46,19 @@ interface FakeBehavior {
   allSeedsFail?: Set<Platform>;
 }
 
-/** Minimal RiotClient double: 3 players per league, 2 match ids per player. */
+/** Minimal RiotClient double: 3 players per league, 2 match ids per player.
+ *  Match ids are opaque counters (like real Riot ids) and the seed behind each
+ *  is held in a side map, so the privacy assertion below is meaningful. */
 function fakeClient(behavior: FakeBehavior = {}): RiotClient {
+  const seedOf = new Map<string, string>();
+  let nextId = 0;
   const league = (region: Platform, tag: string): LeagueListDTO => ({
     tier: tag,
     entries: Array.from({ length: 3 }, (_, i) => ({
       puuid: `${region}-${tag}-${i}`,
       leaguePoints: 0,
-      wins: 0,
-      losses: 0,
+      wins: 60,
+      losses: 40, // 60% career win rate, comfortably past MIN_BASELINE_GAMES
     })),
   });
   return {
@@ -62,13 +68,23 @@ function fakeClient(behavior: FakeBehavior = {}): RiotClient {
       }
       return league(region, kind);
     },
-    getLeagueEntries: async (region: Platform, tier: LeagueTier, division: string, page: number) => {
+    getLeagueEntries: async (
+      region: Platform,
+      tier: LeagueTier,
+      division: string,
+      page: number,
+    ) => {
       if (behavior.allSeedsFail?.has(region)) throw new Error('league entries unavailable');
       if (page > 1) return [];
       return league(region, `${tier}-${division}`).entries;
     },
-    getMatchIds: async (region: Platform, puuid: string) => [`${region}_${puuid}_1`, `${region}_${puuid}_2`],
-    getMatch: async (_region: Platform, id: string) => matchDto(id),
+    getMatchIds: async (region: Platform, puuid: string) =>
+      [1, 2].map(() => {
+        const id = `${region.toUpperCase()}_${++nextId}`;
+        seedOf.set(id, puuid);
+        return id;
+      }),
+    getMatch: async (_region: Platform, id: string) => matchDto(id, seedOf.get(id)),
   } as unknown as RiotClient;
 }
 
@@ -93,18 +109,28 @@ describe('crawl seed ordering', () => {
       Array.from({ length: n }, (_, i) => ({
         puuid: `${region}-${tag}-${i}`,
         leaguePoints: 0,
-        wins: 0,
-        losses: 0,
+        wins: 60,
+        losses: 40,
       }));
+    const seedOf = new Map<string, string>();
+    let seq = 0;
     const client = {
       getApexLeague: async (region: Platform, kind: string) => ({
         tier: kind,
         entries: big(region, kind, 2),
       }),
-      getLeagueEntries: async (region: Platform, tier: LeagueTier, division: string, page: number) =>
-        page > 1 ? [] : big(region, `${tier}-${division}`, 12),
-      getMatchIds: async (region: Platform, puuid: string) => [`${region}_${puuid}`],
-      getMatch: async (_region: Platform, id: string) => matchDto(id),
+      getLeagueEntries: async (
+        region: Platform,
+        tier: LeagueTier,
+        division: string,
+        page: number,
+      ) => (page > 1 ? [] : big(region, `${tier}-${division}`, 12)),
+      getMatchIds: async (region: Platform, puuid: string) => {
+        const id = `${region.toUpperCase()}_${++seq}`;
+        seedOf.set(id, puuid);
+        return [id];
+      },
+      getMatch: async (_region: Platform, id: string) => matchDto(id, seedOf.get(id)),
     } as unknown as RiotClient;
     // pools: EMERALD 48, DIAMOND 48, MASTER 2, GM 2, CHALLENGER 2 → apex 5.9%
     const matches = await crawl(client, {
@@ -122,16 +148,68 @@ describe('crawl seed ordering', () => {
   });
 });
 
+describe('crawl seed baseline capture', () => {
+  it('records the seed player champion, role and career win rate', async () => {
+    const matches = await crawl(fakeClient(), config(['na1']));
+    const seeded = matches.filter((m) => m.seed);
+    expect(seeded.length).toBeGreaterThan(0);
+    for (const m of seeded) {
+      expect(m.seed!.baselineWinRate).toBeCloseTo(0.6, 5); // 60W/40L fixture
+      expect(m.seed!.role).toBe('TOP'); // seed sits in the first slot
+      expect(m.seed!.championKey).toBe('1');
+    }
+  });
+
+  it('never persists a player identifier anywhere in the stored match', async () => {
+    const matches = await crawl(fakeClient(), config(['na1']));
+    const serialized = JSON.stringify(matches);
+    // no seed puuid the fake handed out, and no other participant's, survives
+    expect(serialized).not.toMatch(/challenger|grandmaster|EMERALD-I/i);
+    expect(serialized).not.toContain('puuid');
+    expect(serialized).not.toContain('other-100');
+    // the useful part did survive
+    expect(matches.some((m) => m.seed)).toBe(true);
+  });
+
+  it('skips seeds whose ladder record is too thin to be meaningful', async () => {
+    const thin = {
+      getApexLeague: async (region: Platform, kind: string) => ({
+        tier: kind,
+        entries: [{ puuid: `${region}-${kind}-0`, leaguePoints: 0, wins: 3, losses: 2 }],
+      }),
+      getLeagueEntries: async (
+        region: Platform,
+        tier: LeagueTier,
+        division: string,
+        page: number,
+      ) =>
+        page > 1
+          ? []
+          : [{ puuid: `${region}-${tier}-${division}`, leaguePoints: 0, wins: 2, losses: 1 }],
+      getMatchIds: async (region: Platform, puuid: string) => [`${region}_${puuid}`],
+      getMatch: async (_region: Platform, id: string) => matchDto(id),
+    } as unknown as RiotClient;
+    // every seed is below MIN_BASELINE_GAMES, so nothing is crawled at all
+    await expect(crawl(thin, config(['na1']))).rejects.toThrow(/zero matches/);
+  });
+});
+
 describe('crawl resilience', () => {
   it('a dead apex endpoint skips the tier, not the region or the run', async () => {
-    const matches = await crawl(fakeClient({ apexFails: new Set(['euw1']) }), config(['na1', 'euw1']));
+    const matches = await crawl(
+      fakeClient({ apexFails: new Set(['euw1']) }),
+      config(['na1', 'euw1']),
+    );
     const regions = new Set(matches.map((m) => m.region));
     expect(regions).toContain('na1');
     expect(regions).toContain('euw1'); // still crawled off its ladder seeds
   });
 
   it('a fully dead region is skipped; the other regions keep their matches', async () => {
-    const matches = await crawl(fakeClient({ allSeedsFail: new Set(['euw1']) }), config(['na1', 'euw1']));
+    const matches = await crawl(
+      fakeClient({ allSeedsFail: new Set(['euw1']) }),
+      config(['na1', 'euw1']),
+    );
     expect(matches.length).toBeGreaterThan(0);
     expect(new Set(matches.map((m) => m.region))).toEqual(new Set(['na1']));
   });

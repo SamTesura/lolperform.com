@@ -33,6 +33,10 @@ interface PerksDTO {
 }
 
 export interface ParticipantDTO {
+  /** Used transiently to locate the seed player in a fetched match. NEVER
+   *  stored: normalizeMatch reads it and keeps only the seed's champion,
+   *  role and (rounded) baseline win rate. */
+  puuid?: string;
   championId: number;
   championName: string;
   teamId: number;
@@ -86,14 +90,42 @@ export interface NormMatch {
   /** Banned champion ids (numeric, > 0). */
   bans: number[];
   participants: NormParticipant[];
+  /**
+   * The one player in this match whose ladder record we happen to know: the
+   * seed the match was discovered from. Their career win rate is the only
+   * available handle on player strength, and champion win rates are badly
+   * confounded without it — popular champions are picked by weaker players
+   * than niche ones, within the same rank. See aggregate.ts.
+   *
+   * Deliberately identity-free: the seed's PUUID is used in memory to find
+   * them in the match and then discarded. What persists is a champion, a role
+   * and a win rate rounded to 0.1% — not linkable to a person or across runs.
+   */
+  seed?: SeedObservation;
+}
+
+export interface SeedObservation {
+  championKey: string;
+  role: Role;
+  /** The seed's career ranked win rate this split, rounded to 0.1%. */
+  baselineWinRate: number;
 }
 
 const VALID_ROLES = new Set<Role>(['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY']);
 
 /** Item ids excluded from a build signature (trinkets + common consumables). */
 const NON_CORE_ITEMS = new Set([
-  3340, 3363, 3364, 3330, // trinkets
-  2003, 2031, 2033, 2055, 2138, 2139, 2140, // consumables / biscuits / elixirs
+  3340,
+  3363,
+  3364,
+  3330, // trinkets
+  2003,
+  2031,
+  2033,
+  2055,
+  2138,
+  2139,
+  2140, // consumables / biscuits / elixirs
 ]);
 
 /** "14.12.586.1234" → "14.12". Returns null for unparseable versions. */
@@ -132,6 +164,7 @@ export function normalizeMatch(
   dto: MatchDTO,
   region: Region,
   tier: LeagueTier,
+  seed?: { puuid: string; baselineWinRate: number },
 ): NormMatch | null {
   const patch = patchFromGameVersion(dto.info.gameVersion);
   if (!patch) return null;
@@ -151,7 +184,24 @@ export function normalizeMatch(
     });
   }
 
-  const bans = dto.info.teams.flatMap((t) => t.bans.map((b) => b.championId)).filter((id) => id > 0);
+  const bans = dto.info.teams
+    .flatMap((t) => t.bans.map((b) => b.championId))
+    .filter((id) => id > 0);
 
-  return { matchId: dto.metadata.matchId, patch, region, tier, bans, participants };
+  // Locate the seed player by PUUID, keep only what they played and how good
+  // they are; the identifier itself goes no further than this function.
+  let seedObs: SeedObservation | undefined;
+  if (seed) {
+    const i = dto.info.participants.findIndex((p) => p.puuid === seed.puuid);
+    const p = i >= 0 ? participants[i] : undefined;
+    if (p) {
+      seedObs = {
+        championKey: p.championKey,
+        role: p.role,
+        baselineWinRate: Math.round(seed.baselineWinRate * 1000) / 1000,
+      };
+    }
+  }
+
+  return { matchId: dto.metadata.matchId, patch, region, tier, bans, participants, seed: seedObs };
 }
