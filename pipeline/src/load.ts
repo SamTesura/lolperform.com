@@ -96,8 +96,8 @@ export function buildLoadSql(input: LoadInput): string {
         s(r.patch), s(r.region), s(r.rank), s(r.role), s(r.championKey),
         n(r.games), n(r.wins), n(r.winRate), n(r.pickRate), n(r.banRate),
         n(r.wilsonLower), n(r.score), s(r.tier),
-        r.adjustedWinRate == null ? 'NULL' : n(r.adjustedWinRate),
-        r.playerPoolDelta == null ? 'NULL' : n(r.playerPoolDelta),
+        r.adjustedWinRate === null ? 'NULL' : n(r.adjustedWinRate),
+        r.playerPoolDelta === null ? 'NULL' : n(r.playerPoolDelta),
       ]),
     ),
   );
