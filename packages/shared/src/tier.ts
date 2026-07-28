@@ -4,13 +4,16 @@ import { skillFloorOffset, type SkillFloor } from './skillFloor.js';
 /**
  * Tiering policy — rank-based grading (published on /methodology). Tiers are
  * NOT fixed win-rate cutoffs: champions in a role are ranked by two signals —
- * Wilson-corrected win rate and PBI (pick-ban influence) — and grades are cut
+ * strength (Wilson win rate, corrected for player pool) and meta presence —
+ * and grades are cut
  * at fixed percentiles of that ranking, so "S+" always means "top of this
  * patch's meta", the same convention the major tier lists follow.
  *
- * Per-player signals (best-player win rate / best-player Elo) are deliberately
- * out of scope: they require tracking individual players across months, and
- * this pipeline stores no player identifiers by design.
+ * Per-player signals that need individual players tracked across months
+ * (best-player win rate, best-player Elo) remain out of scope — this pipeline
+ * stores no player identifiers by design. The one player signal it does use,
+ * the picking player's career win rate, is captured per match and aggregated
+ * immediately, carrying no identity with it. See playerSkill.ts.
  *
  * Lives in shared so the pipeline (which computes and stores grades at slice
  * level) and every UI surface stay in agreement.
@@ -106,13 +109,32 @@ export interface GradeInput {
 }
 
 /**
- * PBI (Pick Ban Influence): (win − tierAvg) · pick / (1 − ban).
- * High = contested, meta-defining pick. Our whole-game sampling makes the
- * slice's average win rate 0.5 by construction, so tierAvg is the constant 0.5.
+ * Meta presence: how much of the draft a champion occupies, picked or removed.
+ *
+ * This replaced PBI — (winRate − 0.5) · pick / (1 − ban) — which was being
+ * used as half the strength ranking and could not do that job. Multiplying a
+ * champion's distance from 50% by its pick rate makes popularity amplify the
+ * sign: two champions on an identical 48.2% win rate ranked eight places apart
+ * purely because one was popular, while an equally popular champion above 50%
+ * got the same magnitude as a bonus. That is a meta-impact measure, not a
+ * strength measure, and it was the single largest distortion in the tier list.
+ *
+ * Presence keeps the defensible half of the idea — a champion contested in
+ * every draft is more meta-relevant than a pocket pick, and is played into
+ * prepared opponents, which suppresses its raw win rate — without letting
+ * popularity change the sign of anything.
  */
-export function pbi(r: Pick<GradeInput, 'winRate' | 'pickRate' | 'banRate'>): number {
-  return ((r.winRate - 0.5) * r.pickRate) / Math.max(1e-9, 1 - r.banRate);
+export function presence(r: Pick<GradeInput, 'pickRate' | 'banRate'>): number {
+  return r.pickRate + r.banRate;
 }
+
+/**
+ * Rank-sum weights. Strength dominates deliberately: presence measures how
+ * contested a champion is, not how good it is, so it breaks ties and nudges
+ * boundaries rather than driving the table.
+ */
+export const STRENGTH_WEIGHT = 3;
+export const PRESENCE_WEIGHT = 1;
 
 export interface GradeResult {
   grade: FullTierGrade;
@@ -152,7 +174,8 @@ function blendWithPrior(r: GradeInput): PriorPatchStats {
 
 /**
  * Grade one role's slice. Champions past TIER_LIST_MIN_GAMES are ranked twice —
- * by Wilson win rate and by PBI — then ordered by the sum of the two ranks
+ * by strength (Wilson win rate, corrected for player pool and skill floor) and
+ * by meta presence — then ordered by a weighted sum of the two ranks
  * (rank-sum is scale-free, so neither signal drowns the other) and cut into
  * grades at TIER_PERCENTILES. Rows below the floor get a 'D-' placeholder that
  * no UI surfaces (the tier list omits them; pages show NR) — unless a prior-patch
@@ -181,20 +204,38 @@ export function gradeSlice(rows: readonly GradeInput[]): GradeResult[] {
   if (pool.length === 0) return out;
 
   const blended = new Map(pool.map((x) => [x.i, blendWithPrior(x.r)]));
+  // Midranks: tied values share the average of the positions they span, so a
+  // signal that cannot tell two champions apart contributes nothing to
+  // separating them. Assigning tied rows arbitrary consecutive ranks instead
+  // would let sort order alone move a champion by whole grades — presence in
+  // particular ties constantly (identical ban rates, zero-ban champions).
   const rankOf = (key: (x: (typeof pool)[number]) => number): Map<number, number> => {
     const sorted = [...pool].sort((a, b) => key(b) - key(a));
-    return new Map(sorted.map((x, rank) => [x.i, rank]));
+    const ranks = new Map<number, number>();
+    for (let i = 0; i < sorted.length;) {
+      let j = i;
+      while (j + 1 < sorted.length && key(sorted[j + 1]!) === key(sorted[i]!)) j++;
+      const mid = (i + j) / 2;
+      for (let k = i; k <= j; k++) ranks.set(sorted[k]!.i, mid);
+      i = j + 1;
+    }
+    return ranks;
   };
   const adj = (x: (typeof pool)[number]): number => skillFloorOffset(x.r.skillFloor);
-  const byWilson = rankOf((x) => blended.get(x.i)!.wilsonLower + adj(x));
-  const byPbi = rankOf((x) =>
-    pbi({ ...blended.get(x.i)!, winRate: blended.get(x.i)!.winRate + adj(x) }),
-  );
+  // Player-pool correction as a shift on the Wilson bound. The bound's *width*
+  // encodes sample size, which is unaffected by who was holding the champion,
+  // so shift it rather than recompute it. Zero when unmeasured.
+  const poolShift = (x: (typeof pool)[number]): number =>
+    x.r.adjustedWinRate === null || x.r.adjustedWinRate === undefined
+      ? 0
+      : x.r.adjustedWinRate - x.r.winRate;
+  const byStrength = rankOf((x) => blended.get(x.i)!.wilsonLower + poolShift(x) + adj(x));
+  const byPresence = rankOf((x) => presence(blended.get(x.i)!));
 
   const combined = [...pool].sort((a, b) => {
-    const ra = byWilson.get(a.i)! + byPbi.get(a.i)!;
-    const rb = byWilson.get(b.i)! + byPbi.get(b.i)!;
-    return ra - rb || blended.get(b.i)!.wilsonLower - blended.get(a.i)!.wilsonLower;
+    const weigh = (i: number): number =>
+      STRENGTH_WEIGHT * byStrength.get(i)! + PRESENCE_WEIGHT * byPresence.get(i)!;
+    return weigh(a.i) - weigh(b.i) || blended.get(b.i)!.wilsonLower - blended.get(a.i)!.wilsonLower;
   });
 
   combined.forEach((x, idx) => {
