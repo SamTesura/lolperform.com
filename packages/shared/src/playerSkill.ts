@@ -45,11 +45,16 @@
 
 /**
  * Observations needed before half the measured player-pool gap is applied.
- * The gap is a mean of career win rates whose spread is ~6 points, so ~60
- * observations put its standard error near 0.8 points — the scale of the
- * effect being corrected. Below that, shrink hard.
+ *
+ * Each observation is one distinct player, so the mean's standard error is
+ * roughly their career-win-rate spread (~6 points) over the square root of the
+ * count. At 250 that is ~0.4 points — comfortably under the effect being
+ * corrected, which runs to about a point. The first live estimates were made
+ * before observations were deduplicated per player and swung by more than a
+ * point between consecutive crawls, so this is set to hold the correction back
+ * until the count is genuinely large rather than nominally so.
  */
-export const PLAYER_POOL_SHRINKAGE = 60;
+export const PLAYER_POOL_SHRINKAGE = 250;
 
 /**
  * Hard cap on the correction, in win-rate proportion. Real player-pool gaps
