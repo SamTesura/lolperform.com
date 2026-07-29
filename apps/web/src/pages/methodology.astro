@@ -121,8 +121,21 @@ import Base from '../layouts/Base.astro';
       <p>
         A grade needs <strong class="text-text-primary">1,000 games</strong> in that lane this patch to stand fully on its own.
         Below that — right after a patch flips, before the new sample has filled in — a champion is graded <strong class="text-text-primary">provisional</strong> (dashed tier badge) if it has a prior-patch grade to lean on: its ranking blends the two, weighted by how much of the 1,000-game floor this patch has filled, so the blend is almost entirely last patch's data at game one and entirely this patch's data at game 1,000.
+        The prior has to be worth leaning on: it only counts if it cleared the same 1,000-game floor last patch. Without that rule a champion almost nobody plays in a lane could enter on a handful of games, borrow a prior built from equally few, and come out with a grade — which is how an off-role pick on 144 games briefly outranked bot laners with thousands.
         A brand new champion or lane with no prior-patch history, and no games yet this patch, still shows <strong class="text-text-primary">NR</strong> (not rated) instead of a grade — so a lane can never read "S+" off pure guesswork.
         Win, pick, and ban rates always display the current patch's real numbers next to their game count, whether or not the grade above them is provisional. All numbers come from the current patch only — balance changes make older games misleading — and the sample compounds every few hours as the crawler runs.
+      </p>
+    </section>
+
+    <section class="space-y-2">
+      <h2>What we know we can't see</h2>
+      <p>
+        Two limits are worth stating rather than leaving you to assume we handled them. We cannot
+        see <strong class="text-text-primary">draft order</strong>, so a champion locked first with
+        no information and one locked last as a counter look identical to us. And the player-pool
+        correction leans on the one player per match whose ladder record we know; the other nine are
+        anonymous to us by design, so the correction is a partial one — deliberately an
+        under-correction rather than a guess at the rest.
       </p>
     </section>
 
@@ -168,11 +181,14 @@ import Base from '../layouts/Base.astro';
       <h2>Recent changes</h2>
       <ul class="list-inside list-disc space-y-1 text-text-muted">
         <li>
-          <strong class="text-text-primary">Player-pool correction, and a scoring fix</strong> — the
+          <strong class="text-text-primary">Ranking rebuilt around what a champion is worth</strong> — the
           ranking no longer multiplies a champion's distance from a 50% win rate by how often it is
           picked. That term meant two champions on the same win rate could sit several grades apart
-          purely because one was popular, which pushed common picks down and pocket picks up. Win
-          rates are now also corrected for how strong a champion's players are.
+          purely because one was popular, which pushed common picks down and pocket picks up. It is
+          replaced by meta presence, which counts for a third as much as strength. Win rates are now
+          also corrected for how strong a champion's players are, champions a signal cannot tell
+          apart share a rank on it instead of being ordered arbitrarily, and a prior-patch grade only
+          seeds a provisional grade if the prior itself was properly sampled.
         </li>
         <li>
           <strong class="text-text-primary">Rank-mix and region-mix correction</strong> — stats are
