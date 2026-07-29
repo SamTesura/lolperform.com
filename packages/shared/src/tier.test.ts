@@ -121,11 +121,53 @@ describe('gradeSlice provisional (prior-patch blending)', () => {
       ...Array.from({ length: 10 }, (_, i) => row(0.52 - i * 0.005, 0.12)),
       {
         ...row(0.55, 0.12, 0.05, 100), // only 100 games this patch
-        priorPatch: { winRate: 0.55, pickRate: 0.12, banRate: 0.05, wilsonLower: 0.54 },
+        priorPatch: {
+          winRate: 0.55,
+          pickRate: 0.12,
+          banRate: 0.05,
+          wilsonLower: 0.54,
+          games: 5000,
+        },
       },
     ];
     const graded = gradeSlice(rows);
     expect(graded[10]!.grade).not.toBe('D-');
+    expect(graded[10]!.provisional).toBe(true);
+    expect(graded[10]!.score).toBeGreaterThan(0);
+  });
+
+  it('a thin prior cannot promote a champion: noise is not laundered into a grade', () => {
+    // The live pathology this guards: a champion barely played in the lane
+    // entered on 50 games and borrowed a prior built from equally few, landing
+    // an off-role 144-game Qiyana at S and a 158-game Riven at S-.
+    const rows: GradeInput[] = [
+      ...Array.from({ length: 10 }, (_, i) => row(0.52 - i * 0.005, 0.12)),
+      {
+        ...row(0.62, 0.004, 0.0, 150), // barely played this patch...
+        priorPatch: { winRate: 0.62, pickRate: 0.004, banRate: 0, wilsonLower: 0.58, games: 200 },
+      }, // ...and the prior is just as thin
+    ];
+    const graded = gradeSlice(rows);
+    expect(graded[10]!.grade).toBe('D-');
+    expect(graded[10]!.provisional).toBe(false);
+    expect(graded[10]!.score).toBeLessThan(0);
+  });
+
+  it('a prior that was itself ranked still supports a provisional grade', () => {
+    const rows: GradeInput[] = [
+      ...Array.from({ length: 10 }, (_, i) => row(0.52 - i * 0.005, 0.12)),
+      {
+        ...row(0.55, 0.12, 0.05, 150),
+        priorPatch: {
+          winRate: 0.55,
+          pickRate: 0.12,
+          banRate: 0.05,
+          wilsonLower: 0.54,
+          games: TIER_LIST_MIN_GAMES,
+        },
+      },
+    ];
+    const graded = gradeSlice(rows);
     expect(graded[10]!.provisional).toBe(true);
     expect(graded[10]!.score).toBeGreaterThan(0);
   });
@@ -143,7 +185,7 @@ describe('gradeSlice provisional (prior-patch blending)', () => {
       row(0.52),
       {
         ...row(0.9, 0.12, 0.05, 10), // 10 games — under MIN_TIER_GAMES
-        priorPatch: { winRate: 0.9, pickRate: 0.12, banRate: 0.05, wilsonLower: 0.85 },
+        priorPatch: { winRate: 0.9, pickRate: 0.12, banRate: 0.05, wilsonLower: 0.85, games: 5000 },
       },
     ];
     const graded = gradeSlice(rows);
@@ -156,7 +198,7 @@ describe('gradeSlice provisional (prior-patch blending)', () => {
       ...Array.from({ length: 10 }, (_, i) => row(0.52 - i * 0.005, 0.12)),
       {
         ...row(0.55, 0.12, 0.05, TIER_LIST_MIN_GAMES),
-        priorPatch: { winRate: 0.3, pickRate: 0.12, banRate: 0.05, wilsonLower: 0.25 }, // wildly different prior
+        priorPatch: { winRate: 0.3, pickRate: 0.12, banRate: 0.05, wilsonLower: 0.25, games: 5000 }, // wildly different prior
       },
     ];
     const graded = gradeSlice(rows);
@@ -165,7 +207,13 @@ describe('gradeSlice provisional (prior-patch blending)', () => {
   });
 
   it('blend weight scales with current-patch games: more current games trusts the prior less', () => {
-    const priorPatch = { winRate: 0.65, pickRate: 0.12, banRate: 0.05, wilsonLower: 0.6 };
+    const priorPatch = {
+      winRate: 0.65,
+      pickRate: 0.12,
+      banRate: 0.05,
+      wilsonLower: 0.6,
+      games: 5000,
+    };
     const early: GradeInput = { ...row(0.5, 0.12, 0.05, 100), priorPatch }; // mostly prior (strong)
     const later: GradeInput = { ...row(0.5, 0.12, 0.05, 900), priorPatch }; // mostly current (weak)
     const pool = Array.from({ length: 10 }, (_, i) => row(0.52 - i * 0.005, 0.12));

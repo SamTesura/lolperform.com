@@ -222,7 +222,9 @@ export interface Slice {
 }
 
 export async function getLatestPatch(env: Env): Promise<PatchRow | null> {
-  return env.DB.prepare('SELECT * FROM patches ORDER BY generated_at DESC LIMIT 1').first<PatchRow>();
+  return env.DB.prepare(
+    'SELECT * FROM patches ORDER BY generated_at DESC LIMIT 1',
+  ).first<PatchRow>();
 }
 
 /** The patch immediately before `patch`, if one is still on hand (old-patch
@@ -283,7 +285,13 @@ async function getGradedRoleStats(env: Env, slice: Slice, role: Role): Promise<R
       adjustedWinRate: r.adjusted_win_rate,
       skillFloor: skillFloorFor(idByKey.get(r.champion_key) ?? ''),
       priorPatch: prior
-        ? { winRate: prior.win_rate, pickRate: prior.pick_rate, banRate: prior.ban_rate, wilsonLower: prior.wilson_lower }
+        ? {
+            winRate: prior.win_rate,
+            pickRate: prior.pick_rate,
+            banRate: prior.ban_rate,
+            wilsonLower: prior.wilson_lower,
+            games: prior.games,
+          }
         : undefined,
     };
   });
@@ -313,11 +321,7 @@ export async function getChampionById(env: Env, id: string): Promise<ChampionMet
   return row ? mapChampion(row) : null;
 }
 
-export async function getTierList(
-  env: Env,
-  slice: Slice,
-  role: Role,
-): Promise<RoleStats[]> {
+export async function getTierList(env: Env, slice: Slice, role: Role): Promise<RoleStats[]> {
   return getGradedRoleStats(env, slice, role);
 }
 
