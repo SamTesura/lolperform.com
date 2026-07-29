@@ -250,11 +250,20 @@ async function crawlRegion(
 
   // Each match remembers the seed it was discovered from, so normalizeMatch can
   // record that player's champion and career win rate.
-  const discovered = new Map<string, { tier: LeagueTier; seed: SeedPlayer }>();
+  const discovered = new Map<string, { tier: LeagueTier; seed?: SeedPlayer }>();
   for (const { tier, seed, ids } of idLists) {
+    // Only the first match kept from a seed carries their baseline. We pull up
+    // to matchesPerPlayer games per player, and tagging every one of them with
+    // the same career win rate would repeat a single player's number several
+    // times over — the per-champion mean would then be an average of far fewer
+    // independent players than its count suggests, and jump around between
+    // crawls. One observation per player per crawl keeps them independent.
+    let carried = false;
     for (const id of ids) {
       if (discovered.size >= config.maxMatchesPerRegion) break;
-      if (!discovered.has(id)) discovered.set(id, { tier, seed });
+      if (discovered.has(id)) continue;
+      discovered.set(id, { tier, seed: carried ? undefined : seed });
+      carried = true;
     }
   }
 

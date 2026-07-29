@@ -160,6 +160,19 @@ describe('crawl seed baseline capture', () => {
     }
   });
 
+  it('records one observation per seed player, not one per match they appear in', async () => {
+    // The fake hands out 2 match ids per player. Tagging both with that
+    // player's career win rate would count one player twice in the champion's
+    // mean, making the sample look larger than the number of independent
+    // players behind it — which is how the first live estimates swung by over
+    // a point between consecutive crawls.
+    const matches = await crawl(fakeClient(), config(['na1']));
+    const seeded = matches.filter((m) => m.seed).length;
+    expect(seeded).toBeGreaterThan(0);
+    expect(seeded).toBeLessThan(matches.length);
+    expect(seeded).toBe(matches.length / 2); // exactly one of each player's two
+  });
+
   it('never persists a player identifier anywhere in the stored match', async () => {
     const matches = await crawl(fakeClient(), config(['na1']));
     const serialized = JSON.stringify(matches);

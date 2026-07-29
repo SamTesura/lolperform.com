@@ -133,11 +133,13 @@ export function presence(r: Pick<GradeInput, 'pickRate' | 'banRate'>): number {
 }
 
 /**
- * Rank-sum weights. Strength dominates deliberately: presence measures how
- * contested a champion is, not how good it is, so it breaks ties and nudges
- * boundaries rather than driving the table.
+ * Rank-sum weights. Strength still leads, but presence carries real weight: a
+ * champion contested in a third of drafts is shaping the patch, and it eats
+ * bans and prepared opponents in a way a pocket pick never does. Measured on
+ * live bot lane, moving from 3:1 to 2:1 lifted the heavily-contested picks a
+ * band or so without disturbing the top of the table.
  */
-export const STRENGTH_WEIGHT = 3;
+export const STRENGTH_WEIGHT = 2;
 export const PRESENCE_WEIGHT = 1;
 
 export interface GradeResult {
