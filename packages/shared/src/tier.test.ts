@@ -1,20 +1,43 @@
 import { describe, expect, it } from 'vitest';
-import { baseTier, gradeSlice, pbi, TIER_LIST_MIN_GAMES, type GradeInput } from './tier.js';
+import { baseTier, gradeSlice, presence, TIER_LIST_MIN_GAMES, type GradeInput } from './tier.js';
 
 function row(winRate: number, pickRate = 0.1, banRate = 0.05, games = 5000): GradeInput {
   // wilsonLower ~ winRate for large samples; a fixed offset keeps ordering intact.
   return { winRate, pickRate, banRate, games, wilsonLower: winRate - 0.01 };
 }
 
-describe('pbi', () => {
-  it('rewards contested picks and punishes low-impact ones', () => {
-    const meta = pbi({ winRate: 0.54, pickRate: 0.2, banRate: 0.3 });
-    const fringe = pbi({ winRate: 0.54, pickRate: 0.01, banRate: 0 });
+describe('presence', () => {
+  it('rewards contested picks over pocket picks', () => {
+    const meta = presence({ pickRate: 0.2, banRate: 0.3 });
+    const fringe = presence({ pickRate: 0.01, banRate: 0 });
     expect(meta).toBeGreaterThan(fringe);
   });
 
-  it('is negative for losing champions', () => {
-    expect(pbi({ winRate: 0.45, pickRate: 0.1, banRate: 0.1 })).toBeLessThan(0);
+  it('does not depend on win rate, so popularity cannot flip its sign', () => {
+    // The defect in the old PBI term: (winRate - 0.5) * pickRate meant an
+    // identical win rate scored wildly differently by popularity, and a
+    // popular sub-50% champion was punished for being popular.
+    const winner = presence({ pickRate: 0.15, banRate: 0.1 });
+    const loser = presence({ pickRate: 0.15, banRate: 0.1 });
+    expect(winner).toBe(loser);
+    expect(presence({ pickRate: 0.15, banRate: 0 })).toBeGreaterThan(
+      presence({ pickRate: 0.02, banRate: 0 }),
+    );
+  });
+});
+
+describe('gradeSlice popularity neutrality', () => {
+  it('does not punish a champion for being popular at the same win rate', () => {
+    // The regression this guards: under PBI these two ranked eight places
+    // apart on the live data purely because of pick rate.
+    const rows: GradeInput[] = [
+      { winRate: 0.482, pickRate: 0.11, banRate: 0.12, games: 12000, wilsonLower: 0.473 },
+      { winRate: 0.482, pickRate: 0.015, banRate: 0.0, games: 12000, wilsonLower: 0.473 },
+      ...Array.from({ length: 12 }, (_, i) => row(0.53 - i * 0.004, 0.05)),
+    ];
+    const graded = gradeSlice(rows);
+    // identical strength; the popular one may only be helped, never punished
+    expect(graded[0]!.score).toBeGreaterThanOrEqual(graded[1]!.score);
   });
 });
 
@@ -34,7 +57,7 @@ describe('gradeSlice', () => {
   it('a high-WR fringe pick ranks below a contested meta pick with similar WR', () => {
     const rows = [
       row(0.545, 0.25, 0.3), // meta: high pick, high ban
-      row(0.55, 0.01, 0.0), // fringe: barely played, so tiny meta influence
+      row(0.55, 0.01, 0.0), // fringe: barely played, so little meta presence
       // solid mid-pool picks whose PBI beats the fringe's sliver of pick rate
       ...Array.from({ length: 10 }, (_, i) => row(0.515 - i * 0.003, 0.12)),
     ];

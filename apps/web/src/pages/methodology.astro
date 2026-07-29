@@ -72,11 +72,23 @@ import Base from '../layouts/Base.astro';
           certainty, not luck.
         </li>
         <li>
-          <strong class="text-text-primary">PBI (pick-ban influence)</strong> — win rate above
-          average × pick rate ÷ (1 − ban rate). A contested, frequently banned champion that still
-          wins is shaping the meta; a fringe pick with a shiny win rate is not.
+          <strong class="text-text-primary">Meta presence</strong> — pick rate plus ban rate. A
+          champion contested in every draft is more meta-relevant than a pocket pick, and it is
+          played into opponents who prepared for it, which holds its raw win rate down. Presence
+          counts for a third as much as strength: it is a measure of how contested a champion is,
+          not of how good it is.
         </li>
       </ul>
+      <p>
+        Win rate is corrected before it is ranked, for <strong class="text-text-primary">who picks
+        the champion</strong>. Within a single rank, popular blind-pick-friendly champions are picked
+        by weaker players than niche specialist picks are, and that difference lands on the
+        champion's win rate rather than the player's. Every crawled match carries one observation of
+        how strong the picking player is, taken from their career ranked record, and a champion whose
+        players are stronger than average gives that advantage back. The correction is deliberately
+        an under-correction, and the size of it is published next to the win rate rather than hidden
+        in the score.
+      </p>
       <p>
         Both signals then get a small <strong class="text-text-primary">skill-floor adjustment</strong> (at
         most ±0.4% win-rate equivalent): a mechanically simple champion's win rate is repeatable
@@ -86,7 +98,9 @@ import Base from '../layouts/Base.astro';
         cases, never rewrite a tier.
       </p>
       <p>
-        Each champion gets a rank on both signals; the sum of the two ranks orders the lane. Some
+        Each champion gets a rank on both signals; a weighted sum of the two ranks orders the lane,
+        and champions a signal cannot tell apart share a rank on it rather than being ordered
+        arbitrarily. Some
         sites also factor in per-player signals such as best-player win rate or best-player Elo —
         those require tracking individual players across months, and this site stores no player
         identifiers by design, so our grading uses the signals a sampled, privacy-preserving
@@ -154,6 +168,13 @@ import Base from '../layouts/Base.astro';
       <h2>Recent changes</h2>
       <ul class="list-inside list-disc space-y-1 text-text-muted">
         <li>
+          <strong class="text-text-primary">Player-pool correction, and a scoring fix</strong> — the
+          ranking no longer multiplies a champion's distance from a 50% win rate by how often it is
+          picked. That term meant two champions on the same win rate could sit several grades apart
+          purely because one was popular, which pushed common picks down and pocket picks up. Win
+          rates are now also corrected for how strong a champion's players are.
+        </li>
+        <li>
           <strong class="text-text-primary">Rank-mix and region-mix correction</strong> — stats are
           now weighted to the ladder's real rank distribution, and the pooled view to real server
           populations. The crawl's high-elo oversampling and equal-per-region budget had been
@@ -168,7 +189,7 @@ import Base from '../layouts/Base.astro';
         </li>
         <li>
           <strong class="text-text-primary">Rank-based grading</strong> — tiers
-          now come from each lane's combined Wilson + PBI ranking, cut at fixed percentiles, instead
+          now come from each lane's combined strength + presence ranking, cut at fixed percentiles, instead
           of fixed win-rate thresholds. S+ means "top of the meta", every patch, by construction.
         </li>
         <li>
