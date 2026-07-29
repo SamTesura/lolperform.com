@@ -32,7 +32,8 @@
 
 ### 📊 A Tier List You Can Actually Read
 - Fine-grained **S+ → D−** grades assigned by **rank percentile** within each lane, not fixed win-rate cutoffs — S+ always means "top of this patch's meta"
-- Champions ranked by two combined signals: the **Wilson score lower bound** (a 60%-over-10-games champion never outranks a 53%-over-5,000-games one) and **PBI** (pick-ban influence — contested picks that win shape the meta; fringe picks with shiny win rates don't)
+- Champions ranked by two combined signals: **strength** — the Wilson score lower bound, so a 60%-over-10-games champion never outranks a 53%-over-5,000-games one — and **meta presence** (pick + ban rate), weighted at a third of strength because how contested a champion is isn't how good it is
+- **Player-pool correction**: a win rate measures the champion *and* whoever picked it, and within a single rank the popular blind picks are played by weaker players than niche specialist picks are. Each match carries one observation of how strong the picking player is, taken from their career ranked record, so a champion carried by strong players gives that advantage back — an identity-free correction, deliberately an under-correction, published next to the win rate rather than hidden in a score
 - **50-game floor**: below it a champion is *Unranked*, never mislabeled D−
 - Confidence dimming + sample-size chips on every tile; three levels of disclosure (grid → champion → matchup)
 
