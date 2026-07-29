@@ -91,6 +91,10 @@ export interface PriorPatchStats {
   pickRate: number;
   banRate: number;
   wilsonLower: number;
+  /** Games behind the prior. A prior is only usable if it was itself ranked —
+   *  see gradeSlice. Optional for callers that predate the check; absent is
+   *  treated as unranked, i.e. no provisional grade. */
+  games?: number;
 }
 
 export interface GradeInput {
@@ -153,8 +157,8 @@ export interface GradeResult {
  * out exactly as fast as real signal fades in). No prior, or already past the
  * floor: current stats pass through unchanged.
  */
-function blendWithPrior(r: GradeInput): PriorPatchStats {
-  if (!r.priorPatch || r.games >= TIER_LIST_MIN_GAMES) {
+function blendWithPrior(r: GradeInput, prior: PriorPatchStats | undefined): PriorPatchStats {
+  if (!prior || r.games >= TIER_LIST_MIN_GAMES) {
     return {
       winRate: r.winRate,
       pickRate: r.pickRate,
@@ -163,7 +167,7 @@ function blendWithPrior(r: GradeInput): PriorPatchStats {
     };
   }
   const w = r.games / TIER_LIST_MIN_GAMES;
-  const p = r.priorPatch;
+  const p = prior;
   return {
     winRate: r.winRate * w + p.winRate * (1 - w),
     pickRate: r.pickRate * w + p.pickRate * (1 - w),
@@ -196,14 +200,21 @@ export function gradeSlice(rows: readonly GradeInput[]): GradeResult[] {
     score: r.wilsonLower - 1,
     provisional: false,
   }));
+  // A prior is only worth leaning on if the prior itself was ranked. Without
+  // that gate a champion nobody plays in the lane enters on 50 games and
+  // borrows a prior built from equally few — laundering noise into a grade.
+  // Measured on live 16.14 bot lane, the gate dropped the pool from 95 to 45
+  // and removed a 144-game Qiyana at S and a 158-game Riven at S-.
+  const usablePrior = (r: GradeInput): PriorPatchStats | undefined =>
+    r.priorPatch && (r.priorPatch.games ?? 0) >= TIER_LIST_MIN_GAMES ? r.priorPatch : undefined;
   const pool = rows
     .map((r, i) => ({ i, r }))
     .filter(
-      (x) => x.r.games >= TIER_LIST_MIN_GAMES || (x.r.priorPatch && x.r.games >= MIN_TIER_GAMES),
+      (x) => x.r.games >= TIER_LIST_MIN_GAMES || (usablePrior(x.r) && x.r.games >= MIN_TIER_GAMES),
     );
   if (pool.length === 0) return out;
 
-  const blended = new Map(pool.map((x) => [x.i, blendWithPrior(x.r)]));
+  const blended = new Map(pool.map((x) => [x.i, blendWithPrior(x.r, usablePrior(x.r))]));
   // Midranks: tied values share the average of the positions they span, so a
   // signal that cannot tell two champions apart contributes nothing to
   // separating them. Assigning tied rows arbitrary consecutive ranks instead
