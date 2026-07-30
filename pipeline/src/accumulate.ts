@@ -21,6 +21,27 @@ export function topPatches(matches: NormMatch[], n: number): string[] {
  */
 export const TARGET_PATCH_FLIP_SHARE = 0.2;
 
+/**
+ * Matches on the announced patch, accumulated in the store, that alone trigger
+ * the flip regardless of share.
+ *
+ * The share test above turns out to be calibrated against the wrong quantity.
+ * A crawl samples the recent games of randomly chosen ranked players, not
+ * recent games, and plenty of those players have not played since the patch —
+ * a day into 16.15 the fresh mix was 55% 16.14, 18% 16.13 and only 4.5% 16.15,
+ * with two-patches-old games nearly outvoting the live patch. Waiting for a
+ * fifth of the crawl would have left the site labelled with the previous patch
+ * for days.
+ *
+ * The share gate existed to avoid flipping into an empty tier list, and that
+ * reason is gone: provisional grading blends a thin current sample with the
+ * prior patch, so a new patch is presentable long before it dominates. This
+ * threshold is the volume at which the popular champions clear the provisional
+ * floor of MIN_TIER_GAMES in their lane, which is what makes the flipped list
+ * worth showing.
+ */
+export const MIN_TARGET_PATCH_MATCHES = 3000;
+
 export interface AccumulateResult {
   /** Deduped union pruned to the dataset patch plus the announced (ramping)
    *  patch — persist this, but aggregate only the dominant-patch subset. */
@@ -59,11 +80,16 @@ export function accumulate(
   for (const m of fresh) byId.set(m.matchId, m); // fresh wins on conflict
   const union = [...byId.values()];
 
-  const targetCount = fresh.filter((m) => m.patch === targetPatch).length;
-  const dominantPatch =
-    fresh.length > 0 && targetCount / fresh.length >= TARGET_PATCH_FLIP_SHARE
-      ? targetPatch
-      : (topPatches(fresh, 1)[0] ?? topPatches(union, 1)[0] ?? targetPatch);
+  // Flip on either signal: the announced patch taking a real share of this
+  // crawl (the live game has clearly moved), or enough of it banked to fill a
+  // list on its own (adoption is slower than the crawl can see).
+  const freshShare =
+    fresh.length > 0 ? fresh.filter((m) => m.patch === targetPatch).length / fresh.length : 0;
+  const banked = union.filter((m) => m.patch === targetPatch).length;
+  const flip = freshShare >= TARGET_PATCH_FLIP_SHARE || banked >= MIN_TARGET_PATCH_MATCHES;
+  const dominantPatch = flip
+    ? targetPatch
+    : (topPatches(fresh, 1)[0] ?? topPatches(union, 1)[0] ?? targetPatch);
 
   const keep = new Set([dominantPatch, targetPatch]);
   const store = union.filter((m) => keep.has(m.patch));

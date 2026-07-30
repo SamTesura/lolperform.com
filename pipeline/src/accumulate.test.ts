@@ -76,6 +76,40 @@ describe('accumulate', () => {
     expect(store).toHaveLength(110);
   });
 
+  it('flips on banked volume when adoption is too slow for the share test', () => {
+    // The live 16.15 case: a day in, the fresh crawl was 55% previous patch,
+    // 18% two-patches-old and only ~4.5% the announced one, because a crawl
+    // samples the recent games of random players rather than recent games. The
+    // share test alone would have held the site on the old patch for days.
+    const prior = [
+      ...Array.from({ length: 120_000 }, (_, i) => m(`old${i}`, '16.14')),
+      ...Array.from({ length: 2_960 }, (_, i) => m(`ramp${i}`, '16.15')),
+    ];
+    const fresh = [
+      ...Array.from({ length: 900 }, (_, i) => m(`f14_${i}`, '16.14')),
+      ...Array.from({ length: 45 }, (_, i) => m(`f15_${i}`, '16.15')), // 4.8%, under the share gate
+    ];
+    const { store, dominantPatch } = accumulate(prior, fresh, '16.15');
+    expect(dominantPatch).toBe('16.15'); // banked 3,005 clears MIN_TARGET_PATCH_MATCHES
+    expect(store.every((x) => x.patch === '16.15')).toBe(true);
+    expect(store).toHaveLength(3005);
+  });
+
+  it('does not flip on a trickle: below both the share and the volume gate', () => {
+    const prior = [
+      ...Array.from({ length: 50_000 }, (_, i) => m(`old${i}`, '16.14')),
+      ...Array.from({ length: 400 }, (_, i) => m(`ramp${i}`, '16.15')),
+    ];
+    const fresh = [
+      ...Array.from({ length: 900 }, (_, i) => m(`f14_${i}`, '16.14')),
+      ...Array.from({ length: 40 }, (_, i) => m(`f15_${i}`, '16.15')),
+    ];
+    const { dominantPatch, store } = accumulate(prior, fresh, '16.15');
+    expect(dominantPatch).toBe('16.14');
+    // the ramping patch is still retained rather than discarded
+    expect(store.some((x) => x.patch === '16.15')).toBe(true);
+  });
+
   it('falls back to the stored patch on an empty crawl (store survives)', () => {
     const prior = [m('a', '16.13'), m('b', '16.13')];
     const { store, dominantPatch } = accumulate(prior, [], '16.14');
