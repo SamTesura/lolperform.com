@@ -59,8 +59,11 @@ function BuildPath({
 }: {
   items: number[];
   catalog?: Record<string, ItemInfo>;
-  version: string;
+  /** Undefined until the meta query resolves; item icons need it, so hold the
+   *  section back rather than rendering broken images. */
+  version?: string;
 }) {
+  if (!version) return null;
   const rows = items
     .map((id) => ({ id, info: catalog?.[String(id)], pieces: componentsOf(id, catalog) }))
     .filter((r) => r.info);
