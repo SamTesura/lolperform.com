@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { ACTIVE_REGIONS, RANK_BRACKETS, skillFloorFor } from '@lolperform/shared';
 import { assertApiKey, loadConfig } from './config.js';
 import { detectPatch } from './detect-patch.js';
-import { getChampionMeta } from './ddragon.js';
+import { getBootItems, getChampionMeta, getCompletedItems } from './ddragon.js';
 import { RiotClient } from './riot/client.js';
 import { crawl } from './crawl.js';
 import { aggregate } from './aggregate.js';
@@ -78,7 +78,9 @@ async function main(): Promise<void> {
   // Champion meta first: grading needs each champion's curated skill floor.
   const champions = [...(await getChampionMeta(latestVersion)).values()];
   const skillFloors = new Map(champions.map((c) => [c.key, skillFloorFor(c.id)]));
-  const result = aggregate(dataset, skillFloors);
+  const completedItems = await getCompletedItems(latestVersion);
+  const bootItems = await getBootItems(latestVersion);
+  const result = aggregate(dataset, skillFloors, completedItems, bootItems);
 
   await mkdir(DATA_DIR, { recursive: true });
   await writeJson('dataset-meta.json', {

@@ -194,8 +194,8 @@ function RuneDot({
  * honest per-keystone win rates live in the Keystones list next to it.
  */
 function RunePagePanel({ runes, catalog }: { runes: RunePage; catalog?: RuneCatalog }) {
-  const primary = catalog?.byStyle[String(runes.primaryStyle)];
-  const sub = catalog?.byStyle[String(runes.subStyle)];
+  const primary = catalog?.byStyle?.[String(runes.primaryStyle)];
+  const sub = catalog?.byStyle?.[String(runes.subStyle)];
   if (!primary || !sub) return null;
   const chosen = new Set<number>([runes.keystone, ...runes.primary, ...runes.secondary]);
   const chosenShards = [...runes.shards];
@@ -322,6 +322,114 @@ function Keystones({
         })}
       </ul>
     </section>
+  );
+}
+
+type SlotOption = { item: number; share: number; games: number };
+
+/**
+ * The build laid out the way players read it on the big sites: core items in
+ * order, then alternatives per later slot, plus boots as their own decision.
+ * Every option shows how often the ladder takes it and on how many games —
+ * options, not one prescription. Deliberately no per-slot win rates: an item's
+ * "win rate" mostly measures having been winning long enough to buy it, so we
+ * publish popularity, which is at least exactly what it claims to be.
+ */
+function SlotBreakdown({
+  slots,
+  boots,
+  catalog,
+  version,
+}: {
+  slots: SlotOption[][] | null | undefined;
+  boots: SlotOption[] | null | undefined;
+  catalog?: Record<string, ItemInfo>;
+  version?: string;
+}) {
+  if (!version || !slots || slots.length === 0) return null;
+  const named = (o: SlotOption) => catalog?.[String(o.item)]?.name ?? `Item ${o.item}`;
+
+  const OptionRow = ({ o }: { o: SlotOption }) => (
+    <li className="flex items-center gap-2">
+      <img
+        src={itemIcon(o.item, version)}
+        alt={named(o)}
+        title={named(o)}
+        width={28}
+        height={28}
+        loading="lazy"
+        className="rounded-sm bg-bg-inset"
+      />
+      <span className="stat text-xs text-text-secondary">{formatPercent(o.share)}</span>
+      <span className="stat text-2xs text-text-muted">{o.games.toLocaleString('en-US')}g</span>
+    </li>
+  );
+
+  const core = slots
+    .slice(0, 3)
+    .map((options) => options[0])
+    .filter(Boolean) as SlotOption[];
+  const later = slots.slice(3);
+  const ordinal = (i: number) => `${i + 4}th item`;
+
+  return (
+    <div className="space-y-3 border-t border-border-subtle pt-3">
+      <div className="flex flex-wrap gap-4">
+        {core.length > 0 ? (
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-text-primary">Core items</p>
+            <div className="flex items-center gap-1.5">
+              {core.map((o, i) => (
+                <span key={`${o.item}-${i}`} className="flex items-center gap-1.5">
+                  {i > 0 ? (
+                    <span className="text-text-muted" aria-hidden="true">
+                      →
+                    </span>
+                  ) : null}
+                  <img
+                    src={itemIcon(o.item, version)}
+                    alt={named(o)}
+                    title={`${named(o)} — ${formatPercent(o.share)} of games with this slot filled`}
+                    width={34}
+                    height={34}
+                    loading="lazy"
+                    className="rounded-sm bg-bg-inset"
+                  />
+                </span>
+              ))}
+            </div>
+            <p className="text-2xs text-text-muted">most common first three, in order</p>
+          </div>
+        ) : null}
+        {boots && boots.length > 0 ? (
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-text-primary">Boots</p>
+            <ul className="space-y-1">
+              {boots.map((o) => (
+                <OptionRow key={o.item} o={o} />
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {later.map((options, i) =>
+          options.length > 0 ? (
+            <div key={i} className="space-y-1.5">
+              <p className="text-xs font-semibold text-text-primary">{ordinal(i)}</p>
+              <ul className="space-y-1">
+                {options.map((o) => (
+                  <OptionRow key={o.item} o={o} />
+                ))}
+              </ul>
+            </div>
+          ) : null,
+        )}
+      </div>
+      <p className="text-2xs text-text-muted">
+        Percentages are how often the ladder takes each option, of the games that filled that slot —
+        popularity, not win rate, because finishing a late item mostly means you were already
+        winning.
+      </p>
+    </div>
   );
 }
 
@@ -713,6 +821,12 @@ function Detail({ championId }: { championId: string }) {
               </span>
             </div>
             <BuildPath items={champBuild.items} catalog={itemCatalog.data} version={version} />
+            <SlotBreakdown
+              slots={champBuild.slotOptions}
+              boots={champBuild.bootOptions}
+              catalog={itemCatalog.data}
+              version={version}
+            />
           </div>
         ) : (
           <p className="rounded-lg border border-dashed border-border-subtle bg-bg-surface/60 p-3 text-sm text-text-muted">

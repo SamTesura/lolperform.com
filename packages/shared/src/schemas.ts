@@ -151,6 +151,23 @@ export const buildPathSchema = z.object({
   games: z.number().int().nonnegative(),
   wins: z.number().int().nonnegative(),
   winRate: z.number().min(0).max(1),
+  /**
+   * Per display-slot alternatives: for each item slot, the finished items most
+   * often held at that inventory position, with each option's share of the
+   * games that filled the slot and its raw count. Popularity, deliberately not
+   * per-slot win rates — an item's "win rate" mostly measures having been
+   * winning long enough to buy it.
+   */
+  slotOptions: z
+    .array(z.array(z.object({ item: z.number().int(), share: z.number(), games: z.number().int() })))
+    .nullable()
+    .default(null),
+  /** Boots ranked by popularity — their own decision, kept out of the
+   *  positional slots. Same popularity-not-win-rate treatment as slots. */
+  bootOptions: z
+    .array(z.object({ item: z.number().int(), share: z.number(), games: z.number().int() }))
+    .nullable()
+    .default(null),
 });
 export type BuildPath = z.infer<typeof buildPathSchema>;
 
