@@ -15,6 +15,7 @@ import {
   type Region,
   type Role,
   type RoleStats,
+  type RunePageStats,
   type LeagueTier,
   type RunePage,
   type SkillFloor,
@@ -25,6 +26,7 @@ import { gradeSlice } from './tier.js';
 export interface AggregateResult {
   roleStats: RoleStats[];
   keystones: KeystoneStats[];
+  runePages: RunePageStats[];
   matchups: Matchup[];
   duos: DuoSynergy[];
   builds: BuildPath[];
@@ -124,6 +126,7 @@ export function aggregate(
   const out: AggregateResult = {
     roleStats: [],
     keystones: [],
+    runePages: [],
     matchups: [],
     duos: [],
     builds: [],
@@ -204,6 +207,11 @@ function aggregateSlice(
   const itemFreq = new Map<string, Map<number, number>>(); // `${champ}|${role}` -> item id -> times bought
   const slotAgg = new Map<string, Map<number, number>[]>(); // `${champ}|${role}` -> slot index -> item -> count
   const bootAgg = new Map<string, Map<number, number>>(); // `${champ}|${role}` -> boots item -> count
+  // `${role}|${champ}` -> runeSignature -> tally + mode count of full pages
+  const runePageAgg = new Map<
+    string,
+    Map<string, { tally: Tally; pages: Map<string, { page: RunePage; n: number }> }>
+  >();
   const keystoneAgg = new Map<string, Tally>(); // `${role}|${champ}|${keystone}`
 
   const getTally = (map: Map<string, Tally>, key: string): Tally => {
@@ -243,6 +251,23 @@ function aggregateSlice(
       add(getTally(roleAgg, `${p.role}|${p.championKey}`), p.win, w);
       if (p.runes.keystone > 0) {
         add(getTally(keystoneAgg, `${p.role}|${p.championKey}|${p.runes.keystone}`), p.win, w);
+        const rpKey = `${p.role}|${p.championKey}`;
+        let sigs2 = runePageAgg.get(rpKey);
+        if (!sigs2) {
+          sigs2 = new Map();
+          runePageAgg.set(rpKey, sigs2);
+        }
+        const sig = runeSignature(p.runes);
+        let entry = sigs2.get(sig);
+        if (!entry) {
+          entry = { tally: tally(), pages: new Map() };
+          sigs2.set(sig, entry);
+        }
+        add(entry.tally, p.win, w);
+        const pageKey = JSON.stringify(p.runes);
+        const pc = entry.pages.get(pageKey);
+        if (pc) pc.n += 1;
+        else entry.pages.set(pageKey, { page: p.runes, n: 1 });
       }
       addBuild(p.championKey, p.role, null, p);
       if (p.items.length > 0) {
@@ -423,6 +448,36 @@ function aggregateSlice(
       wins: t.wins,
       winRate: t.wWins / t.wGames,
       wilsonLower: wilsonLowerBound(t.wWins, t.wGames),
+    });
+  }
+
+  // --- emit the champion's two most common rune pages ---
+  // Signature = keystone + both styles (fat arms); the stored page is the most
+  // common full page inside the signature, and games/wins are the signature's
+  // own — a pre-lock sample, so the win rate is honest to show.
+  for (const [key, sigs2] of runePageAgg) {
+    const [role, championKey] = key.split('|') as [Role, string];
+    const ranked2 = [...sigs2.values()]
+      .filter((e) => e.tally.games >= MIN_KEYSTONE_GAMES)
+      .sort((a, b) => b.tally.games - a.tally.games)
+      .slice(0, 2);
+    ranked2.forEach((e, i) => {
+      let best: { page: RunePage; n: number } | null = null;
+      for (const pc of e.pages.values()) if (!best || pc.n > best.n) best = pc;
+      if (!best) return;
+      out.runePages.push({
+        patch,
+        region,
+        rank,
+        role,
+        championKey,
+        slot: (i + 1) as 1 | 2,
+        runes: best.page,
+        games: e.tally.games,
+        wins: e.tally.wins,
+        winRate: e.tally.wWins / e.tally.wGames,
+        wilsonLower: wilsonLowerBound(e.tally.wWins, e.tally.wGames),
+      });
     });
   }
 

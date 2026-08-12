@@ -8,6 +8,7 @@ import type {
   DuoSynergy,
   Matchup,
   KeystoneStats,
+  RunePageStats,
   RoleStats,
 } from '@lolperform/shared';
 
@@ -23,6 +24,7 @@ export interface LoadInput {
   champions: ChampionMeta[];
   roleStats: RoleStats[];
   keystones: KeystoneStats[];
+  runePages: RunePageStats[];
   matchups: Matchup[];
   duos: DuoSynergy[];
   builds: BuildPath[];
@@ -64,7 +66,7 @@ export function buildLoadSql(input: LoadInput): string {
   const patch = s(meta.patch);
   const parts: string[] = ['PRAGMA foreign_keys = ON;'];
 
-  for (const table of ['role_stats', 'keystone_stats', 'matchups', 'duos', 'builds']) {
+  for (const table of ['role_stats', 'keystone_stats', 'rune_pages', 'matchups', 'duos', 'builds']) {
     parts.push(`DELETE FROM ${table} WHERE patch = ${patch};`);
   }
   parts.push(`DELETE FROM patches WHERE patch = ${patch};`);
@@ -111,6 +113,17 @@ export function buildLoadSql(input: LoadInput): string {
       input.keystones.map((k) => [
         s(k.patch), s(k.region), s(k.rank), s(k.role), s(k.championKey),
         n(k.keystone), n(k.games), n(k.wins), n(k.winRate), n(k.wilsonLower),
+      ]),
+    ),
+  );
+
+  parts.push(
+    insertRows(
+      'rune_pages',
+      ['patch', 'region', 'rank', 'role', 'champion_key', 'slot', 'runes', 'games', 'wins', 'win_rate', 'wilson_lower'],
+      input.runePages.map((r) => [
+        s(r.patch), s(r.region), s(r.rank), s(r.role), s(r.championKey),
+        n(r.slot), s(JSON.stringify(r.runes)), n(r.games), n(r.wins), n(r.winRate), n(r.wilsonLower),
       ]),
     ),
   );
@@ -179,6 +192,7 @@ async function main(): Promise<void> {
     champions: await readJson<ChampionMeta[]>('champions.json'),
     roleStats: await readJson<RoleStats[]>('role-stats.json'),
     keystones: await readJsonOr<KeystoneStats[]>('keystones.json', []),
+    runePages: await readJsonOr<RunePageStats[]>('rune-pages.json', []),
     matchups: await readJson<Matchup[]>('matchups.json'),
     duos: await readJson<DuoSynergy[]>('duos.json'),
     builds: await readJson<BuildPath[]>('builds.json'),
