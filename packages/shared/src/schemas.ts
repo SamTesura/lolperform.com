@@ -190,6 +190,23 @@ export const buildPathSchema = z.object({
     .array(z.object({ item: z.number().int(), share: z.number(), games: z.number().int() }))
     .nullable()
     .default(null),
+  /**
+   * Summoner spell pairs with pick share AND win rate. Spells are locked in
+   * champion select — pre-lock like runes, unlike items — so a per-pair win
+   * rate is a fair number to publish.
+   */
+  spellOptions: z
+    .array(
+      z.object({
+        spells: z.tuple([z.number().int(), z.number().int()]),
+        share: z.number(),
+        games: z.number().int(),
+        wins: z.number().int(),
+        winRate: z.number().min(0).max(1),
+      }),
+    )
+    .nullable()
+    .default(null),
 });
 export type BuildPath = z.infer<typeof buildPathSchema>;
 

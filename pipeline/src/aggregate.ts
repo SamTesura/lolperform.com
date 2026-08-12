@@ -207,6 +207,7 @@ function aggregateSlice(
   const itemFreq = new Map<string, Map<number, number>>(); // `${champ}|${role}` -> item id -> times bought
   const slotAgg = new Map<string, Map<number, number>[]>(); // `${champ}|${role}` -> slot index -> item -> count
   const bootAgg = new Map<string, Map<number, number>>(); // `${champ}|${role}` -> boots item -> count
+  const spellAgg = new Map<string, Map<string, Tally>>(); // `${champ}|${role}` -> `${a}-${b}` -> tally
   // `${role}|${champ}` -> runeSignature -> tally + mode count of full pages
   const runePageAgg = new Map<
     string,
@@ -300,6 +301,14 @@ function aggregateSlice(
             bucket.set(id, (bucket.get(id) ?? 0) + 1);
           });
         for (const id of finished.filter(isBoots)) bt2.set(id, (bt2.get(id) ?? 0) + 1);
+      }
+      if (p.spells) {
+        let sp = spellAgg.get(`${p.championKey}|${p.role}`);
+        if (!sp) {
+          sp = new Map();
+          spellAgg.set(`${p.championKey}|${p.role}`, sp);
+        }
+        add(getTally(sp, `${p.spells[0]}-${p.spells[1]}`), p.win, w);
       }
     }
 
@@ -426,6 +435,7 @@ function aggregateSlice(
       winRate: top.wins / top.games,
       slotOptions: null,
       bootOptions: null,
+      spellOptions: null,
     });
   }
 
@@ -520,6 +530,23 @@ function aggregateSlice(
     const slots = slotAgg.get(`${championKey}|${role}`) ?? [];
     const slotOptions = slots.slice(0, slotCount).map((bucket) => topOptions(bucket, 3));
     const bootOptions = topOptions(bootAgg.get(`${championKey}|${role}`), 3);
+    // Spell pairs carry their own win rate — locked in champion select, so
+    // unlike items the number cannot be an effect of already winning.
+    const spellTallies = spellAgg.get(`${championKey}|${role}`);
+    let spellOptions: NonNullable<BuildPath['spellOptions']> = [];
+    if (spellTallies) {
+      const filled = [...spellTallies.values()].reduce((a2, b2) => a2 + b2.games, 0);
+      spellOptions = [...spellTallies.entries()]
+        .sort((a2, b2) => b2[1].games - a2[1].games)
+        .slice(0, 3)
+        .map(([pair, st]) => ({
+          spells: pair.split('-').map(Number) as [number, number],
+          share: st.games / filled,
+          games: st.games,
+          wins: st.wins,
+          winRate: st.wWins / st.wGames,
+        }));
+    }
 
     out.builds.push({
       patch,
@@ -535,6 +562,7 @@ function aggregateSlice(
       winRate: t.wins / t.games,
       slotOptions: slotOptions.some((o) => o.length > 0) ? slotOptions : null,
       bootOptions: bootOptions.length > 0 ? bootOptions : null,
+      spellOptions: spellOptions.length > 0 ? spellOptions : null,
     });
   }
 }

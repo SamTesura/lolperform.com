@@ -492,6 +492,76 @@ function SlotBreakdown({
   );
 }
 
+type SpellOption = {
+  spells: [number, number];
+  share: number;
+  games: number;
+  wins: number;
+  winRate: number;
+};
+
+interface SpellInfo {
+  name: string;
+  image: string;
+}
+
+/**
+ * Summoner spell pairs, each with win rate, pick share and games. The win
+ * rate is shown here — and not on items — because spells are locked in
+ * champion select: a pre-lock choice cannot be an effect of already winning.
+ */
+function SpellPairs({
+  options,
+  catalog,
+  version,
+}: {
+  options: SpellOption[] | null | undefined;
+  catalog?: Record<string, SpellInfo>;
+  version?: string;
+}) {
+  if (!version || !options || options.length === 0) return null;
+  const info = (id: number) => catalog?.[String(id)];
+  return (
+    <section className="space-y-2">
+      <h3>Summoner spells</h3>
+      <ul className="divide-y divide-border-subtle rounded-lg border border-border-subtle bg-bg-surface">
+        {options.map((o) => (
+          <li
+            key={o.spells.join('-')}
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 p-2.5"
+          >
+            <span className="flex items-center gap-1">
+              {o.spells.map((id) => {
+                const sp = info(id);
+                return (
+                  <img
+                    key={id}
+                    src={`https://ddragon.leagueoflegends.com/cdn/${version}/img/spell/${sp?.image ?? ''}`}
+                    alt={sp?.name ?? `Spell ${id}`}
+                    title={sp?.name ?? `Spell ${id}`}
+                    width={28}
+                    height={28}
+                    loading="lazy"
+                    className="rounded-sm bg-bg-inset"
+                  />
+                );
+              })}
+            </span>
+            <span className="min-w-28 flex-1 text-sm text-text-primary">
+              {o.spells.map((id) => info(id)?.name ?? id).join(' + ')}
+            </span>
+            <span className="stat text-sm text-text-secondary">{formatPercent(o.winRate)} win</span>
+            <span className="stat text-xs text-text-muted">{formatPercent(o.share)} of games</span>
+            <span className="stat text-xs text-text-muted">
+              {o.games.toLocaleString('en-US')} games
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /**
  * Data Dragon item descriptions use light markup (<stats>, <attention>,
  * <passive>, <br>, damage-type tags…). Parse it into plain-text structure and
@@ -587,6 +657,26 @@ function Detail({ championId }: { championId: string }) {
         }
       }
       return { keystones, byStyle };
+    },
+  });
+
+  const spellCatalog = useQuery({
+    queryKey: ['spells', version],
+    enabled: Boolean(version),
+    staleTime: Infinity,
+    queryFn: async (): Promise<Record<string, SpellInfo>> => {
+      const res = await fetch(
+        `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/summoner.json`,
+      );
+      if (!res.ok) throw new Error(`summoner.json ${res.status}`);
+      const json = (await res.json()) as {
+        data: Record<string, { key: string; name: string; image: { full: string } }>;
+      };
+      const out: Record<string, SpellInfo> = {};
+      for (const sp of Object.values(json.data)) {
+        out[sp.key] = { name: sp.name, image: sp.image.full };
+      }
+      return out;
     },
   });
 
@@ -753,6 +843,12 @@ function Detail({ championId }: { championId: string }) {
         pages={(champ.data?.runePages ?? []).filter((p) => !primary || p.role === primary.role)}
         fallback={champBuild?.runes}
         catalog={runeCatalog.data}
+      />
+
+      <SpellPairs
+        options={champBuild?.spellOptions}
+        catalog={spellCatalog.data}
+        version={version}
       />
 
       <section className="space-y-2">
