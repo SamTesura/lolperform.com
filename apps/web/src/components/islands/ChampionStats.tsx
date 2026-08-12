@@ -45,7 +45,10 @@ function parseItemDescription(desc: string): {
 } {
   const statsMatch = /<stats>([\s\S]*?)<\/stats>/i.exec(desc);
   const stats = statsMatch
-    ? statsMatch[1]!.split(/<br\s*\/?>/i).map(stripTags).filter(Boolean)
+    ? statsMatch[1]!
+        .split(/<br\s*\/?>/i)
+        .map(stripTags)
+        .filter(Boolean)
     : [];
   const rest = desc.replace(/<stats>[\s\S]*?<\/stats>/i, '');
 
@@ -145,7 +148,12 @@ function Detail({ championId }: { championId: string }) {
                     while the champion is absent from that lane's tier list.
                     Win rate always shows. */}
                 {s.score > 0 ? (
-                  <TierBadge tier={baseTier(s.tier)} grade={s.tier} size="md" provisional={s.provisional} />
+                  <TierBadge
+                    tier={baseTier(s.tier)}
+                    grade={s.tier}
+                    size="md"
+                    provisional={s.provisional}
+                  />
                 ) : (
                   <span
                     className="inline-flex items-center rounded-md border border-border-default px-2 py-1 text-xs font-semibold text-text-muted"
@@ -154,9 +162,15 @@ function Detail({ championId }: { championId: string }) {
                     NR
                   </span>
                 )}
-                <span className="text-sm font-medium text-text-secondary">{ROLE_LABELS[s.role]}</span>
+                <span className="text-sm font-medium text-text-secondary">
+                  {ROLE_LABELS[s.role]}
+                </span>
                 <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:gap-3">
-                  <StatBadge label="Win" value={formatPercent(s.winRate)} tone={s.winRate >= 0.5 ? 'positive' : 'negative'} />
+                  <StatBadge
+                    label="Win"
+                    value={formatPercent(s.winRate)}
+                    tone={s.winRate >= 0.5 ? 'positive' : 'negative'}
+                  />
                   <StatBadge label="Pick" value={formatPercent(s.pickRate)} />
                   <StatBadge label="Ban" value={formatPercent(s.banRate)} />
                   <StatBadge label="Games" value={s.games.toLocaleString('en-US')} />
@@ -176,7 +190,16 @@ function Detail({ championId }: { championId: string }) {
                 {bestMatchups.map((m, i) => {
                   const opp = index.get(m.opponentKey);
                   if (!opp) return null;
-                  return <MatchupRow key={m.opponentKey} matchup={m} self={self} opponent={opp} version={version} striped={i % 2 === 1} />;
+                  return (
+                    <MatchupRow
+                      key={m.opponentKey}
+                      matchup={m}
+                      self={self}
+                      opponent={opp}
+                      version={version}
+                      striped={i % 2 === 1}
+                    />
+                  );
                 })}
               </div>
             </section>
@@ -188,7 +211,16 @@ function Detail({ championId }: { championId: string }) {
                 {toughMatchups.map((m, i) => {
                   const opp = index.get(m.opponentKey);
                   if (!opp) return null;
-                  return <MatchupRow key={m.opponentKey} matchup={m} self={self} opponent={opp} version={version} striped={i % 2 === 1} />;
+                  return (
+                    <MatchupRow
+                      key={m.opponentKey}
+                      matchup={m}
+                      self={self}
+                      opponent={opp}
+                      version={version}
+                      striped={i % 2 === 1}
+                    />
+                  );
                 })}
               </div>
             </section>
@@ -209,9 +241,14 @@ function Detail({ championId }: { championId: string }) {
                 const partner = index.get(partnerKey);
                 if (!partner) return null;
                 return (
-                  <span key={partnerKey} className="rounded-sm border border-border-subtle bg-bg-surface px-2 py-1 text-sm">
+                  <span
+                    key={partnerKey}
+                    className="rounded-sm border border-border-subtle bg-bg-surface px-2 py-1 text-sm"
+                  >
                     <span className="text-text-secondary">{partner.name}</span>{' '}
-                    <span className="stat font-semibold text-positive">{formatPercent(d.winRate)}</span>
+                    <span className="stat font-semibold text-positive">
+                      {formatPercent(d.winRate)}
+                    </span>
                   </span>
                 );
               })}
@@ -220,7 +257,7 @@ function Detail({ championId }: { championId: string }) {
       ) : null}
 
       <section className="space-y-2">
-        <h3>Most common build</h3>
+        <h3>Most-bought items</h3>
         {champBuild ? (
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border-subtle bg-bg-surface p-3">
             <div className="flex flex-wrap gap-2">
@@ -324,8 +361,17 @@ function Detail({ championId }: { championId: string }) {
                 );
               })}
             </div>
-            <span className="stat text-sm text-text-muted">
-              {formatPercent(champBuild.winRate)} win · {champBuild.games.toLocaleString('en-US')} games
+            {/* The win rate belongs to the CHAMPION in this role, not to this
+                item set: each slot is independently the most-purchased item, a
+                composite no single game need have built. Exact-build win rates
+                need sample depth a sampled crawl rarely has per champion, so we
+                attribute the number honestly instead of implying build causality. */}
+            <span
+              className="stat text-sm text-text-muted"
+              title="Slots show the champion's most-purchased items this patch, ranked by how often each is bought — not one exact build. The win rate is the champion's own in this role."
+            >
+              champion wins {formatPercent(champBuild.winRate)} ·{' '}
+              {champBuild.games.toLocaleString('en-US')} games
             </span>
           </div>
         ) : (

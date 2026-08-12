@@ -48,3 +48,6 @@ pipeline/data/store/
 
 # claude code local machine settings
 .claude/settings.local.json
+
+# local knowledge-graph artifacts (graphify)
+graphify-out/
