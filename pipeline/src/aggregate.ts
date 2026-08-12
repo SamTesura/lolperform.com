@@ -118,6 +118,8 @@ function buildSignature(p: NormParticipant): string {
 export function aggregate(
   matches: NormMatch[],
   skillFloors?: ReadonlyMap<string, SkillFloor>,
+  completedItems?: ReadonlySet<number>,
+  bootItems?: ReadonlySet<number>,
 ): AggregateResult {
   const out: AggregateResult = {
     roleStats: [],
@@ -136,11 +138,11 @@ export function aggregate(
     const allowed = new Set(BRACKET_TIERS[bracket]);
     if (pool) {
       const pooled = matches.filter((m) => allowed.has(m.tier));
-      if (pooled.length > 0) aggregateSlice(pooled, bracket, 'all', out, skillFloors);
+      if (pooled.length > 0) aggregateSlice(pooled, bracket, 'all', out, skillFloors, completedItems, bootItems);
     }
     for (const region of regions) {
       const slice = matches.filter((m) => m.region === region && allowed.has(m.tier));
-      if (slice.length > 0) aggregateSlice(slice, bracket, region, out, skillFloors);
+      if (slice.length > 0) aggregateSlice(slice, bracket, region, out, skillFloors, completedItems, bootItems);
     }
   }
   return out;
@@ -183,8 +185,13 @@ function aggregateSlice(
   region: Region,
   out: AggregateResult,
   skillFloors?: ReadonlyMap<string, SkillFloor>,
+  completedItems?: ReadonlySet<number>,
+  bootItems?: ReadonlySet<number>,
 ): void {
   const patch = slice[0]!.patch;
+  // Without a catalog every item counts (old behaviour, and what tests use).
+  const isCompleted = (id: number): boolean => completedItems?.has(id) ?? true;
+  const isBoots = (id: number): boolean => bootItems?.has(id) ?? false;
   const totalMatches = slice.length;
   const weights = matchWeights(slice, region === 'all');
   const baselines = centredBaselines(slice);
@@ -195,6 +202,8 @@ function aggregateSlice(
   const duoAgg = new Map<string, Tally>(); // `${adc}|${sup}`
   const buildAgg = new Map<string, Map<string, BuildTally>>(); // `${champ}|${role}|${opp|-}` -> sig -> tally
   const itemFreq = new Map<string, Map<number, number>>(); // `${champ}|${role}` -> item id -> times bought
+  const slotAgg = new Map<string, Map<number, number>[]>(); // `${champ}|${role}` -> slot index -> item -> count
+  const bootAgg = new Map<string, Map<number, number>>(); // `${champ}|${role}` -> boots item -> count
   const keystoneAgg = new Map<string, Tally>(); // `${role}|${champ}|${keystone}`
 
   const getTally = (map: Map<string, Tally>, key: string): Tally => {
@@ -243,7 +252,29 @@ function aggregateSlice(
           f = new Map();
           itemFreq.set(fKey, f);
         }
-        for (const id of new Set(p.items)) f.set(id, (f.get(id) ?? 0) + 1);
+        const finished = p.items.filter(isCompleted);
+        for (const id of new Set(finished)) f.set(id, (f.get(id) ?? 0) + 1);
+        // Boots are their own decision, tallied separately so the positional
+        // slots describe the actual damage/utility build order.
+        let sk = slotAgg.get(fKey);
+        if (!sk) {
+          sk = [];
+          slotAgg.set(fKey, sk);
+        }
+        let bt2 = bootAgg.get(fKey);
+        if (!bt2) {
+          bt2 = new Map();
+          bootAgg.set(fKey, bt2);
+        }
+        // Inventory position as an (approximate) build-order proxy: slot k of
+        // the non-boot finished list is roughly the k-th completed item.
+        finished
+          .filter((id) => !isBoots(id))
+          .forEach((id, si) => {
+            const bucket = (sk![si] ??= new Map());
+            bucket.set(id, (bucket.get(id) ?? 0) + 1);
+          });
+        for (const id of finished.filter(isBoots)) bt2.set(id, (bt2.get(id) ?? 0) + 1);
       }
     }
 
@@ -368,6 +399,8 @@ function aggregateSlice(
       games: top.games,
       wins: top.wins,
       winRate: top.wins / top.games,
+      slotOptions: null,
+      bootOptions: null,
     });
   }
 
@@ -417,6 +450,22 @@ function aggregateSlice(
       }
     }
     if (!top) continue;
+
+    // Per-slot alternatives: top finished items at each inventory position,
+    // with each option's share of the games that filled that slot. Boots are
+    // their own row. Popularity, deliberately not per-slot win rates.
+    const topOptions = (bucket: Map<number, number> | undefined, take: number) => {
+      if (!bucket || bucket.size === 0) return [];
+      const filled = [...bucket.values()].reduce((a, b) => a + b, 0);
+      return [...bucket.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, take)
+        .map(([item, n]) => ({ item, share: n / filled, games: n }));
+    };
+    const slots = slotAgg.get(`${championKey}|${role}`) ?? [];
+    const slotOptions = slots.slice(0, slotCount).map((bucket) => topOptions(bucket, 3));
+    const bootOptions = topOptions(bootAgg.get(`${championKey}|${role}`), 3);
+
     out.builds.push({
       patch,
       region,
@@ -429,6 +478,8 @@ function aggregateSlice(
       games: t.games,
       wins: t.wins,
       winRate: t.wins / t.games,
+      slotOptions: slotOptions.some((o) => o.length > 0) ? slotOptions : null,
+      bootOptions: bootOptions.length > 0 ? bootOptions : null,
     });
   }
 }

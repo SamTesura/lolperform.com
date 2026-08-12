@@ -140,11 +140,13 @@ export function buildLoadSql(input: LoadInput): string {
   parts.push(
     insertRows(
       'builds',
-      ['patch', 'region', 'rank', 'role', 'champion_key', 'opponent_key', 'items', 'runes', 'games', 'wins', 'win_rate'],
+      ['patch', 'region', 'rank', 'role', 'champion_key', 'opponent_key', 'items', 'runes', 'games', 'wins', 'win_rate', 'slot_options', 'boot_options'],
       input.builds.map((b) => [
         s(b.patch), s(b.region), s(b.rank), s(b.role), s(b.championKey),
         s(b.opponentKey ?? '-'), s(JSON.stringify(b.items)), s(JSON.stringify(b.runes)),
         n(b.games), n(b.wins), n(b.winRate),
+        b.slotOptions === null || b.slotOptions === undefined ? 'NULL' : s(JSON.stringify(b.slotOptions)),
+        b.bootOptions === null || b.bootOptions === undefined ? 'NULL' : s(JSON.stringify(b.bootOptions)),
       ]),
     ),
   );

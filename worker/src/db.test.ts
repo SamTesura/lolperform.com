@@ -39,10 +39,14 @@ describe('row mappers', () => {
       games: 300,
       wins: 165,
       win_rate: 0.55,
+      slot_options: null,
+      boot_options: null,
     });
     expect(b.opponentKey).toBeNull();
     expect(b.items).toEqual([3006, 6672, 3094]);
     expect(b.runes.keystone).toBe(8008);
+    expect(b.slotOptions).toBeNull();
+    expect(b.bootOptions).toBeNull();
   });
 
   it('tolerates malformed build items without throwing', () => {
@@ -58,9 +62,12 @@ describe('row mappers', () => {
       games: 30,
       wins: 18,
       win_rate: 0.6,
+      slot_options: 'also-not-json',
+      boot_options: null,
     });
     expect(b.items).toEqual([]);
     expect(b.opponentKey).toBe('202');
+    expect(b.slotOptions).toBeNull(); // corrupt JSON degrades to null, never a 500
   });
 
   it('maps a counter pick', () => {

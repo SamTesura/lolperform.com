@@ -98,6 +98,8 @@ interface BuildRow {
   games: number;
   wins: number;
   win_rate: number;
+  slot_options: string | null;
+  boot_options: string | null;
 }
 interface CounterRow {
   champion_key: string;
@@ -183,7 +185,19 @@ export function mapBuild(r: BuildRow): BuildPath {
     games: r.games,
     wins: r.wins,
     winRate: r.win_rate,
+    slotOptions: safeJsonOrNull<BuildPath['slotOptions']>(r.slot_options),
+    bootOptions: safeJsonOrNull<BuildPath['bootOptions']>(r.boot_options),
   };
+}
+
+/** Nullable JSON column: corrupt or missing yields null, never a 500. */
+function safeJsonOrNull<T>(value: string | null | undefined): T | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
 }
 
 export function mapCounter(r: CounterRow): CounterPick {
