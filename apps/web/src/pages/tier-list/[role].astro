@@ -1,0 +1,33 @@
+---
+import Base from '../../layouts/Base.astro';
+import TierGrid from '../../components/islands/TierGrid';
+import { ROLE_LABELS, ROLES } from '@lolperform/shared';
+import { ROLE_SLUGS } from '../../lib/roles';
+
+export function getStaticPaths() {
+  return ROLES.map((role) => ({ params: { role: ROLE_SLUGS[role] }, props: { role } }));
+}
+
+const { role } = Astro.props;
+const label = ROLE_LABELS[role];
+---
+
+<Base
+  title={`${label} Tier List — LoL Champions by Rank & Region — lolperform`}
+  description={`League of Legends ${label.toLowerCase()} tier list ranked by rank and region. Readable, sample-size-honest, refreshed every patch.`}
+>
+  <div class="space-y-4 py-4">
+    <header class="space-y-1">
+      <h1>{label} Tier List</h1>
+      <p class="text-text-secondary">
+        Champions ranked within {label.toLowerCase()}. Only champions with a reliable sample are listed.
+      </p>
+      <p class="text-xs text-text-muted">
+        Sampled high-elo data across eight regions (All Regions pooled by default), not a full-ladder
+        dataset. Only champions with 1,000+ games this patch are ranked; the rest are omitted until
+        they reach that. Win rates use a small-sample-corrected score. <a href="/methodology">How this works →</a>
+      </p>
+    </header>
+    <TierGrid client:load initialRole={role} />
+  </div>
+</Base>
