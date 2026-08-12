@@ -15,6 +15,7 @@ import {
   getCounters,
   getDuos,
   getDuosForChampion,
+  getKeystonesForChampion,
   getLatestPatch,
   getMatchupsForChampion,
   getRoleStatsForChampion,
@@ -99,13 +100,14 @@ export const champion: Handler = async (request, env) => {
 
   return cachedJson(env, cacheKey(url.pathname, parsed.data), async () => {
     const slice: Slice = { patch, region: parsed.data.region, rank: parsed.data.rank };
-    const [stats, matchups, synergies, builds] = await Promise.all([
+    const [stats, matchups, synergies, builds, keystones] = await Promise.all([
       getRoleStatsForChampion(env, slice, meta.key),
       getMatchupsForChampion(env, slice, meta.key),
       getDuosForChampion(env, slice, meta.key),
       getBuildsForChampion(env, slice, meta.key),
+      getKeystonesForChampion(env, slice, meta.key),
     ]);
-    return { meta, stats, matchups, synergies, builds };
+    return { meta, stats, matchups, synergies, builds, keystones };
   });
 };
 

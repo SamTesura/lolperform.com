@@ -82,6 +82,27 @@ export const roleStatsSchema = z.object({
 });
 export type RoleStats = z.infer<typeof roleStatsSchema>;
 
+/**
+ * Win rate of one keystone rune on one champion in one role.
+ *
+ * Unlike item statistics this is defensible: a rune page is locked in champion
+ * select, before the game exists, so it cannot be an effect of already winning
+ * the way a completed item can. It is still a *choice*, so it carries the usual
+ * selection caveat, which is why the UI shows it against the champion's own
+ * baseline rather than as a standalone number.
+ */
+export const keystoneStatsSchema = z.object({
+  ...sliceShape,
+  role: roleSchema,
+  championKey: championKeySchema,
+  keystone: z.number().int(),
+  games: z.number().int().nonnegative(),
+  wins: z.number().int().nonnegative(),
+  winRate: z.number().min(0).max(1),
+  wilsonLower: z.number().min(0).max(1),
+});
+export type KeystoneStats = z.infer<typeof keystoneStatsSchema>;
+
 /** Champion-vs-champion lane matchup (same role, opposing teams). */
 export const matchupSchema = z.object({
   ...sliceShape,
@@ -160,6 +181,7 @@ export const championDetailResponseSchema = z.object({
   matchups: z.array(matchupSchema),
   synergies: z.array(duoSynergySchema),
   builds: z.array(buildPathSchema),
+  keystones: z.array(keystoneStatsSchema).default([]),
 });
 export type ChampionDetailResponse = z.infer<typeof championDetailResponseSchema>;
 

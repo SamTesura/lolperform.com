@@ -18,6 +18,7 @@ import { TierBadge } from '../primitives/TierBadge';
 import { RegionRankControls } from './Controls';
 import { QueryProvider } from './QueryProvider';
 import { AWAITING_DATA, EmptyState, Loading } from './States';
+import type { KeystoneStats } from '@lolperform/shared';
 import { formatPercent } from '../../lib/format';
 
 interface ItemInfo {
@@ -130,6 +131,84 @@ function BuildPath({
   );
 }
 
+interface KeystoneInfo {
+  name: string;
+  icon: string;
+}
+
+/**
+ * Keystone win rates, shown against the champion's own win rate in the role.
+ *
+ * The delta is the point. A raw keystone win rate still carries the champion's
+ * own strength inside it, so comparing keystones to the champion's baseline is
+ * what isolates the choice. And unlike an item statistic this is a fair thing
+ * to publish at all: a rune page is locked in champion select, before the game
+ * exists, so it cannot be an effect of already winning — whereas a completed
+ * item's win rate largely measures having survived long enough to finish it.
+ */
+function Keystones({
+  rows,
+  baseline,
+  catalog,
+}: {
+  rows: KeystoneStats[];
+  /** The champion's win rate in this role — the thing each keystone is judged against. */
+  baseline: number | undefined;
+  catalog?: Record<string, KeystoneInfo>;
+}) {
+  if (rows.length === 0) return null;
+  const sorted = [...rows].sort((a, b) => b.games - a.games);
+
+  return (
+    <section className="space-y-2">
+      <h3>Keystones</h3>
+      <p className="text-xs text-text-muted">
+        Compared with this champion's own win rate in the role. Runes are locked in champion select,
+        so unlike item statistics this is a choice made before the game — not a side effect of
+        already winning it.
+      </p>
+      <ul className="divide-y divide-border-subtle rounded-lg border border-border-subtle bg-bg-surface">
+        {sorted.map((k) => {
+          const info = catalog?.[String(k.keystone)];
+          const delta = baseline === undefined ? null : k.winRate - baseline;
+          return (
+            <li key={k.keystone} className="flex flex-wrap items-center gap-x-3 gap-y-1 p-2.5">
+              {info ? (
+                <img
+                  src={`https://ddragon.leagueoflegends.com/cdn/img/${info.icon}`}
+                  alt=""
+                  width={28}
+                  height={28}
+                  loading="lazy"
+                  className="rounded-sm bg-bg-inset"
+                />
+              ) : (
+                <span className="h-7 w-7 rounded-sm bg-bg-inset" aria-hidden="true" />
+              )}
+              <span className="min-w-32 flex-1 text-sm text-text-primary">
+                {info?.name ?? `Keystone ${k.keystone}`}
+              </span>
+              <span className="stat text-sm text-text-secondary">{formatPercent(k.winRate)}</span>
+              {delta === null ? null : (
+                <span
+                  className={`stat text-xs ${delta >= 0 ? 'text-tier-s' : 'text-text-muted'}`}
+                  title="Difference from this champion's win rate in the role"
+                >
+                  {delta >= 0 ? '+' : '−'}
+                  {formatPercent(Math.abs(delta))}
+                </span>
+              )}
+              <span className="stat text-xs text-text-muted">
+                {k.games.toLocaleString('en-US')} games
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 /**
  * Data Dragon item descriptions use light markup (<stats>, <attention>,
  * <passive>, <br>, damage-type tags…). Parse it into plain-text structure and
@@ -205,6 +284,29 @@ function Detail({ championId }: { championId: string }) {
   // Item names + one-line descriptions for build tooltips, straight from the
   // same Data Dragon version the icons use. Cached for the session; the build
   // renders fine without it (icons only) if the fetch fails.
+  // Keystone names/icons live in a separate Data Dragon file from items.
+  const runeCatalog = useQuery({
+    queryKey: ['runes', version],
+    enabled: Boolean(version),
+    staleTime: Infinity,
+    queryFn: async (): Promise<Record<string, KeystoneInfo>> => {
+      const res = await fetch(
+        `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/runesReforged.json`,
+      );
+      if (!res.ok) throw new Error(`runesReforged ${res.status}`);
+      const styles = (await res.json()) as {
+        slots: { runes: { id: number; name: string; icon: string }[] }[];
+      }[];
+      const out: Record<string, KeystoneInfo> = {};
+      for (const style of styles) {
+        for (const r of style.slots[0]?.runes ?? []) {
+          out[String(r.id)] = { name: r.name, icon: r.icon };
+        }
+      }
+      return out;
+    },
+  });
+
   const itemCatalog = useQuery({
     queryKey: ['item-catalog', version],
     enabled: Boolean(version),
@@ -358,6 +460,12 @@ function Detail({ championId }: { championId: string }) {
           </div>
         </section>
       ) : null}
+
+      <Keystones
+        rows={champ.data?.keystones?.filter((k) => !primary || k.role === primary.role) ?? []}
+        baseline={primary?.winRate}
+        catalog={runeCatalog.data}
+      />
 
       <section className="space-y-2">
         <h3>Most-bought items</h3>

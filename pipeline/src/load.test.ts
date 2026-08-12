@@ -82,6 +82,20 @@ const input: LoadInput = {
       winRate: 0.55,
     },
   ],
+  keystones: [
+    {
+      patch: '16.12',
+      region: 'na1',
+      rank: 'emerald_plus',
+      role: 'BOTTOM',
+      championKey: '145',
+      keystone: 8008,
+      games: 420,
+      wins: 231,
+      winRate: 0.55,
+      wilsonLower: 0.5,
+    },
+  ],
 };
 
 describe('buildLoadSql', () => {
@@ -89,6 +103,9 @@ describe('buildLoadSql', () => {
 
   it('clears the patch before inserting (idempotent)', () => {
     expect(sql).toContain("DELETE FROM role_stats WHERE patch = '16.12';");
+    // Every per-patch table must be cleared before reload or the insert
+    // collides with its own primary key on the next crawl.
+    expect(sql).toContain("DELETE FROM keystone_stats WHERE patch = '16.12';");
     expect(sql).toContain("DELETE FROM patches WHERE patch = '16.12';");
   });
 
@@ -106,6 +123,14 @@ describe('buildLoadSql', () => {
   it('serializes build items/runes as JSON and maps null opponent to "-"', () => {
     expect(sql).toContain("'[3006,6672,3094]'");
     expect(sql).toContain('"keystone":8008');
+  });
+
+  it('writes keystone rows carrying their own sample, not champion totals', () => {
+    // The whole point of the table: a keystone row carries the games and wins
+    // observed on THAT keystone. Borrowing the champion's totals is the
+    // mistake the build card made.
+    expect(sql).toContain('INSERT OR REPLACE INTO keystone_stats');
+    expect(sql).toContain("'BOTTOM', '145', 8008, 420, 231");
     // null opponent build stored under the '-' sentinel
     expect(sql).toMatch(/INSERT OR REPLACE INTO builds[\s\S]*'-'/);
   });
