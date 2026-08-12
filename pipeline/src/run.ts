@@ -93,6 +93,7 @@ async function main(): Promise<void> {
     counts: {
       roleStats: result.roleStats.length,
       keystones: result.keystones.length,
+      runePages: result.runePages.length,
       matchups: result.matchups.length,
       duos: result.duos.length,
       builds: result.builds.length,
@@ -101,6 +102,7 @@ async function main(): Promise<void> {
   await writeJson('champions.json', champions);
   await writeJson('role-stats.json', result.roleStats);
   await writeJson('keystones.json', result.keystones);
+  await writeJson('rune-pages.json', result.runePages);
   await writeJson('matchups.json', result.matchups);
   await writeJson('duos.json', result.duos);
   await writeJson('builds.json', result.builds);

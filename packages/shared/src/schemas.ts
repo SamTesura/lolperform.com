@@ -103,6 +103,28 @@ export const keystoneStatsSchema = z.object({
 });
 export type KeystoneStats = z.infer<typeof keystoneStatsSchema>;
 
+/**
+ * One of a champion's most common rune pages, with the page's own sample.
+ *
+ * The signature is keystone + primary style + secondary style, so the arms
+ * stay fat; the stored page is the most common full page inside that
+ * signature. Like keystones (and unlike items), a rune page is locked before
+ * the game exists, so its win rate is a fair thing to publish.
+ */
+export const runePageStatsSchema = z.object({
+  ...sliceShape,
+  role: roleSchema,
+  championKey: championKeySchema,
+  /** 1 = most played page, 2 = second most played. */
+  slot: z.number().int().min(1).max(2),
+  runes: z.lazy(() => runePageSchema),
+  games: z.number().int().nonnegative(),
+  wins: z.number().int().nonnegative(),
+  winRate: z.number().min(0).max(1),
+  wilsonLower: z.number().min(0).max(1),
+});
+export type RunePageStats = z.infer<typeof runePageStatsSchema>;
+
 /** Champion-vs-champion lane matchup (same role, opposing teams). */
 export const matchupSchema = z.object({
   ...sliceShape,
@@ -199,6 +221,7 @@ export const championDetailResponseSchema = z.object({
   synergies: z.array(duoSynergySchema),
   builds: z.array(buildPathSchema),
   keystones: z.array(keystoneStatsSchema).default([]),
+  runePages: z.array(runePageStatsSchema).default([]),
 });
 export type ChampionDetailResponse = z.infer<typeof championDetailResponseSchema>;
 

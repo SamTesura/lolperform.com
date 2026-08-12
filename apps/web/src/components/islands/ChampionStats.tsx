@@ -18,7 +18,7 @@ import { TierBadge } from '../primitives/TierBadge';
 import { RegionRankControls } from './Controls';
 import { QueryProvider } from './QueryProvider';
 import { AWAITING_DATA, EmptyState, Loading } from './States';
-import type { KeystoneStats, RunePage } from '@lolperform/shared';
+import type { KeystoneStats, RunePage, RunePageStats } from '@lolperform/shared';
 import { formatPercent } from '../../lib/format';
 
 interface ItemInfo {
@@ -208,33 +208,34 @@ function RunePagePanel({ runes, catalog }: { runes: RunePage; catalog?: RuneCata
   );
 
   return (
-    <div className="flex flex-wrap gap-4 rounded-lg border border-border-subtle bg-bg-surface p-3">
-      <div className="space-y-2">
+    <div className="flex flex-wrap gap-3">
+      <div className="space-y-2.5 rounded-lg bg-bg-inset/60 p-3">
         {styleHeader(primary)}
-        {primary.slots.map((slot, si) => (
-          <div key={si} className="flex items-center gap-2">
-            {slot.runes.map((r) => (
-              <RuneDot
-                key={r.id}
-                icon={r.icon}
-                name={r.name}
-                chosen={chosen.has(r.id)}
-                size={si === 0 ? 34 : 26}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-      <div className="space-y-2">
-        {styleHeader(sub)}
-        {sub.slots.slice(1).map((slot, si) => (
-          <div key={si} className="flex items-center gap-2">
+        <div className="flex justify-center border-b border-border-subtle pb-2">
+          {primary.slots[0]?.runes.map((r) => (
+            <span key={r.id} className="px-1.5">
+              <RuneDot icon={r.icon} name={r.name} chosen={chosen.has(r.id)} size={38} />
+            </span>
+          ))}
+        </div>
+        {primary.slots.slice(1).map((slot, si) => (
+          <div key={si} className="flex justify-center gap-3">
             {slot.runes.map((r) => (
               <RuneDot key={r.id} icon={r.icon} name={r.name} chosen={chosen.has(r.id)} size={26} />
             ))}
           </div>
         ))}
-        <div className="flex items-center gap-2 border-t border-border-subtle pt-2">
+      </div>
+      <div className="space-y-2.5 rounded-lg bg-bg-inset/60 p-3">
+        {styleHeader(sub)}
+        {sub.slots.slice(1).map((slot, si) => (
+          <div key={si} className="flex justify-center gap-3">
+            {slot.runes.map((r) => (
+              <RuneDot key={r.id} icon={r.icon} name={r.name} chosen={chosen.has(r.id)} size={26} />
+            ))}
+          </div>
+        ))}
+        <div className="flex justify-center gap-3 border-t border-border-subtle pt-2">
           {chosenShards.map((id, i) =>
             SHARD_INFO[id] ? (
               <RuneDot
@@ -249,6 +250,64 @@ function RunePagePanel({ runes, catalog }: { runes: RunePage; catalog?: RuneCata
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The champion's rune pages: up to two, switchable, each headed by its own
+ * win rate and sample — a per-page pre-lock statistic, so unlike item numbers
+ * it means what it says. Falls back to the build row's page when per-page
+ * rows haven't been aggregated yet. Options, not one prescription.
+ */
+function RunePages({
+  pages,
+  fallback,
+  catalog,
+}: {
+  pages: RunePageStats[];
+  fallback?: RunePage;
+  catalog?: RuneCatalog;
+}) {
+  const [active, setActive] = useState(0);
+  const usable = pages.filter((p) => p.runes.keystone > 0);
+  const current = usable[active] ?? usable[0];
+
+  if (usable.length === 0) {
+    if (!fallback) return null;
+    return (
+      <section className="space-y-2">
+        <h3>Most common runes</h3>
+        <RunePagePanel runes={fallback} catalog={catalog} />
+      </section>
+    );
+  }
+
+  return (
+    <section className="space-y-2">
+      <h3>Rune pages</h3>
+      <div className="flex flex-wrap items-center gap-2">
+        {usable.map((p, i) => (
+          <button
+            key={p.slot}
+            type="button"
+            aria-pressed={i === active}
+            onClick={() => setActive(i)}
+            className={`rounded-md border px-3 py-1.5 text-xs transition-colors duration-150 ${
+              i === active
+                ? 'border-accent bg-bg-elevated text-text-primary'
+                : 'border-border-subtle text-text-muted hover:text-text-primary'
+            }`}
+          >
+            {i === 0 ? 'Most played' : 'Alternative'}
+            <span className="stat ml-2 text-text-secondary">{formatPercent(p.winRate)}</span>
+            <span className="stat ml-1.5 text-2xs text-text-muted">
+              {p.games.toLocaleString('en-US')}g
+            </span>
+          </button>
+        ))}
+      </div>
+      {current ? <RunePagePanel runes={current.runes} catalog={catalog} /> : null}
+    </section>
   );
 }
 
@@ -690,12 +749,11 @@ function Detail({ championId }: { championId: string }) {
         baseline={primary?.winRate}
         catalog={runeCatalog.data?.keystones}
       />
-      {champBuild ? (
-        <section className="space-y-2">
-          <h3>Most common runes</h3>
-          <RunePagePanel runes={champBuild.runes} catalog={runeCatalog.data} />
-        </section>
-      ) : null}
+      <RunePages
+        pages={(champ.data?.runePages ?? []).filter((p) => !primary || p.role === primary.role)}
+        fallback={champBuild?.runes}
+        catalog={runeCatalog.data}
+      />
 
       <section className="space-y-2">
         <h3>Most-bought items</h3>

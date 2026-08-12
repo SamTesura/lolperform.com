@@ -98,6 +98,28 @@ const input: LoadInput = {
       wilsonLower: 0.5,
     },
   ],
+  runePages: [
+    {
+      patch: '16.12',
+      region: 'na1',
+      rank: 'emerald_plus',
+      role: 'BOTTOM',
+      championKey: '145',
+      slot: 1,
+      runes: {
+        keystone: 8008,
+        primaryStyle: 8000,
+        subStyle: 8200,
+        primary: [8008],
+        secondary: [8226],
+        shards: [5005, 5008, 5001],
+      },
+      games: 380,
+      wins: 209,
+      winRate: 0.55,
+      wilsonLower: 0.5,
+    },
+  ],
 };
 
 describe('buildLoadSql', () => {
@@ -108,6 +130,7 @@ describe('buildLoadSql', () => {
     // Every per-patch table must be cleared before reload or the insert
     // collides with its own primary key on the next crawl.
     expect(sql).toContain("DELETE FROM keystone_stats WHERE patch = '16.12';");
+    expect(sql).toContain("DELETE FROM rune_pages WHERE patch = '16.12';");
     expect(sql).toContain("DELETE FROM patches WHERE patch = '16.12';");
   });
 

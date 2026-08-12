@@ -7,6 +7,7 @@ import {
   type DuoSynergy,
   type GradeInput,
   type KeystoneStats,
+  type RunePageStats,
   type Matchup,
   type RankBracket,
   type Region,
@@ -58,6 +59,19 @@ interface KeystoneRow {
   role: string;
   champion_key: string;
   keystone: number;
+  games: number;
+  wins: number;
+  win_rate: number;
+  wilson_lower: number;
+}
+interface RunePageRow {
+  patch: string;
+  region: string;
+  rank: string;
+  role: string;
+  champion_key: string;
+  slot: number;
+  runes: string;
   games: number;
   wins: number;
   win_rate: number;
@@ -430,6 +444,33 @@ export async function getKeystonesForChampion(
     .bind(slice.patch, slice.region, slice.rank, championKey)
     .all<KeystoneRow>();
   return results.map(mapKeystone);
+}
+
+export async function getRunePagesForChampion(
+  env: Env,
+  slice: Slice,
+  championKey: string,
+): Promise<RunePageStats[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT * FROM rune_pages
+     WHERE patch = ? AND region = ? AND rank = ? AND champion_key = ?
+     ORDER BY slot ASC`,
+  )
+    .bind(slice.patch, slice.region, slice.rank, championKey)
+    .all<RunePageRow>();
+  return results.map((r) => ({
+    patch: r.patch,
+    region: r.region as Region,
+    rank: r.rank as RankBracket,
+    role: r.role as Role,
+    championKey: r.champion_key,
+    slot: r.slot as 1 | 2,
+    runes: safeRunes(r.runes),
+    games: r.games,
+    wins: r.wins,
+    winRate: r.win_rate,
+    wilsonLower: r.wilson_lower,
+  }));
 }
 
 export async function getBuildsForChampion(
