@@ -82,6 +82,7 @@ const input: LoadInput = {
       winRate: 0.55,
       slotOptions: [[{ item: 6672, share: 0.62, games: 186 }]],
       bootOptions: [{ item: 3006, share: 0.8, games: 240 }],
+      spellOptions: [{ spells: [4, 7], share: 0.9, games: 270, wins: 149, winRate: 0.5519 }],
     },
   ],
   keystones: [

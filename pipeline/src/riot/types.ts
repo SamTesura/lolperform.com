@@ -42,6 +42,8 @@ export interface ParticipantDTO {
   teamId: number;
   teamPosition: string;
   win: boolean;
+  summoner1Id: number;
+  summoner2Id: number;
   item0: number;
   item1: number;
   item2: number;
@@ -77,6 +79,9 @@ export interface NormParticipant {
   role: Role;
   teamId: 100 | 200;
   win: boolean;
+  /** Summoner spell pair, sorted ascending so Flash+Heal and Heal+Flash are
+   *  one thing. Absent on matches stored before this was captured. */
+  spells?: [number, number];
   /** Non-zero item ids, trinket/consumables excluded. */
   items: number[];
   runes: RunePage;
@@ -174,11 +179,16 @@ export function normalizeMatch(
   for (const p of dto.info.participants) {
     if (!VALID_ROLES.has(p.teamPosition as Role)) return null; // remakes / missing positions
     if (p.teamId !== 100 && p.teamId !== 200) return null;
+    const pair = [p.summoner1Id, p.summoner2Id].sort((a, b) => a - b);
     participants.push({
       championKey: String(p.championId),
       role: p.teamPosition as Role,
       teamId: p.teamId,
       win: p.win,
+      spells:
+        Number.isFinite(pair[0]) && Number.isFinite(pair[1]) && pair[0]! > 0
+          ? (pair as [number, number])
+          : undefined,
       items: coreItems(p),
       runes: parseRunes(p.perks),
     });

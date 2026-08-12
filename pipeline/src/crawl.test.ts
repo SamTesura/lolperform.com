@@ -17,6 +17,8 @@ function matchDto(matchId: string, seedPuuid?: string): MatchDTO {
       teamId,
       teamPosition: role,
       win: teamId === 100,
+      summoner1Id: 4,
+      summoner2Id: 7,
       item0: 3031,
       item1: 0,
       item2: 0,
