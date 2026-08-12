@@ -12,14 +12,26 @@ import {
 } from '@lolperform/shared';
 import { fetchMeta, fetchTierList } from '../../lib/api';
 import { championIndex } from '../../lib/champions';
+import { ROLE_SLUGS } from '../../lib/roles';
 import { TierBadge } from '../primitives/TierBadge';
 import { TierTile } from '../primitives/TierTile';
 import { RegionRankControls, RoleTabsInteractive } from './Controls';
 import { QueryProvider } from './QueryProvider';
 import { AWAITING_DATA, EmptyState, Loading } from './States';
 
-function Grid() {
-  const [role, setRole] = useState<Role>('BOTTOM');
+function Grid({ initialRole }: { initialRole?: Role }) {
+  const [role, setRole] = useState<Role>(initialRole ?? 'BOTTOM');
+
+  // Keep the address bar pointing at the role being viewed, so the current
+  // list is always shareable — /tier-list/support and friends are real
+  // prerendered pages, and switching tabs swaps to that page's URL without a
+  // reload.
+  const selectRole = (next: Role) => {
+    setRole(next);
+    if (typeof history !== 'undefined') {
+      history.replaceState(null, '', `/tier-list/${ROLE_SLUGS[next]}`);
+    }
+  };
   const [region, setRegion] = useState<Region>(DEFAULT_REGION);
   const [rank, setRank] = useState<RankBracket>(DEFAULT_RANK_BRACKET);
 
@@ -42,7 +54,7 @@ function Grid() {
 
   return (
     <div className="space-y-4">
-      <RoleTabsInteractive value={role} onChange={setRole} />
+      <RoleTabsInteractive value={role} onChange={selectRole} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <RegionRankControls region={region} rank={rank} onRegion={setRegion} onRank={setRank} />
         {tiers.data ? (
@@ -78,7 +90,9 @@ function Grid() {
                   {rows.map((stat) => {
                     const m = index.get(stat.championKey);
                     if (!m) return null;
-                    return <TierTile key={stat.championKey} stat={stat} meta={m} version={version} />;
+                    return (
+                      <TierTile key={stat.championKey} stat={stat} meta={m} version={version} />
+                    );
                   })}
                 </div>
               </section>
@@ -90,10 +104,10 @@ function Grid() {
   );
 }
 
-export default function TierGrid() {
+export default function TierGrid({ initialRole }: { initialRole?: Role }) {
   return (
     <QueryProvider>
-      <Grid />
+      <Grid initialRole={initialRole} />
     </QueryProvider>
   );
 }
