@@ -4,7 +4,7 @@
 
 ### 🎮 **[LIVE APPLICATION →](https://lolperform.com)** 🎮
 
-**A readable, bot-lane-first League of Legends analytics platform powered by the Riot Games API**
+**A readable League of Legends analytics platform for every role — with a bot-lane specialty — powered by the Riot Games API**
 
 [![Live Site](https://img.shields.io/badge/🌐_Live_Site-lolperform.com-4ee0c8?style=for-the-badge)](https://lolperform.com)
 [![CI](https://img.shields.io/github/actions/workflow/status/SamTesura/lolperform.com/ci.yml?style=for-the-badge&label=CI)](https://github.com/SamTesura/lolperform.com/actions/workflows/ci.yml)
