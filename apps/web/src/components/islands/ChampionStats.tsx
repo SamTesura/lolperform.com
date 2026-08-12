@@ -25,6 +25,106 @@ interface ItemInfo {
   plaintext?: string;
   description?: string;
   gold?: { base: number; total: number };
+  /** Item ids this one is built from, straight out of Data Dragon. Unlike
+   *  everything else on this page it is not a sampled statistic — it is the
+   *  shop's own recipe, so it is exact and needs no confidence treatment. */
+  from?: string[];
+}
+
+interface Piece {
+  id: string;
+  info: ItemInfo;
+}
+
+/** Immediate components of an item, in Data Dragon's own order. */
+function componentsOf(id: number, catalog?: Record<string, ItemInfo>): Piece[] {
+  const from = catalog?.[String(id)]?.from ?? [];
+  const out: Piece[] = [];
+  for (const c of from) {
+    const info = catalog?.[c];
+    if (info) out.push({ id: c, info });
+  }
+  return out;
+}
+
+/**
+ * How each finished item is actually bought: the pieces, their prices, and the
+ * total. Aimed at players who know what to build but not what to buy on a back
+ * — the shop recipe answers that exactly, with no sample size to caveat.
+ */
+function BuildPath({
+  items,
+  catalog,
+  version,
+}: {
+  items: number[];
+  catalog?: Record<string, ItemInfo>;
+  version: string;
+}) {
+  const rows = items
+    .map((id) => ({ id, info: catalog?.[String(id)], pieces: componentsOf(id, catalog) }))
+    .filter((r) => r.info);
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="space-y-1.5 border-t border-border-subtle pt-3">
+      <p className="text-xs text-text-muted">
+        What to buy to finish each item — prices are the pieces, not the total.
+      </p>
+      <ul className="space-y-1.5">
+        {rows.map((r) => (
+          <li key={r.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+            <img
+              src={itemIcon(r.id, version)}
+              alt=""
+              width={24}
+              height={24}
+              loading="lazy"
+              className="rounded-sm bg-bg-inset"
+            />
+            <span className="font-semibold text-text-primary">{r.info!.name}</span>
+            {r.info!.gold?.total ? (
+              <span className="stat text-tier-s">
+                {r.info!.gold.total.toLocaleString('en-US')}g
+              </span>
+            ) : null}
+            {r.pieces.length > 0 ? (
+              <>
+                <span className="text-text-muted" aria-hidden="true">
+                  =
+                </span>
+                {r.pieces.map((p, i) => (
+                  <span key={`${r.id}-${p.id}-${i}`} className="flex items-center gap-1">
+                    {i > 0 ? (
+                      <span className="text-text-muted" aria-hidden="true">
+                        +
+                      </span>
+                    ) : null}
+                    <img
+                      src={itemIcon(Number(p.id), version)}
+                      alt=""
+                      width={18}
+                      height={18}
+                      loading="lazy"
+                      className="rounded-sm bg-bg-inset"
+                    />
+                    <span className="text-text-secondary">{p.info.name}</span>
+                    {p.info.gold?.total ? (
+                      <span className="stat text-text-muted">
+                        {p.info.gold.total.toLocaleString('en-US')}
+                      </span>
+                    ) : null}
+                  </span>
+                ))}
+              </>
+            ) : (
+              <span className="text-text-muted">— buy it straight from the shop</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 /**
@@ -259,120 +359,127 @@ function Detail({ championId }: { championId: string }) {
       <section className="space-y-2">
         <h3>Most-bought items</h3>
         {champBuild ? (
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border-subtle bg-bg-surface p-3">
-            <div className="flex flex-wrap gap-2">
-              {Array.from({
-                // Six item slots, seven for bot lane — the support quest item
-                // occupies one down there.
-                length: champBuild.role === 'BOTTOM' || champBuild.role === 'UTILITY' ? 7 : 6,
-              }).map((_, i) => {
-                const id = champBuild.items[i];
-                const info = id ? itemCatalog.data?.[String(id)] : undefined;
-                return id ? (
-                  <span key={`${id}-${i}`} className="group relative inline-block">
-                    <img
-                      src={itemIcon(id, version)}
-                      alt={info?.name ?? `Item slot ${i + 1}`}
-                      width={40}
-                      height={40}
-                      loading="lazy"
-                      className="rounded-sm bg-bg-inset"
-                    />
-                    {info ? (
-                      <span
-                        role="tooltip"
-                        className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden w-60 -translate-x-1/2 rounded-md border border-border-default bg-bg-overlay p-2.5 text-left shadow-lg group-hover:block"
-                      >
-                        <span className="block text-xs font-semibold text-tier-s">{info.name}</span>
-                        {(() => {
-                          const parsed = info.description
-                            ? parseItemDescription(info.description)
-                            : { stats: [], sections: [] };
-                          return (
-                            <>
-                              {/* Items with no passive/active prose (e.g. Infinity
+          <div className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-bg-surface p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap gap-2">
+                {Array.from({
+                  // Six item slots, seven for bot lane — the support quest item
+                  // occupies one down there.
+                  length: champBuild.role === 'BOTTOM' || champBuild.role === 'UTILITY' ? 7 : 6,
+                }).map((_, i) => {
+                  const id = champBuild.items[i];
+                  const info = id ? itemCatalog.data?.[String(id)] : undefined;
+                  return id ? (
+                    <span key={`${id}-${i}`} className="group relative inline-block">
+                      <img
+                        src={itemIcon(id, version)}
+                        alt={info?.name ?? `Item slot ${i + 1}`}
+                        width={40}
+                        height={40}
+                        loading="lazy"
+                        className="rounded-sm bg-bg-inset"
+                      />
+                      {info ? (
+                        <span
+                          role="tooltip"
+                          className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden w-60 -translate-x-1/2 rounded-md border border-border-default bg-bg-overlay p-2.5 text-left shadow-lg group-hover:block"
+                        >
+                          <span className="block text-xs font-semibold text-tier-s">
+                            {info.name}
+                          </span>
+                          {(() => {
+                            const parsed = info.description
+                              ? parseItemDescription(info.description)
+                              : { stats: [], sections: [] };
+                            return (
+                              <>
+                                {/* Items with no passive/active prose (e.g. Infinity
                                   Edge) carry their one-liner in plaintext — show
                                   it under the name like the big sites do. */}
-                              {parsed.sections.length === 0 && info.plaintext ? (
-                                <span className="mt-0.5 block text-2xs leading-snug text-text-muted">
-                                  {info.plaintext}
-                                </span>
-                              ) : null}
-                              {parsed.stats.length > 0 ? (
-                                <span className="mt-1 block">
-                                  {parsed.stats.map((line) => {
-                                    const m = /^([\d.]+%?)\s*(.*)$/.exec(line);
-                                    return (
-                                      <span
-                                        key={line}
-                                        className="block text-2xs leading-snug text-text-secondary"
-                                      >
-                                        {m ? (
-                                          <>
-                                            <span className="stat font-semibold text-text-primary">
-                                              {m[1]}
-                                            </span>{' '}
-                                            {m[2]}
-                                          </>
-                                        ) : (
-                                          line
-                                        )}
-                                      </span>
-                                    );
-                                  })}
-                                </span>
-                              ) : null}
-                              {parsed.sections.map((s, si) => (
-                                <span key={si} className="mt-1.5 block">
-                                  {s.label ? (
-                                    <span className="block text-2xs font-semibold text-text-primary">
-                                      {s.label}
-                                    </span>
-                                  ) : null}
-                                  {s.text ? (
-                                    <span className="block text-2xs leading-snug text-text-muted">
-                                      {s.text}
-                                    </span>
-                                  ) : null}
-                                </span>
-                              ))}
-                              {info.gold?.total ? (
-                                <span className="mt-1.5 block text-2xs text-text-muted">
-                                  Cost:{' '}
-                                  <span className="stat font-semibold text-tier-s">
-                                    {info.gold.total.toLocaleString('en-US')}
+                                {parsed.sections.length === 0 && info.plaintext ? (
+                                  <span className="mt-0.5 block text-2xs leading-snug text-text-muted">
+                                    {info.plaintext}
                                   </span>
-                                  {typeof info.gold.base === 'number' ? ` (${info.gold.base})` : ''}
-                                </span>
-                              ) : null}
-                            </>
-                          );
-                        })()}
-                      </span>
-                    ) : null}
-                  </span>
-                ) : (
-                  <div
-                    key={`empty-${i}`}
-                    title="No consistent pick for this slot yet"
-                    className="h-10 w-10 rounded-sm border border-dashed border-border-subtle bg-bg-inset/50"
-                    aria-label={`Item slot ${i + 1}: no consistent pick yet`}
-                  />
-                );
-              })}
-            </div>
-            {/* The win rate belongs to the CHAMPION in this role, not to this
+                                ) : null}
+                                {parsed.stats.length > 0 ? (
+                                  <span className="mt-1 block">
+                                    {parsed.stats.map((line) => {
+                                      const m = /^([\d.]+%?)\s*(.*)$/.exec(line);
+                                      return (
+                                        <span
+                                          key={line}
+                                          className="block text-2xs leading-snug text-text-secondary"
+                                        >
+                                          {m ? (
+                                            <>
+                                              <span className="stat font-semibold text-text-primary">
+                                                {m[1]}
+                                              </span>{' '}
+                                              {m[2]}
+                                            </>
+                                          ) : (
+                                            line
+                                          )}
+                                        </span>
+                                      );
+                                    })}
+                                  </span>
+                                ) : null}
+                                {parsed.sections.map((s, si) => (
+                                  <span key={si} className="mt-1.5 block">
+                                    {s.label ? (
+                                      <span className="block text-2xs font-semibold text-text-primary">
+                                        {s.label}
+                                      </span>
+                                    ) : null}
+                                    {s.text ? (
+                                      <span className="block text-2xs leading-snug text-text-muted">
+                                        {s.text}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                ))}
+                                {info.gold?.total ? (
+                                  <span className="mt-1.5 block text-2xs text-text-muted">
+                                    Cost:{' '}
+                                    <span className="stat font-semibold text-tier-s">
+                                      {info.gold.total.toLocaleString('en-US')}
+                                    </span>
+                                    {typeof info.gold.base === 'number'
+                                      ? ` (${info.gold.base})`
+                                      : ''}
+                                  </span>
+                                ) : null}
+                              </>
+                            );
+                          })()}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <div
+                      key={`empty-${i}`}
+                      title="No consistent pick for this slot yet"
+                      className="h-10 w-10 rounded-sm border border-dashed border-border-subtle bg-bg-inset/50"
+                      aria-label={`Item slot ${i + 1}: no consistent pick yet`}
+                    />
+                  );
+                })}
+              </div>
+              {/* The win rate belongs to the CHAMPION in this role, not to this
                 item set: each slot is independently the most-purchased item, a
                 composite no single game need have built. Exact-build win rates
                 need sample depth a sampled crawl rarely has per champion, so we
                 attribute the number honestly instead of implying build causality. */}
-            <span
-              className="stat text-sm text-text-muted"
-              title="Slots show the champion's most-purchased items this patch, ranked by how often each is bought — not one exact build. The win rate is the champion's own in this role."
-            >
-              champion wins {formatPercent(champBuild.winRate)} ·{' '}
-              {champBuild.games.toLocaleString('en-US')} games
-            </span>
+              <span
+                className="stat text-sm text-text-muted"
+                title="Slots show the champion's most-purchased items this patch, ranked by how often each is bought — not one exact build. The win rate is the champion's own in this role."
+              >
+                champion wins {formatPercent(champBuild.winRate)} ·{' '}
+                {champBuild.games.toLocaleString('en-US')} games
+              </span>
+            </div>
+            <BuildPath items={champBuild.items} catalog={itemCatalog.data} version={version} />
           </div>
         ) : (
           <p className="rounded-lg border border-dashed border-border-subtle bg-bg-surface/60 p-3 text-sm text-text-muted">

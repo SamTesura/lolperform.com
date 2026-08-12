@@ -13,10 +13,18 @@ export default defineConfig({
   vite: {
     plugins: [tailwindcss()],
     // Local dev: proxy the API to a locally-running Worker (`wrangler dev`).
-    // In production the Worker serves both the site and /api from the same origin.
+    // In production the Worker serves both the site and /api from the same
+    // origin. Set API_PROXY to borrow a populated API instead — e.g.
+    // `API_PROXY=https://lolperform.com pnpm --filter @lolperform/web dev`
+    // — which is the only way to exercise the data-driven islands locally
+    // without a seeded local D1. changeOrigin makes the upstream see its own
+    // host, so the Worker's origin-locked CORS is satisfied.
     server: {
       proxy: {
-        '/api': 'http://localhost:8787',
+        '/api': {
+          target: process.env.API_PROXY ?? 'http://localhost:8787',
+          changeOrigin: true,
+        },
       },
     },
   },
