@@ -18,7 +18,7 @@ import { TierBadge } from '../primitives/TierBadge';
 import { RegionRankControls } from './Controls';
 import { QueryProvider } from './QueryProvider';
 import { AWAITING_DATA, EmptyState, Loading } from './States';
-import type { KeystoneStats } from '@lolperform/shared';
+import type { KeystoneStats, RunePage } from '@lolperform/shared';
 import { formatPercent } from '../../lib/format';
 
 interface ItemInfo {
@@ -134,6 +134,122 @@ function BuildPath({
 interface KeystoneInfo {
   name: string;
   icon: string;
+}
+
+interface RuneStyle {
+  id: number;
+  name: string;
+  icon: string;
+  slots: { runes: { id: number; name: string; icon: string }[] }[];
+}
+
+interface RuneCatalog {
+  keystones: Record<string, KeystoneInfo>;
+  byStyle: Record<string, RuneStyle>;
+}
+
+/** The nine stat shards. Data Dragon's runesReforged file does not list them,
+ *  but their icons live on the same CDN under StatMods. */
+const SHARD_INFO: Record<number, { name: string; icon: string }> = {
+  5001: { name: 'Health Scaling', icon: 'perk-images/StatMods/StatModsHealthScalingIcon.png' },
+  5005: { name: 'Attack Speed', icon: 'perk-images/StatMods/StatModsAttackSpeedIcon.png' },
+  5007: { name: 'Ability Haste', icon: 'perk-images/StatMods/StatModsCDRScalingIcon.png' },
+  5008: { name: 'Adaptive Force', icon: 'perk-images/StatMods/StatModsAdaptiveForceIcon.png' },
+  5010: { name: 'Movement Speed', icon: 'perk-images/StatMods/StatModsMovementSpeedIcon.png' },
+  5011: { name: 'Health', icon: 'perk-images/StatMods/StatModsHealthPlusIcon.png' },
+  5013: { name: 'Tenacity and Slow Resist', icon: 'perk-images/StatMods/StatModsTenacityIcon.png' },
+};
+
+const ddIcon = (path: string): string => `https://ddragon.leagueoflegends.com/cdn/img/${path}`;
+
+function RuneDot({
+  icon,
+  name,
+  chosen,
+  size,
+}: {
+  icon: string;
+  name: string;
+  chosen: boolean;
+  size: number;
+}) {
+  return (
+    <img
+      src={ddIcon(icon)}
+      alt={chosen ? `${name} (chosen)` : name}
+      title={name}
+      width={size}
+      height={size}
+      loading="lazy"
+      className={chosen ? 'rounded-full ring-2 ring-accent' : 'rounded-full opacity-30 grayscale'}
+    />
+  );
+}
+
+/**
+ * The most common rune page, drawn as the in-client tree: every rune of the
+ * primary and secondary styles shown, with the chosen ones lit and the rest
+ * dimmed. Layout data comes from Data Dragon, the chosen page from the
+ * champion's most common rune signature this patch. Presentation only — the
+ * honest per-keystone win rates live in the Keystones list next to it.
+ */
+function RunePagePanel({ runes, catalog }: { runes: RunePage; catalog?: RuneCatalog }) {
+  const primary = catalog?.byStyle[String(runes.primaryStyle)];
+  const sub = catalog?.byStyle[String(runes.subStyle)];
+  if (!primary || !sub) return null;
+  const chosen = new Set<number>([runes.keystone, ...runes.primary, ...runes.secondary]);
+  const chosenShards = [...runes.shards];
+
+  const styleHeader = (style: RuneStyle) => (
+    <div className="flex items-center gap-2 rounded-md bg-bg-inset px-2.5 py-1.5">
+      <img src={ddIcon(style.icon)} alt="" width={18} height={18} loading="lazy" />
+      <span className="text-xs font-semibold text-text-primary">{style.name}</span>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-wrap gap-4 rounded-lg border border-border-subtle bg-bg-surface p-3">
+      <div className="space-y-2">
+        {styleHeader(primary)}
+        {primary.slots.map((slot, si) => (
+          <div key={si} className="flex items-center gap-2">
+            {slot.runes.map((r) => (
+              <RuneDot
+                key={r.id}
+                icon={r.icon}
+                name={r.name}
+                chosen={chosen.has(r.id)}
+                size={si === 0 ? 34 : 26}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2">
+        {styleHeader(sub)}
+        {sub.slots.slice(1).map((slot, si) => (
+          <div key={si} className="flex items-center gap-2">
+            {slot.runes.map((r) => (
+              <RuneDot key={r.id} icon={r.icon} name={r.name} chosen={chosen.has(r.id)} size={26} />
+            ))}
+          </div>
+        ))}
+        <div className="flex items-center gap-2 border-t border-border-subtle pt-2">
+          {chosenShards.map((id, i) =>
+            SHARD_INFO[id] ? (
+              <RuneDot
+                key={`${id}-${i}`}
+                icon={SHARD_INFO[id].icon}
+                name={SHARD_INFO[id].name}
+                chosen
+                size={20}
+              />
+            ) : null,
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -284,26 +400,26 @@ function Detail({ championId }: { championId: string }) {
   // Item names + one-line descriptions for build tooltips, straight from the
   // same Data Dragon version the icons use. Cached for the session; the build
   // renders fine without it (icons only) if the fetch fails.
-  // Keystone names/icons live in a separate Data Dragon file from items.
+  // Rune names, icons and full tree layout live in a separate Data Dragon file.
   const runeCatalog = useQuery({
     queryKey: ['runes', version],
     enabled: Boolean(version),
     staleTime: Infinity,
-    queryFn: async (): Promise<Record<string, KeystoneInfo>> => {
+    queryFn: async (): Promise<RuneCatalog> => {
       const res = await fetch(
         `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US/runesReforged.json`,
       );
       if (!res.ok) throw new Error(`runesReforged ${res.status}`);
-      const styles = (await res.json()) as {
-        slots: { runes: { id: number; name: string; icon: string }[] }[];
-      }[];
-      const out: Record<string, KeystoneInfo> = {};
+      const styles = (await res.json()) as RuneStyle[];
+      const keystones: Record<string, KeystoneInfo> = {};
+      const byStyle: Record<string, RuneStyle> = {};
       for (const style of styles) {
+        byStyle[String(style.id)] = style;
         for (const r of style.slots[0]?.runes ?? []) {
-          out[String(r.id)] = { name: r.name, icon: r.icon };
+          keystones[String(r.id)] = { name: r.name, icon: r.icon };
         }
       }
-      return out;
+      return { keystones, byStyle };
     },
   });
 
@@ -464,8 +580,14 @@ function Detail({ championId }: { championId: string }) {
       <Keystones
         rows={champ.data?.keystones?.filter((k) => !primary || k.role === primary.role) ?? []}
         baseline={primary?.winRate}
-        catalog={runeCatalog.data}
+        catalog={runeCatalog.data?.keystones}
       />
+      {champBuild ? (
+        <section className="space-y-2">
+          <h3>Most common runes</h3>
+          <RunePagePanel runes={champBuild.runes} catalog={runeCatalog.data} />
+        </section>
+      ) : null}
 
       <section className="space-y-2">
         <h3>Most-bought items</h3>
