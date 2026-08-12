@@ -6,6 +6,7 @@ import {
   type CounterPick,
   type DuoSynergy,
   type GradeInput,
+  type KeystoneStats,
   type Matchup,
   type RankBracket,
   type Region,
@@ -49,6 +50,18 @@ interface RoleStatsRow {
   tier: string;
   adjusted_win_rate: number | null;
   player_pool_delta: number | null;
+}
+interface KeystoneRow {
+  patch: string;
+  region: string;
+  rank: string;
+  role: string;
+  champion_key: string;
+  keystone: number;
+  games: number;
+  wins: number;
+  win_rate: number;
+  wilson_lower: number;
 }
 interface MatchupRow {
   patch: string;
@@ -373,6 +386,36 @@ export async function getDuosForChampion(
     .bind(slice.patch, slice.region, slice.rank, championKey, championKey)
     .all<DuoRow>();
   return results.map(mapDuo);
+}
+
+function mapKeystone(r: KeystoneRow): KeystoneStats {
+  return {
+    patch: r.patch,
+    region: r.region as Region,
+    rank: r.rank as RankBracket,
+    role: r.role as Role,
+    championKey: r.champion_key,
+    keystone: r.keystone,
+    games: r.games,
+    wins: r.wins,
+    winRate: r.win_rate,
+    wilsonLower: r.wilson_lower,
+  };
+}
+
+export async function getKeystonesForChampion(
+  env: Env,
+  slice: Slice,
+  championKey: string,
+): Promise<KeystoneStats[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT * FROM keystone_stats
+     WHERE patch = ? AND region = ? AND rank = ? AND champion_key = ?
+     ORDER BY games DESC`,
+  )
+    .bind(slice.patch, slice.region, slice.rank, championKey)
+    .all<KeystoneRow>();
+  return results.map(mapKeystone);
 }
 
 export async function getBuildsForChampion(

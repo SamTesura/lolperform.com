@@ -9,6 +9,7 @@ import {
   wilsonLowerBound,
   type BuildPath,
   type DuoSynergy,
+  type KeystoneStats,
   type Matchup,
   type RankBracket,
   type Region,
@@ -23,6 +24,7 @@ import { gradeSlice } from './tier.js';
 
 export interface AggregateResult {
   roleStats: RoleStats[];
+  keystones: KeystoneStats[];
   matchups: Matchup[];
   duos: DuoSynergy[];
   builds: BuildPath[];
@@ -32,6 +34,10 @@ export interface AggregateResult {
 export const MIN_MATCHUP_GAMES = 10;
 export const MIN_DUO_GAMES = 10;
 export const MIN_BUILD_GAMES = 20;
+/** A keystone needs this many games on a champion before it is worth showing.
+ *  Keystone choice is coarse — most champions realistically run three to six —
+ *  so the arms stay fat and this floor is about noise, not scarcity. */
+export const MIN_KEYSTONE_GAMES = 100;
 
 interface Tally {
   games: number;
@@ -113,7 +119,13 @@ export function aggregate(
   matches: NormMatch[],
   skillFloors?: ReadonlyMap<string, SkillFloor>,
 ): AggregateResult {
-  const out: AggregateResult = { roleStats: [], matchups: [], duos: [], builds: [] };
+  const out: AggregateResult = {
+    roleStats: [],
+    keystones: [],
+    matchups: [],
+    duos: [],
+    builds: [],
+  };
   const regions = [...new Set(matches.map((m) => m.region))];
   // "all" pools every region into the largest, steadiest sample. Only emit it
   // when the crawl spans more than one region, so a single-region run doesn't
@@ -183,6 +195,7 @@ function aggregateSlice(
   const duoAgg = new Map<string, Tally>(); // `${adc}|${sup}`
   const buildAgg = new Map<string, Map<string, BuildTally>>(); // `${champ}|${role}|${opp|-}` -> sig -> tally
   const itemFreq = new Map<string, Map<number, number>>(); // `${champ}|${role}` -> item id -> times bought
+  const keystoneAgg = new Map<string, Tally>(); // `${role}|${champ}|${keystone}`
 
   const getTally = (map: Map<string, Tally>, key: string): Tally => {
     let t = map.get(key);
@@ -219,6 +232,9 @@ function aggregateSlice(
     for (const p of m.participants) {
       team[p.teamId][p.role] = p;
       add(getTally(roleAgg, `${p.role}|${p.championKey}`), p.win, w);
+      if (p.runes.keystone > 0) {
+        add(getTally(keystoneAgg, `${p.role}|${p.championKey}|${p.runes.keystone}`), p.win, w);
+      }
       addBuild(p.championKey, p.role, null, p);
       if (p.items.length > 0) {
         const fKey = `${p.championKey}|${p.role}`;
@@ -352,6 +368,28 @@ function aggregateSlice(
       games: top.games,
       wins: top.wins,
       winRate: top.wins / top.games,
+    });
+  }
+
+  // --- emit keystone win rates ---
+  // Weighted like role stats, so the rank/region correction carries over. The
+  // floor is a noise guard, not a scarcity one: a champion realistically runs
+  // three to six keystones, so the arms are fat wherever the champion itself
+  // has a usable sample.
+  for (const [key, t] of keystoneAgg) {
+    if (t.games < MIN_KEYSTONE_GAMES) continue;
+    const [role, championKey, keystone] = key.split('|') as [Role, string, string];
+    out.keystones.push({
+      patch,
+      region,
+      rank,
+      role,
+      championKey,
+      keystone: Number(keystone),
+      games: t.games,
+      wins: t.wins,
+      winRate: t.wWins / t.wGames,
+      wilsonLower: wilsonLowerBound(t.wWins, t.wGames),
     });
   }
 

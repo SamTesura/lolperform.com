@@ -7,6 +7,7 @@ import type {
   ChampionMeta,
   DuoSynergy,
   Matchup,
+  KeystoneStats,
   RoleStats,
 } from '@lolperform/shared';
 
@@ -21,6 +22,7 @@ export interface LoadInput {
   meta: DatasetMetaFile;
   champions: ChampionMeta[];
   roleStats: RoleStats[];
+  keystones: KeystoneStats[];
   matchups: Matchup[];
   duos: DuoSynergy[];
   builds: BuildPath[];
@@ -62,7 +64,7 @@ export function buildLoadSql(input: LoadInput): string {
   const patch = s(meta.patch);
   const parts: string[] = ['PRAGMA foreign_keys = ON;'];
 
-  for (const table of ['role_stats', 'matchups', 'duos', 'builds']) {
+  for (const table of ['role_stats', 'keystone_stats', 'matchups', 'duos', 'builds']) {
     parts.push(`DELETE FROM ${table} WHERE patch = ${patch};`);
   }
   parts.push(`DELETE FROM patches WHERE patch = ${patch};`);
@@ -98,6 +100,17 @@ export function buildLoadSql(input: LoadInput): string {
         n(r.wilsonLower), n(r.score), s(r.tier),
         r.adjustedWinRate === null ? 'NULL' : n(r.adjustedWinRate),
         r.playerPoolDelta === null ? 'NULL' : n(r.playerPoolDelta),
+      ]),
+    ),
+  );
+
+  parts.push(
+    insertRows(
+      'keystone_stats',
+      ['patch', 'region', 'rank', 'role', 'champion_key', 'keystone', 'games', 'wins', 'win_rate', 'wilson_lower'],
+      input.keystones.map((k) => [
+        s(k.patch), s(k.region), s(k.rank), s(k.role), s(k.championKey),
+        n(k.keystone), n(k.games), n(k.wins), n(k.winRate), n(k.wilsonLower),
       ]),
     ),
   );
@@ -146,11 +159,24 @@ async function readJson<T>(name: string): Promise<T> {
   return JSON.parse(await readFile(new URL(name, DATA_DIR), 'utf8')) as T;
 }
 
+/** Same, but a missing file yields a fallback instead of aborting the load.
+ *  A dataset written before this table existed should still load everything
+ *  else rather than costing the whole D1 update. */
+async function readJsonOr<T>(name: string, fallback: T): Promise<T> {
+  try {
+    return await readJson<T>(name);
+  } catch {
+    console.warn(`[load] ${name} missing — loading without it`);
+    return fallback;
+  }
+}
+
 async function main(): Promise<void> {
   const input: LoadInput = {
     meta: await readJson<DatasetMetaFile>('dataset-meta.json'),
     champions: await readJson<ChampionMeta[]>('champions.json'),
     roleStats: await readJson<RoleStats[]>('role-stats.json'),
+    keystones: await readJsonOr<KeystoneStats[]>('keystones.json', []),
     matchups: await readJson<Matchup[]>('matchups.json'),
     duos: await readJson<DuoSynergy[]>('duos.json'),
     builds: await readJson<BuildPath[]>('builds.json'),
