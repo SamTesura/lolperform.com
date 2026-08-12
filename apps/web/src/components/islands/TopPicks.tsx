@@ -1,15 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  DEFAULT_RANK_BRACKET,
-  DEFAULT_REGION,
-  ROLES,
-  ROLE_LABELS,
-  type Role,
-} from '@lolperform/shared';
+import { DEFAULT_RANK_BRACKET, DEFAULT_REGION, ROLE_LABELS, type Role } from '@lolperform/shared';
 import { fetchMeta, fetchTierList } from '../../lib/api';
 import { championIndex } from '../../lib/champions';
 import { TierTile } from '../primitives/TierTile';
+import { RoleTabsInteractive } from './Controls';
 import { QueryProvider } from './QueryProvider';
 import { AWAITING_DATA, EmptyState, Loading } from './States';
 
@@ -29,33 +24,11 @@ function Picks() {
   const version = meta.data?.version;
   const top = (tiers.data?.champions ?? []).filter((c) => c.score > 0).slice(0, 8);
 
-  const tabs = (
-    <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Role">
-      {ROLES.map((r) => {
-        const active = r === role;
-        return (
-          <button
-            key={r}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => setRole(r)}
-            className={`rounded-md border px-2.5 py-1 text-xs transition-colors duration-150 ${
-              active
-                ? 'border-accent bg-bg-elevated text-text-primary'
-                : 'border-border-subtle text-text-muted hover:text-text-primary'
-            }`}
-          >
-            {ROLE_LABELS[r]}
-          </button>
-        );
-      })}
-    </div>
-  );
-
   return (
     <div className="space-y-3">
-      {tabs}
+      {/* The site's own role tabs, not a second bespoke style — a role switcher
+          should look the same here as it does on the tier list. */}
+      <RoleTabsInteractive value={role} onChange={setRole} />
       {tiers.isLoading ? (
         <Loading label={`Loading top ${ROLE_LABELS[role].toLowerCase()} picks…`} />
       ) : tiers.isError || top.length === 0 ? (
