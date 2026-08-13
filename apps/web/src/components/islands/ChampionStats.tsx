@@ -424,10 +424,11 @@ function SlotBreakdown({
     </li>
   );
 
-  // An item may top several positional buckets (Navori as both 2nd and 4th),
-  // which reads as a broken duplicate. Dedupe cumulatively left to right: the
-  // core trio never repeats itself, and each later column only shows items not
-  // already on display. Columns can thin out; an empty one hides entirely.
+  // The core trio never repeats itself, and later columns exclude the trio —
+  // an item both in core and as a "4th item" reads as a broken duplicate. The
+  // later columns MAY repeat each other: the same item genuinely is the 4th
+  // buy in some games and the 5th in others, and each column should offer a
+  // full set of options.
   const used = new Set<number>();
   const core: SlotOption[] = [];
   for (const options of slots.slice(0, 3)) {
@@ -437,11 +438,9 @@ function SlotBreakdown({
       used.add(pick.item);
     }
   }
-  const later = slots.slice(3).map((options) => {
-    const kept = options.filter((o) => !used.has(o.item)).slice(0, 3);
-    for (const o of kept) used.add(o.item);
-    return kept;
-  });
+  const later = slots
+    .slice(3)
+    .map((options) => options.filter((o) => !used.has(o.item)).slice(0, 3));
   const ordinal = (i: number) => `${i + 4}th item`;
 
   return (
