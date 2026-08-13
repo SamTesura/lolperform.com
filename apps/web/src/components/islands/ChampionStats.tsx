@@ -8,6 +8,7 @@ import {
   type Matchup,
   type RankBracket,
   type Region,
+  type Role,
 } from '@lolperform/shared';
 import { fetchChampion, fetchMeta } from '../../lib/api';
 import { championIndex } from '../../lib/champions';
@@ -15,7 +16,7 @@ import { itemIcon } from '../../lib/ddragon';
 import { MatchupRow } from '../primitives/MatchupRow';
 import { StatBadge } from '../primitives/StatBadge';
 import { TierBadge } from '../primitives/TierBadge';
-import { RegionRankControls } from './Controls';
+import { RegionRankControls, RoleTabsInteractive } from './Controls';
 import { QueryProvider } from './QueryProvider';
 import { AWAITING_DATA, EmptyState, Loading } from './States';
 import type { KeystoneStats, RunePage, RunePageStats } from '@lolperform/shared';
@@ -645,6 +646,10 @@ function topMatchups(matchups: Matchup[], favored: boolean, n = 6): Matchup[] {
 function Detail({ championId }: { championId: string }) {
   const [region, setRegion] = useState<Region>(DEFAULT_REGION);
   const [rank, setRank] = useState<RankBracket>(DEFAULT_RANK_BRACKET);
+  // null until the user picks: then every section follows the chosen role.
+  // Any champion can theoretically play any role, so all five stay clickable;
+  // roles without data fall through to the sections' own empty states.
+  const [roleChoice, setRoleChoice] = useState<Role | null>(null);
 
   const meta = useQuery({ queryKey: ['meta'], queryFn: fetchMeta });
   const champ = useQuery({
@@ -721,16 +726,21 @@ function Detail({ championId }: { championId: string }) {
   if (champ.isError || !champ.data) return <EmptyState {...AWAITING_DATA} />;
 
   const { meta: self, stats, matchups, synergies, builds } = champ.data;
-  // primary role = most games
+  // default role = most games; the tabs override it
   const primary = stats.slice().sort((a, b) => b.games - a.games)[0];
-  const roleMatchups = primary ? matchups.filter((m) => m.role === primary.role) : matchups;
+  const activeRole: Role = roleChoice ?? primary?.role ?? 'BOTTOM';
+  const active = stats.find((s) => s.role === activeRole);
+  const roleMatchups = matchups.filter((m) => m.role === activeRole);
   const bestMatchups = topMatchups(roleMatchups, true);
   const toughMatchups = topMatchups(roleMatchups, false);
-  const champBuild = builds.find((b) => b.opponentKey === null) ?? builds[0];
+  // Strictly the chosen role's own build — a wrong-role fallback would show
+  // mid items under a bot tab.
+  const champBuild = builds.find((b) => b.opponentKey === null && b.role === activeRole);
 
   return (
     <div className="space-y-6">
       <RegionRankControls region={region} rank={rank} onRegion={setRegion} onRank={setRank} />
+      <RoleTabsInteractive value={activeRole} onChange={setRoleChoice} />
 
       {stats.length === 0 ? (
         <EmptyState {...AWAITING_DATA} />
@@ -828,7 +838,7 @@ function Detail({ championId }: { championId: string }) {
         </div>
       ) : null}
 
-      {synergies.length > 0 ? (
+      {(activeRole === 'BOTTOM' || activeRole === 'UTILITY') && synergies.length > 0 ? (
         <section className="space-y-2">
           <h3>Bot-lane synergy</h3>
           <div className="flex flex-wrap gap-2">
@@ -857,12 +867,12 @@ function Detail({ championId }: { championId: string }) {
       ) : null}
 
       <Keystones
-        rows={champ.data?.keystones?.filter((k) => !primary || k.role === primary.role) ?? []}
-        baseline={primary?.winRate}
+        rows={champ.data?.keystones?.filter((k) => k.role === activeRole) ?? []}
+        baseline={active?.winRate}
         catalog={runeCatalog.data?.keystones}
       />
       <RunePages
-        pages={(champ.data?.runePages ?? []).filter((p) => !primary || p.role === primary.role)}
+        pages={(champ.data?.runePages ?? []).filter((p) => p.role === activeRole)}
         fallback={champBuild?.runes}
         catalog={runeCatalog.data}
       />
