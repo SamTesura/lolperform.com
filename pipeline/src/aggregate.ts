@@ -40,6 +40,12 @@ export const MIN_BUILD_GAMES = 20;
  *  Keystone choice is coarse — most champions realistically run three to six —
  *  so the arms stay fat and this floor is about noise, not scarcity. */
 export const MIN_KEYSTONE_GAMES = 100;
+/** A full rune page splits the sample much finer than a keystone: demanding
+ *  100 games of the SECOND page hid it for all but a handful of champions
+ *  early in a patch (27 of 236 champions had one on the first 16.16 load).
+ *  30 games is enough to show the option — the page chip displays its own
+ *  games count and win rate, so the reader can judge the sample. */
+export const MIN_RUNE_PAGE_GAMES = 30;
 
 interface Tally {
   games: number;
@@ -471,7 +477,7 @@ function aggregateSlice(
   for (const [key, sigs2] of runePageAgg) {
     const [role, championKey] = key.split('|') as [Role, string];
     const ranked2 = [...sigs2.values()]
-      .filter((e) => e.tally.games >= MIN_KEYSTONE_GAMES)
+      .filter((e) => e.tally.games >= MIN_RUNE_PAGE_GAMES)
       .sort((a, b) => b.tally.games - a.tally.games)
       .slice(0, 2);
     ranked2.forEach((e, i) => {
