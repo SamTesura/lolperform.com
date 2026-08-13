@@ -67,6 +67,37 @@ describe('aggregate post-stratification', () => {
   });
 });
 
+describe('aggregate rune pages', () => {
+  it('emits a second page once it clears the 30-game floor, not the keystone floor', () => {
+    // 160 games on the fixture page + 45 games on an Electrocute page: the
+    // alternative must surface even though it is nowhere near 100 games.
+    const matches = botLaneMatches(205, 120).map((m, i) =>
+      i < 45
+        ? {
+            ...m,
+            participants: m.participants.map((pt) =>
+              pt.championKey === '51'
+                ? {
+                    ...pt,
+                    runes: { ...pt.runes, keystone: 8112, primaryStyle: 8100 },
+                  }
+                : pt,
+            ),
+          }
+        : m,
+    );
+    const result = aggregate(matches);
+    const pages = result.runePages.filter(
+      (r) => r.championKey === '51' && r.role === 'BOTTOM' && r.rank === 'emerald_plus',
+    );
+    expect(pages).toHaveLength(2);
+    expect(pages.find((r) => r.slot === 1)!.games).toBe(160);
+    const alt = pages.find((r) => r.slot === 2)!;
+    expect(alt.games).toBe(45);
+    expect(alt.runes.keystone).toBe(8112);
+  });
+});
+
 describe('aggregate', () => {
   const matches = botLaneMatches(1250, 750); // Caitlyn bot wins 750/1250 = 60% (>= tier-list floor)
 
