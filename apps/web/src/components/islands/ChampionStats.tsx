@@ -441,6 +441,10 @@ function SlotBreakdown({
   const later = slots
     .slice(3)
     .map((options) => options.filter((o) => !used.has(o.item)).slice(0, 3));
+  // Always show the 4th-6th columns: a silently missing column reads as a bug.
+  // An empty one states why instead (too few games reached that slot, or every
+  // recorded option is already in the core trio).
+  while (later.length < 3) later.push([]);
   const ordinal = (i: number) => `${i + 4}th item`;
 
   return (
@@ -482,18 +486,24 @@ function SlotBreakdown({
             </ul>
           </div>
         ) : null}
-        {later.map((options, i) =>
-          options.length > 0 ? (
-            <div key={i} className="space-y-1.5">
-              <p className="text-xs font-semibold text-text-primary">{ordinal(i)}</p>
+        {later.map((options, i) => (
+          <div key={i} className="space-y-1.5">
+            <p className="text-xs font-semibold text-text-primary">{ordinal(i)}</p>
+            {options.length > 0 ? (
               <ul className="space-y-1">
                 {options.map((o) => (
                   <OptionRow key={o.item} o={o} />
                 ))}
               </ul>
-            </div>
-          ) : null,
-        )}
+            ) : (
+              <p className="text-2xs text-text-muted">
+                not enough games
+                <br />
+                reached this slot yet
+              </p>
+            )}
+          </div>
+        ))}
       </div>
       <p className="text-2xs text-text-muted">
         Percentages are how often the ladder takes each option, of the games that filled that slot —
