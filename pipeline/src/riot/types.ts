@@ -44,6 +44,10 @@ export interface ParticipantDTO {
   win: boolean;
   summoner1Id: number;
   summoner2Id: number;
+  /** Season 2026 role-quest bound item. ADC boots live HERE, not in item0-5:
+   *  the bot-lane quest moves boots to a dedicated slot outside the six item
+   *  slots (0% of stored 16.16 BOTTOM games carry a boot id in items). */
+  roleBoundItem?: number;
   item0: number;
   item1: number;
   item2: number;
@@ -82,6 +86,9 @@ export interface NormParticipant {
   /** Summoner spell pair, sorted ascending so Flash+Heal and Heal+Flash are
    *  one thing. Absent on matches stored before this was captured. */
   spells?: [number, number];
+  /** Role-quest bound item id (2026: ADC boots sit here, slotless). Absent on
+   *  matches stored before this was captured, or when no quest item exists. */
+  quest?: number;
   /** Non-zero item ids, trinket/consumables excluded. */
   items: number[];
   runes: RunePage;
@@ -189,6 +196,8 @@ export function normalizeMatch(
         Number.isFinite(pair[0]) && Number.isFinite(pair[1]) && pair[0]! > 0
           ? (pair as [number, number])
           : undefined,
+      quest:
+        Number.isFinite(p.roleBoundItem) && p.roleBoundItem! > 0 ? p.roleBoundItem : undefined,
       items: coreItems(p),
       runes: parseRunes(p.perks),
     });

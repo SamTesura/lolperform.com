@@ -19,6 +19,7 @@ function matchDto(matchId: string, seedPuuid?: string): MatchDTO {
       win: teamId === 100,
       summoner1Id: 4,
       summoner2Id: 7,
+      roleBoundItem: 3006,
       item0: 3031,
       item1: 0,
       item2: 0,
@@ -187,6 +188,14 @@ describe('crawl seed baseline capture', () => {
     expect(serialized).not.toContain('other-100');
     // the useful part did survive
     expect(matches.some((m) => m.seed)).toBe(true);
+  });
+
+  it('carries the role-quest bound item into the store (2026 slotless boots)', async () => {
+    const matches = await crawl(fakeClient(), config(['na1']));
+    expect(matches.length).toBeGreaterThan(0);
+    for (const m of matches) {
+      for (const p of m.participants) expect(p.quest).toBe(3006);
+    }
   });
 
   it('skips seeds whose ladder record is too thin to be meaningful', async () => {
