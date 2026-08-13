@@ -528,7 +528,9 @@ function aggregateSlice(
         .map(([item, n]) => ({ item, share: n / filled, games: n }));
     };
     const slots = slotAgg.get(`${championKey}|${role}`) ?? [];
-    const slotOptions = slots.slice(0, slotCount).map((bucket) => topOptions(bucket, 3));
+    // 6 deep, not 3: the UI dedupes items across columns (core trio first),
+    // so it needs spares below the raw top of each slot.
+    const slotOptions = slots.slice(0, slotCount).map((bucket) => topOptions(bucket, 6));
     const bootOptions = topOptions(bootAgg.get(`${championKey}|${role}`), 3);
     // Spell pairs carry their own win rate — locked in champion select, so
     // unlike items the number cannot be an effect of already winning.

@@ -424,11 +424,24 @@ function SlotBreakdown({
     </li>
   );
 
-  const core = slots
-    .slice(0, 3)
-    .map((options) => options[0])
-    .filter(Boolean) as SlotOption[];
-  const later = slots.slice(3);
+  // An item may top several positional buckets (Navori as both 2nd and 4th),
+  // which reads as a broken duplicate. Dedupe cumulatively left to right: the
+  // core trio never repeats itself, and each later column only shows items not
+  // already on display. Columns can thin out; an empty one hides entirely.
+  const used = new Set<number>();
+  const core: SlotOption[] = [];
+  for (const options of slots.slice(0, 3)) {
+    const pick = options.find((o) => !used.has(o.item));
+    if (pick) {
+      core.push(pick);
+      used.add(pick.item);
+    }
+  }
+  const later = slots.slice(3).map((options) => {
+    const kept = options.filter((o) => !used.has(o.item)).slice(0, 3);
+    for (const o of kept) used.add(o.item);
+    return kept;
+  });
   const ordinal = (i: number) => `${i + 4}th item`;
 
   return (
