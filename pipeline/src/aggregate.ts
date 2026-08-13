@@ -301,6 +301,9 @@ function aggregateSlice(
             bucket.set(id, (bucket.get(id) ?? 0) + 1);
           });
         for (const id of finished.filter(isBoots)) bt2.set(id, (bt2.get(id) ?? 0) + 1);
+        // 2026 role quests park boots in a slotless quest slot (ADC): the id
+        // arrives via roleBoundItem, never in item0-5.
+        if (p.quest && isBoots(p.quest)) bt2.set(p.quest, (bt2.get(p.quest) ?? 0) + 1);
       }
       if (p.spells) {
         let sp = spellAgg.get(`${p.championKey}|${p.role}`);
