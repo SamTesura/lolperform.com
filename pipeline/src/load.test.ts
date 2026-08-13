@@ -164,4 +164,32 @@ describe('buildLoadSql', () => {
   it('never emits a NaN literal', () => {
     expect(sql).not.toContain('NaN');
   });
+
+  it('keeps every statement under the D1 100 KB cap even with fat JSON rows', () => {
+    // Run 31641932893 died on SQLITE_TOOBIG: 100 builds rows per statement
+    // crossed D1's 100 KB statement limit once slot/boot/spell JSON landed.
+    const fatOptions = Array.from({ length: 3 }, () =>
+      Array.from({ length: 40 }, (_, i) => ({ item: 3000 + i, share: 0.0123, games: 1234 })),
+    );
+    const fat: LoadInput = {
+      ...input,
+      builds: Array.from({ length: 200 }, (_, i) => ({
+        ...input.builds[0]!,
+        championKey: String(i),
+        slotOptions: fatOptions,
+      })),
+    };
+    const statements = buildLoadSql(fat)
+      .split(/;\n/)
+      .filter((t) => t.trim().length > 0);
+    expect(statements.length).toBeGreaterThan(2); // byte cap actually split them
+    for (const st of statements) {
+      expect(Buffer.byteLength(st, 'utf8')).toBeLessThan(100_000);
+    }
+    // nothing lost to the chunking: every row still present exactly once
+    const joined = statements.join(';');
+    for (let i = 0; i < 200; i++) {
+      expect(joined).toContain(`'${i}', '-'`);
+    }
+  });
 });

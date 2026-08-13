@@ -40,18 +40,31 @@ function n(value: number): string {
   return Number.isFinite(value) ? String(value) : '0';
 }
 
-/** Build a chunked multi-row INSERT for one table. */
+/** D1 rejects any single statement over 100 KB (SQLITE_TOOBIG). Builds rows
+ *  carry JSON columns (slot/boot/spell options) heavy enough that a fixed
+ *  row-count chunk crossed it, so chunks are capped by bytes as well. */
+const MAX_STATEMENT_BYTES = 80_000;
+
+/** Build a multi-row INSERT for one table, chunked by row count and bytes. */
 function insertRows(table: string, columns: string[], rows: string[][], chunk = 100): string {
   if (rows.length === 0) return '';
-  const cols = columns.join(', ');
+  const head = `INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES\n  `;
   const out: string[] = [];
-  for (let i = 0; i < rows.length; i += chunk) {
-    const values = rows
-      .slice(i, i + chunk)
-      .map((r) => `(${r.join(', ')})`)
-      .join(',\n  ');
-    out.push(`INSERT OR REPLACE INTO ${table} (${cols}) VALUES\n  ${values};`);
+  let batch: string[] = [];
+  let bytes = head.length;
+  const flush = () => {
+    if (batch.length > 0) out.push(head + batch.join(',\n  ') + ';');
+    batch = [];
+    bytes = head.length;
+  };
+  for (const r of rows) {
+    const value = `(${r.join(', ')})`;
+    const added = Buffer.byteLength(value, 'utf8') + 4; // separator slack
+    if (batch.length > 0 && (batch.length >= chunk || bytes + added > MAX_STATEMENT_BYTES)) flush();
+    batch.push(value);
+    bytes += added;
   }
+  flush();
   return out.join('\n');
 }
 
