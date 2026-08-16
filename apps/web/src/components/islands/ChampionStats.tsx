@@ -395,14 +395,24 @@ type SlotOption = { item: number; share: number; games: number };
  * "win rate" mostly measures having been winning long enough to buy it, so we
  * publish popularity, which is at least exactly what it claims to be.
  */
+type CoreOption = {
+  items: [number, number, number];
+  share: number;
+  games: number;
+  wins: number;
+  winRate: number;
+};
+
 function SlotBreakdown({
   slots,
   boots,
+  coreBuilds,
   catalog,
   version,
 }: {
   slots: SlotOption[][] | null | undefined;
   boots: SlotOption[] | null | undefined;
+  coreBuilds?: CoreOption[] | null;
   catalog?: Record<string, ItemInfo>;
   version?: string;
 }) {
@@ -432,11 +442,17 @@ function SlotBreakdown({
   // full set of options.
   const used = new Set<number>();
   const core: SlotOption[] = [];
-  for (const options of slots.slice(0, 3)) {
-    const pick = options.find((o) => !used.has(o.item));
-    if (pick) {
-      core.push(pick);
-      used.add(pick.item);
+  if (coreBuilds && coreBuilds.length > 0) {
+    // Archetype rows replace the derived trio; the most common one defines
+    // what the later columns treat as already displayed.
+    for (const id of coreBuilds[0]!.items) used.add(id);
+  } else {
+    for (const options of slots.slice(0, 3)) {
+      const pick = options.find((o) => !used.has(o.item));
+      if (pick) {
+        core.push(pick);
+        used.add(pick.item);
+      }
     }
   }
   const later = slots
@@ -451,7 +467,47 @@ function SlotBreakdown({
   return (
     <div className="space-y-3 border-t border-border-subtle pt-3">
       <div className="flex flex-wrap gap-4">
-        {core.length > 0 ? (
+        {coreBuilds && coreBuilds.length > 0 ? (
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-text-primary">Core builds</p>
+            <ul className="space-y-1.5">
+              {coreBuilds.map((cb) => (
+                <li key={cb.items.join('-')} className="flex items-center gap-2">
+                  <span className="flex items-center gap-1">
+                    {cb.items.map((id, i) => (
+                      <span key={`${id}-${i}`} className="flex items-center gap-1">
+                        {i > 0 ? (
+                          <span className="text-text-muted" aria-hidden="true">
+                            →
+                          </span>
+                        ) : null}
+                        <img
+                          src={itemIcon(id, version)}
+                          alt={catalog?.[String(id)]?.name ?? `Item ${id}`}
+                          title={catalog?.[String(id)]?.name ?? `Item ${id}`}
+                          width={28}
+                          height={28}
+                          loading="lazy"
+                          className="rounded-sm bg-bg-inset"
+                        />
+                      </span>
+                    ))}
+                  </span>
+                  <span className="stat text-xs text-text-secondary">
+                    {formatPercent(cb.winRate)} win
+                  </span>
+                  <span className="stat text-2xs text-text-muted">{formatPercent(cb.share)}</span>
+                  <span className="stat text-2xs text-text-muted">
+                    {cb.games.toLocaleString('en-US')}g
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-2xs text-text-muted">
+              first three in order — win rate among games that completed three items
+            </p>
+          </div>
+        ) : core.length > 0 ? (
           <div className="space-y-1.5">
             <p className="text-xs font-semibold text-text-primary">Core items</p>
             <div className="flex items-center gap-1.5">
@@ -1010,6 +1066,7 @@ function Detail({ championId }: { championId: string }) {
             <SlotBreakdown
               slots={champBuild.slotOptions}
               boots={champBuild.bootOptions}
+              coreBuilds={champBuild.coreOptions}
               catalog={itemCatalog.data}
               version={version}
             />

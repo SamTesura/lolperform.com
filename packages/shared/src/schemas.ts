@@ -207,6 +207,22 @@ export const buildPathSchema = z.object({
     )
     .nullable()
     .default(null),
+  /** Distinct first-three build archetypes (Kraken-first vs Collector-first),
+   *  in purchase order, with win rate among games that completed three items.
+   *  Conditioning on equal build depth removes most of the survivorship bias
+   *  that makes raw per-item win rates unpublishable. */
+  coreOptions: z
+    .array(
+      z.object({
+        items: z.tuple([z.number().int(), z.number().int(), z.number().int()]),
+        share: z.number(),
+        games: z.number().int(),
+        wins: z.number().int(),
+        winRate: z.number().min(0).max(1),
+      }),
+    )
+    .nullable()
+    .default(null),
 });
 export type BuildPath = z.infer<typeof buildPathSchema>;
 

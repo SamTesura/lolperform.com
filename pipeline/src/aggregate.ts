@@ -213,7 +213,9 @@ function aggregateSlice(
   const itemFreq = new Map<string, Map<number, number>>(); // `${champ}|${role}` -> item id -> times bought
   const slotAgg = new Map<string, Map<number, number>[]>(); // `${champ}|${role}` -> slot index -> item -> count
   const bootAgg = new Map<string, Map<number, number>>(); // `${champ}|${role}` -> boots item -> count
-  const spellAgg = new Map<string, Map<string, Tally>>(); // `${champ}|${role}` -> `${a}-${b}` -> tally
+  const spellAgg = new Map<string, Map<string, Tally>>();
+  // `${champ}|${role}` -> 'a>b>c' first-three sequence -> tally (games with >=3 finished items)
+  const coreSeqAgg = new Map<string, Map<string, Tally>>(); // `${champ}|${role}` -> `${a}-${b}` -> tally
   // `${role}|${champ}` -> runeSignature -> tally + mode count of full pages
   const runePageAgg = new Map<
     string,
@@ -310,6 +312,18 @@ function aggregateSlice(
         // 2026 role quests park boots in a slotless quest slot (ADC): the id
         // arrives via roleBoundItem, never in item0-5.
         if (p.quest && isBoots(p.quest)) bt2.set(p.quest, (bt2.get(p.quest) ?? 0) + 1);
+        // Build archetypes: the ordered first three completed non-boot items.
+        // Only games that reached three completed items count, so the win
+        // rates compare archetypes at equal build depth.
+        const seq = finished.filter((id) => !isBoots(id));
+        if (seq.length >= 3) {
+          let cs = coreSeqAgg.get(fKey);
+          if (!cs) {
+            cs = new Map();
+            coreSeqAgg.set(fKey, cs);
+          }
+          add(getTally(cs, `${seq[0]}>${seq[1]}>${seq[2]}`), p.win, w);
+        }
       }
       if (p.spells) {
         let sp = spellAgg.get(`${p.championKey}|${p.role}`);
@@ -445,6 +459,7 @@ function aggregateSlice(
       slotOptions: null,
       bootOptions: null,
       spellOptions: null,
+      coreOptions: null,
     });
   }
 
@@ -559,6 +574,23 @@ function aggregateSlice(
         }));
     }
 
+    const seqTallies = coreSeqAgg.get(`${championKey}|${role}`);
+    let coreOptions: NonNullable<BuildPath['coreOptions']> = [];
+    if (seqTallies) {
+      const reached = [...seqTallies.values()].reduce((a2, b2) => a2 + b2.games, 0);
+      coreOptions = [...seqTallies.entries()]
+        .filter(([, ct]) => ct.games >= MIN_BUILD_GAMES)
+        .sort((a2, b2) => b2[1].games - a2[1].games)
+        .slice(0, 3)
+        .map(([seq, ct]) => ({
+          items: seq.split('>').map(Number) as [number, number, number],
+          share: ct.games / reached,
+          games: ct.games,
+          wins: ct.wins,
+          winRate: ct.wWins / ct.wGames,
+        }));
+    }
+
     out.builds.push({
       patch,
       region,
@@ -574,6 +606,7 @@ function aggregateSlice(
       slotOptions: slotOptions.some((o) => o.length > 0) ? slotOptions : null,
       bootOptions: bootOptions.length > 0 ? bootOptions : null,
       spellOptions: spellOptions.length > 0 ? spellOptions : null,
+      coreOptions: coreOptions.length > 0 ? coreOptions : null,
     });
   }
 }
