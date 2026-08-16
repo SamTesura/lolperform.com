@@ -115,6 +115,7 @@ interface BuildRow {
   slot_options: string | null;
   boot_options: string | null;
   spell_options: string | null;
+  core_options: string | null;
 }
 interface CounterRow {
   champion_key: string;
@@ -203,6 +204,7 @@ export function mapBuild(r: BuildRow): BuildPath {
     slotOptions: safeJsonOrNull<BuildPath['slotOptions']>(r.slot_options),
     bootOptions: safeJsonOrNull<BuildPath['bootOptions']>(r.boot_options),
     spellOptions: safeJsonOrNull<BuildPath['spellOptions']>(r.spell_options),
+    coreOptions: safeJsonOrNull<BuildPath['coreOptions']>(r.core_options),
   };
 }
 
