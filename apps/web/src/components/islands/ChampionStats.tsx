@@ -407,6 +407,72 @@ type CoreOption = {
   winRate: number;
 };
 
+type StartOption = {
+  items: number[];
+  share: number;
+  games: number;
+  wins: number;
+  winRate: number;
+};
+
+function StartingItems({
+  options,
+  catalog,
+  version,
+}: {
+  options?: StartOption[] | null;
+  catalog?: Record<string, ItemInfo>;
+  version?: string;
+}) {
+  if (!version || !options || options.length === 0) return null;
+  return (
+    <div className="space-y-1.5 border-t border-border-subtle pt-3">
+      <p className="text-xs font-semibold text-text-primary">Starting items</p>
+      <ul className="space-y-1.5">
+        {options.map((o) => {
+          const counts = new Map<number, number>();
+          for (const id of o.items) counts.set(id, (counts.get(id) ?? 0) + 1);
+          return (
+            <li key={o.items.join('-')} className="flex flex-wrap items-center gap-2">
+              <span className="flex items-center gap-1.5">
+                {[...counts.entries()].map(([id, n2]) => (
+                  <span key={id} className="relative inline-block">
+                    <img
+                      src={itemIcon(id, version)}
+                      alt={catalog?.[String(id)]?.name ?? `Item ${id}`}
+                      title={catalog?.[String(id)]?.name ?? `Item ${id}`}
+                      width={28}
+                      height={28}
+                      loading="lazy"
+                      className="rounded-sm bg-bg-inset"
+                    />
+                    {n2 > 1 ? (
+                      <span className="stat absolute -bottom-1 -right-1 rounded-sm bg-bg-overlay px-0.5 text-2xs text-text-secondary">
+                        ×{n2}
+                      </span>
+                    ) : null}
+                  </span>
+                ))}
+              </span>
+              <span className="stat text-xs text-text-secondary">
+                {formatPercent(o.winRate)} win
+              </span>
+              <span className="stat text-2xs text-text-muted">{formatPercent(o.share)}</span>
+              <span className="stat text-2xs text-text-muted">
+                {o.games.toLocaleString('en-US')}g
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="text-2xs text-text-muted">
+        bought in the first 30 seconds — locked before the game develops, so the win rate is
+        fair. From a one-in-five timeline sample of games.
+      </p>
+    </div>
+  );
+}
+
 function SlotBreakdown({
   slots,
   boots,
@@ -1070,6 +1136,11 @@ function Detail({ championId }: { championId: string }) {
                 {champBuild.games.toLocaleString('en-US')} games
               </span>
             </div>
+            <StartingItems
+              options={champBuild.startOptions}
+              catalog={itemCatalog.data}
+              version={version}
+            />
             <BuildPath items={champBuild.items} catalog={itemCatalog.data} version={version} />
             <SlotBreakdown
               slots={champBuild.slotOptions}

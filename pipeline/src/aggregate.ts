@@ -46,6 +46,10 @@ export const MIN_KEYSTONE_GAMES = 100;
  *  30 games is enough to show the option — the page chip displays its own
  *  games count and win rate, so the reader can judge the sample. */
 export const MIN_RUNE_PAGE_GAMES = 30;
+/** Starting-item signatures arrive at one-fifth the match rate (the crawl
+ *  samples timelines 1-in-5) and the choice space is tiny, so a low floor
+ *  still filters noise without starving the section. */
+export const MIN_START_GAMES = 10;
 
 interface Tally {
   games: number;
@@ -214,6 +218,8 @@ function aggregateSlice(
   const slotAgg = new Map<string, Map<number, number>[]>(); // `${champ}|${role}` -> slot index -> item -> count
   const bootAgg = new Map<string, Map<number, number>>(); // `${champ}|${role}` -> boots item -> count
   const spellAgg = new Map<string, Map<string, Tally>>();
+  // `${champ}|${role}` -> 'id+id+id' opening-buy signature -> tally.
+  const startAgg = new Map<string, Map<string, Tally>>();
   // `${champ}|${role}` -> first completed item -> group tally + continuation counts.
   // Keyed by FIRST item, not the exact trio: players think in "Kraken first" /
   // "Yun Tal build", and exact ordered trios fragment so hard that a 1,400-game
@@ -347,6 +353,14 @@ function aggregateSlice(
         }
         add(getTally(sp, `${p.spells[0]}-${p.spells[1]}`), p.win, w);
       }
+      if (p.start && p.start.length > 0) {
+        let st = startAgg.get(`${p.championKey}|${p.role}`);
+        if (!st) {
+          st = new Map();
+          startAgg.set(`${p.championKey}|${p.role}`, st);
+        }
+        add(getTally(st, p.start.join('+')), p.win, w);
+      }
     }
 
     for (const role of ROLES) {
@@ -474,6 +488,7 @@ function aggregateSlice(
       bootOptions: null,
       spellOptions: null,
       coreOptions: null,
+      startOptions: null,
     });
   }
 
@@ -612,6 +627,25 @@ function aggregateSlice(
         }));
     }
 
+    // Opening buys: a purchase at 0:00 is locked before the game develops —
+    // the purest pre-outcome choice on the page, so its win rate is fair.
+    const startTallies = startAgg.get(`${championKey}|${role}`);
+    let startOptions: NonNullable<BuildPath['startOptions']> = [];
+    if (startTallies) {
+      const sampled = [...startTallies.values()].reduce((a2, b2) => a2 + b2.games, 0);
+      startOptions = [...startTallies.entries()]
+        .filter(([, st2]) => st2.games >= MIN_START_GAMES)
+        .sort((a2, b2) => b2[1].games - a2[1].games)
+        .slice(0, 4)
+        .map(([sig, st2]) => ({
+          items: sig.split('+').map(Number),
+          share: st2.games / sampled,
+          games: st2.games,
+          wins: st2.wins,
+          winRate: st2.wWins / st2.wGames,
+        }));
+    }
+
     const seqGroups = coreSeqAgg.get(`${championKey}|${role}`);
     let coreOptions: NonNullable<BuildPath['coreOptions']> = [];
     if (seqGroups) {
@@ -657,6 +691,7 @@ function aggregateSlice(
       bootOptions: bootOptions.length > 0 ? bootOptions : null,
       spellOptions: spellOptions.length > 0 ? spellOptions : null,
       coreOptions: coreOptions.length > 0 ? coreOptions : null,
+      startOptions: startOptions.length > 0 ? startOptions : null,
     });
   }
 }

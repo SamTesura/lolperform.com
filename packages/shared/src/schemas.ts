@@ -224,6 +224,21 @@ export const buildPathSchema = z.object({
     )
     .nullable()
     .default(null),
+  /** Opening buys (first 30s, timeline-sampled 1-in-5): the full purchase set
+   *  including potions, e.g. Doran's Blade + 2 potions. A 0:00 purchase is
+   *  locked before the game develops, so the win rate is fair to publish. */
+  startOptions: z
+    .array(
+      z.object({
+        items: z.array(z.number().int()).min(1),
+        share: z.number(),
+        games: z.number().int(),
+        wins: z.number().int(),
+        winRate: z.number().min(0).max(1),
+      }),
+    )
+    .nullable()
+    .default(null),
 });
 export type BuildPath = z.infer<typeof buildPathSchema>;
 

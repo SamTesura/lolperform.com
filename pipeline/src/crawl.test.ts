@@ -3,7 +3,7 @@ import { QUEUE_RANKED_SOLO, type LeagueTier, type Platform } from '@lolperform/s
 import { crawl } from './crawl.js';
 import type { PipelineConfig } from './config.js';
 import type { RiotClient } from './riot/client.js';
-import type { LeagueListDTO, MatchDTO } from './riot/types.js';
+import type { LeagueListDTO, MatchDTO, MatchTimelineDTO } from './riot/types.js';
 
 const ROLES = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'] as const;
 
@@ -88,6 +88,24 @@ function fakeClient(behavior: FakeBehavior = {}): RiotClient {
         return id;
       }),
     getMatch: async (_region: Platform, id: string) => matchDto(id, seedOf.get(id)),
+    getMatchTimeline: async (): Promise<MatchTimelineDTO> => ({
+      info: {
+        frames: [
+          {
+            events: [
+              // every participant opens Doran's Blade + potion; a late buy and
+              // a trinket must be ignored
+              ...Array.from({ length: 10 }, (_, pi) => [
+                { type: 'ITEM_PURCHASED', timestamp: 5_000, participantId: pi + 1, itemId: 2003 },
+                { type: 'ITEM_PURCHASED', timestamp: 6_000, participantId: pi + 1, itemId: 1055 },
+                { type: 'ITEM_PURCHASED', timestamp: 7_000, participantId: pi + 1, itemId: 3340 },
+                { type: 'ITEM_PURCHASED', timestamp: 90_000, participantId: pi + 1, itemId: 1036 },
+              ]).flat(),
+            ],
+          },
+        ],
+      },
+    }),
   } as unknown as RiotClient;
 }
 
@@ -195,6 +213,21 @@ describe('crawl seed baseline capture', () => {
     expect(matches.length).toBeGreaterThan(0);
     for (const m of matches) {
       for (const p of m.participants) expect(p.quest).toBe(3006);
+    }
+  });
+
+  it('captures opening buys for sampled timelines only (sorted, windowed)', async () => {
+    const matches = await crawl(fakeClient(), config(['na1']));
+    const withStart = matches.filter((m) => m.participants.every((p) => p.start));
+    const withoutStart = matches.filter((m) => m.participants.every((p) => !p.start));
+    // 1-in-5 sampling: some matches carry starts, most do not
+    expect(withStart.length).toBeGreaterThan(0);
+    expect(withoutStart.length).toBeGreaterThan(withStart.length);
+    for (const m of withStart) {
+      for (const p of m.participants) {
+        // sorted, trinket (3340) excluded, 90s purchase (1036) outside window
+        expect(p.start).toEqual([1055, 2003]);
+      }
     }
   });
 

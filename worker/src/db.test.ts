@@ -43,6 +43,7 @@ describe('row mappers', () => {
       boot_options: null,
       spell_options: null,
   core_options: null,
+  start_options: null,
     });
     expect(b.opponentKey).toBeNull();
     expect(b.items).toEqual([3006, 6672, 3094]);
@@ -68,6 +69,7 @@ describe('row mappers', () => {
       boot_options: null,
       spell_options: null,
   core_options: null,
+  start_options: null,
     });
     expect(b.items).toEqual([]);
     expect(b.opponentKey).toBe('202');
