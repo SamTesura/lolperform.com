@@ -472,7 +472,10 @@ function SlotBreakdown({
             <p className="text-xs font-semibold text-text-primary">Core builds</p>
             <ul className="space-y-1.5">
               {coreBuilds.map((cb) => (
-                <li key={cb.items.join('-')} className="flex items-center gap-2">
+                <li key={cb.items.join('-')} className="flex flex-wrap items-center gap-2">
+                  <span className="min-w-40 text-xs font-medium text-text-primary">
+                    {catalog?.[String(cb.items[0])]?.name ?? `Item ${cb.items[0]}`} first
+                  </span>
                   <span className="flex items-center gap-1">
                     {cb.items.map((id, i) => (
                       <span key={`${id}-${i}`} className="flex items-center gap-1">
@@ -504,7 +507,8 @@ function SlotBreakdown({
               ))}
             </ul>
             <p className="text-2xs text-text-muted">
-              first three in order — win rate among games that completed three items
+              grouped by first item bought; icons show each group's most common continuation —
+              win rate covers every game that started on that item
             </p>
           </div>
         ) : core.length > 0 ? (

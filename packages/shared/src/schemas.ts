@@ -207,10 +207,11 @@ export const buildPathSchema = z.object({
     )
     .nullable()
     .default(null),
-  /** Distinct first-three build archetypes (Kraken-first vs Collector-first),
-   *  in purchase order, with win rate among games that completed three items.
-   *  Conditioning on equal build depth removes most of the survivorship bias
-   *  that makes raw per-item win rates unpublishable. */
+  /** Build archetypes grouped by FIRST completed item (Kraken-first vs
+   *  Yun Tal-first): items = the group's most common three-item continuation,
+   *  stats = the whole group's. The first completed item is close to a
+   *  pre-outcome choice, which is what makes this win rate publishable while
+   *  raw per-item win rates are not. */
   coreOptions: z
     .array(
       z.object({

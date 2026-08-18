@@ -214,8 +214,12 @@ function aggregateSlice(
   const slotAgg = new Map<string, Map<number, number>[]>(); // `${champ}|${role}` -> slot index -> item -> count
   const bootAgg = new Map<string, Map<number, number>>(); // `${champ}|${role}` -> boots item -> count
   const spellAgg = new Map<string, Map<string, Tally>>();
-  // `${champ}|${role}` -> 'a>b>c' first-three sequence -> tally (games with >=3 finished items)
-  const coreSeqAgg = new Map<string, Map<string, Tally>>(); // `${champ}|${role}` -> `${a}-${b}` -> tally
+  // `${champ}|${role}` -> first completed item -> group tally + continuation counts.
+  // Keyed by FIRST item, not the exact trio: players think in "Kraken first" /
+  // "Yun Tal build", and exact ordered trios fragment so hard that a 1,400-game
+  // champion's top sequence sat under the floor while its first-item groups
+  // were hundreds of games fat.
+  const coreSeqAgg = new Map<string, Map<number, { tally: Tally; trios: Map<string, number> }>>(); // `${champ}|${role}` -> `${a}-${b}` -> tally
   // `${role}|${champ}` -> runeSignature -> tally + mode count of full pages
   const runePageAgg = new Map<
     string,
@@ -312,17 +316,27 @@ function aggregateSlice(
         // 2026 role quests park boots in a slotless quest slot (ADC): the id
         // arrives via roleBoundItem, never in item0-5.
         if (p.quest && isBoots(p.quest)) bt2.set(p.quest, (bt2.get(p.quest) ?? 0) + 1);
-        // Build archetypes: the ordered first three completed non-boot items.
-        // Only games that reached three completed items count, so the win
-        // rates compare archetypes at equal build depth.
+        // Build archetypes, grouped by the first completed non-boot item. The
+        // group's win rate covers every game that started on that item — the
+        // first completed item is close to a pre-outcome choice — while the
+        // displayed trio is the group's most common continuation.
         const seq = finished.filter((id) => !isBoots(id));
-        if (seq.length >= 3) {
+        if (seq.length >= 1) {
           let cs = coreSeqAgg.get(fKey);
           if (!cs) {
             cs = new Map();
             coreSeqAgg.set(fKey, cs);
           }
-          add(getTally(cs, `${seq[0]}>${seq[1]}>${seq[2]}`), p.win, w);
+          let g = cs.get(seq[0]!);
+          if (!g) {
+            g = { tally: tally(), trios: new Map() };
+            cs.set(seq[0]!, g);
+          }
+          add(g.tally, p.win, w);
+          if (seq.length >= 3) {
+            const k = `${seq[0]}>${seq[1]}>${seq[2]}`;
+            g.trios.set(k, (g.trios.get(k) ?? 0) + 1);
+          }
         }
       }
       if (p.spells) {
@@ -574,21 +588,31 @@ function aggregateSlice(
         }));
     }
 
-    const seqTallies = coreSeqAgg.get(`${championKey}|${role}`);
+    const seqGroups = coreSeqAgg.get(`${championKey}|${role}`);
     let coreOptions: NonNullable<BuildPath['coreOptions']> = [];
-    if (seqTallies) {
-      const reached = [...seqTallies.values()].reduce((a2, b2) => a2 + b2.games, 0);
-      coreOptions = [...seqTallies.entries()]
-        .filter(([, ct]) => ct.games >= MIN_BUILD_GAMES)
-        .sort((a2, b2) => b2[1].games - a2[1].games)
+    if (seqGroups) {
+      const reached = [...seqGroups.values()].reduce((a2, b2) => a2 + b2.tally.games, 0);
+      coreOptions = [...seqGroups.entries()]
+        .filter(([, g]) => g.tally.games >= MIN_BUILD_GAMES && g.trios.size > 0)
+        .sort((a2, b2) => b2[1].tally.games - a2[1].tally.games)
         .slice(0, 3)
-        .map(([seq, ct]) => ({
-          items: seq.split('>').map(Number) as [number, number, number],
-          share: ct.games / reached,
-          games: ct.games,
-          wins: ct.wins,
-          winRate: ct.wWins / ct.wGames,
-        }));
+        .map(([, g]) => {
+          let bestK = '';
+          let bestN = 0;
+          for (const [k, n2] of g.trios) {
+            if (n2 > bestN) {
+              bestN = n2;
+              bestK = k;
+            }
+          }
+          return {
+            items: bestK.split('>').map(Number) as [number, number, number],
+            share: g.tally.games / reached,
+            games: g.tally.games,
+            wins: g.tally.wins,
+            winRate: g.tally.wWins / g.tally.wGames,
+          };
+        });
     }
 
     out.builds.push({
