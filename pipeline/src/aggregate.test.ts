@@ -98,6 +98,37 @@ describe('aggregate rune pages', () => {
   });
 });
 
+describe('aggregate core build archetypes', () => {
+  it('groups by first item so small continuation forks do not starve the row', () => {
+    // 60 Kraken-first games splitting into two continuations (35 + 25) plus
+    // 30 Collector-first games: exact-trio keying at a 20-game floor would
+    // show the two big trios and give Kraken-first only a partial sample.
+    // First-item grouping must report Kraken-first as one 60-game archetype
+    // whose displayed trio is the more common continuation.
+    const matches = botLaneMatches(90, 50).map((m, i) => {
+      const items = i < 35 ? [6672, 3031, 3094] : i < 60 ? [6672, 3036, 3094] : [6676, 3031, 3094];
+      return {
+        ...m,
+        participants: m.participants.map((pt) =>
+          pt.championKey === '51' ? { ...pt, items } : pt,
+        ),
+      };
+    });
+    const result = aggregate(matches);
+    const build = result.builds.find(
+      (b) =>
+        b.championKey === '51' && b.role === 'BOTTOM' && b.rank === 'emerald_plus' &&
+        b.opponentKey === null,
+    )!;
+    expect(build.coreOptions).not.toBeNull();
+    const [kraken, collector] = build.coreOptions!;
+    expect(kraken!.games).toBe(60); // the whole first-item group
+    expect(kraken!.items).toEqual([6672, 3031, 3094]); // majority continuation
+    expect(collector!.games).toBe(30);
+    expect(collector!.items).toEqual([6676, 3031, 3094]);
+  });
+});
+
 describe('aggregate', () => {
   const matches = botLaneMatches(1250, 750); // Caitlyn bot wins 750/1250 = 60% (>= tier-list floor)
 
