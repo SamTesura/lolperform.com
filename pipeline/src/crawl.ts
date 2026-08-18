@@ -183,6 +183,9 @@ function sampleOrder(
  * progress to disk, so an external kill — runner eviction, cancellation, the
  * job timeout — costs at most the region in flight, not the whole crawl.
  */
+/** Fetch the timeline for every Nth discovered match (see crawlRegion). */
+const TIMELINE_SAMPLE_EVERY = 5;
+
 export async function crawl(
   client: RiotClient,
   config: PipelineConfig,
@@ -268,12 +271,26 @@ async function crawlRegion(
   }
 
   const entries = [...discovered.entries()];
+  // Starting items need the timeline — a second request per match. One match
+  // in five keeps the request overhead at 20% while the tiny choice space
+  // (a handful of viable opening buys per champion) still fills fast.
+  const timelineIds = new Set(
+    entries.filter((_, i) => i % TIMELINE_SAMPLE_EVERY === 0).map(([id]) => id),
+  );
   const norms = await mapPool(entries, concurrency, async ([id, { tier, seed }]) => {
     if (Date.now() > matchDeadline) return null;
     try {
       const dto = await client.getMatch(region, id);
       if (!dto || dto.info.queueId !== QUEUE_RANKED_SOLO) return null;
-      return normalizeMatch(dto, region, tier, seed);
+      let timeline = null;
+      if (timelineIds.has(id)) {
+        try {
+          timeline = await client.getMatchTimeline(region, id);
+        } catch {
+          // start data is a bonus; the match itself is still worth keeping
+        }
+      }
+      return normalizeMatch(dto, region, tier, seed, timeline);
     } catch {
       return null;
     }

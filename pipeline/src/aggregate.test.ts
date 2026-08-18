@@ -162,6 +162,38 @@ describe('aggregate keystone-list page parity', () => {
   });
 });
 
+describe('aggregate starting items', () => {
+  it('emits opening-buy options with their own pre-lock win rates', () => {
+    // 40 sampled games open Doran's + pot, 15 open Cull + pot, the rest have
+    // no timeline sample. Both signatures clear the 10-game floor; shares are
+    // of the sampled games only.
+    const matches = botLaneMatches(200, 110).map((m, i) => {
+      const start = i < 40 ? [1055, 2003] : i < 55 ? [1083, 2003] : undefined;
+      return start === undefined
+        ? m
+        : {
+            ...m,
+            participants: m.participants.map((pt) =>
+              pt.championKey === '51' ? { ...pt, start } : pt,
+            ),
+          };
+    });
+    const result = aggregate(matches);
+    const build = result.builds.find(
+      (b) =>
+        b.championKey === '51' && b.role === 'BOTTOM' && b.rank === 'emerald_plus' &&
+        b.opponentKey === null,
+    )!;
+    expect(build.startOptions).not.toBeNull();
+    const [dorans, cull] = build.startOptions!;
+    expect(dorans!.items).toEqual([1055, 2003]);
+    expect(dorans!.games).toBe(40);
+    expect(dorans!.share).toBeCloseTo(40 / 55, 5);
+    expect(cull!.items).toEqual([1083, 2003]);
+    expect(cull!.games).toBe(15);
+  });
+});
+
 describe('aggregate core build archetypes', () => {
   it('groups by first item so small continuation forks do not starve the row', () => {
     // 60 Kraken-first games splitting into two continuations (35 + 25) plus

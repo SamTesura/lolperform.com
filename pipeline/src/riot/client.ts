@@ -5,7 +5,7 @@ import {
   type Platform,
 } from '@lolperform/shared';
 import { DEV_KEY_WINDOWS, parseRateLimitHeader, RateLimiter, sleep } from './rateLimiter.js';
-import type { LeagueEntryDTO, LeagueListDTO, MatchDTO } from './types.js';
+import type { LeagueEntryDTO, LeagueListDTO, MatchDTO, MatchTimelineDTO } from './types.js';
 
 const MAX_RETRIES = 8;
 
@@ -144,5 +144,12 @@ export class RiotClient {
     if (!/^[A-Za-z0-9_-]+$/.test(matchId)) return Promise.resolve(null);
     const route = REGION_ROUTE[region];
     return this.request<MatchDTO>(route, `/lol/match/v5/matches/${matchId}`);
+  }
+
+  /** Match timeline — the source for opening item purchases. */
+  getMatchTimeline(region: Platform, matchId: string): Promise<MatchTimelineDTO | null> {
+    if (!/^[A-Za-z0-9_-]+$/.test(matchId)) return Promise.resolve(null);
+    const route = REGION_ROUTE[region];
+    return this.request<MatchTimelineDTO>(route, `/lol/match/v5/matches/${matchId}/timeline`);
   }
 }

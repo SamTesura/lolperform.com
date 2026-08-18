@@ -86,6 +86,9 @@ const input: LoadInput = {
       coreOptions: [
         { items: [3006, 6672, 3094], share: 0.7, games: 210, wins: 118, winRate: 0.5619 },
       ],
+      startOptions: [
+        { items: [1055, 2003], share: 0.8, games: 48, wins: 27, winRate: 0.5625 },
+      ],
     },
   ],
   keystones: [
