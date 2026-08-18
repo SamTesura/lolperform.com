@@ -595,7 +595,9 @@ function aggregateSlice(
       coreOptions = [...seqGroups.entries()]
         .filter(([, g]) => g.tally.games >= MIN_BUILD_GAMES && g.trios.size > 0)
         .sort((a2, b2) => b2[1].tally.games - a2[1].tally.games)
-        .slice(0, 3)
+        // 5, not 3: the site gives options, and real forks run deep — Ashe's
+        // Yun Tal-first group is her fourth-largest and was the one asked for.
+        .slice(0, 5)
         .map(([, g]) => {
           let bestK = '';
           let bestN = 0;
