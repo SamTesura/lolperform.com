@@ -134,6 +134,34 @@ describe('aggregate keystone-page coverage', () => {
   });
 });
 
+describe('aggregate keystone-list page parity', () => {
+  it('lists a keystone whose page is displayed even under the keystone floor', () => {
+    // 160 games on the fixture keystone + 45 on an Electrocute page: the
+    // Electrocute page clears the 30-game page floor, so it will be on
+    // display — the keystone list must then include Electrocute too (45 <
+    // 100), or the page names a keystone the list does not have (the Ashe
+    // contradiction, mirror of Lucian's).
+    const matches = botLaneMatches(205, 120).map((m, i) =>
+      i < 45
+        ? {
+            ...m,
+            participants: m.participants.map((pt) =>
+              pt.championKey === '51'
+                ? { ...pt, runes: { ...pt.runes, keystone: 8112, primaryStyle: 8100 } }
+                : pt,
+            ),
+          }
+        : m,
+    );
+    const result = aggregate(matches);
+    const ks = result.keystones.filter(
+      (k) => k.championKey === '51' && k.role === 'BOTTOM' && k.rank === 'emerald_plus',
+    );
+    expect(ks.map((k) => k.keystone).sort()).toEqual([8005, 8112]);
+    expect(ks.find((k) => k.keystone === 8112)!.games).toBe(45);
+  });
+});
+
 describe('aggregate core build archetypes', () => {
   it('groups by first item so small continuation forks do not starve the row', () => {
     // 60 Kraken-first games splitting into two continuations (35 + 25) plus

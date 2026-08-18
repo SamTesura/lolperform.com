@@ -477,28 +477,7 @@ function aggregateSlice(
     });
   }
 
-  // --- emit keystone win rates ---
-  // Weighted like role stats, so the rank/region correction carries over. The
-  // floor is a noise guard, not a scarcity one: a champion realistically runs
-  // three to six keystones, so the arms are fat wherever the champion itself
-  // has a usable sample.
-  for (const [key, t] of keystoneAgg) {
-    if (t.games < MIN_KEYSTONE_GAMES) continue;
-    const [role, championKey, keystone] = key.split('|') as [Role, string, string];
-    out.keystones.push({
-      patch,
-      region,
-      rank,
-      role,
-      championKey,
-      keystone: Number(keystone),
-      games: t.games,
-      wins: t.wins,
-      winRate: t.wWins / t.wGames,
-      wilsonLower: wilsonLowerBound(t.wWins, t.wGames),
-    });
-  }
-
+  const pageKeystones = new Set<string>();
   // --- emit the champion's rune pages: two most common + keystone coverage ---
   // Signature = keystone + both styles (fat arms); the stored page is the most
   // common full page inside the signature, and games/wins are the signature's
@@ -529,6 +508,7 @@ function aggregateSlice(
       let best: { page: RunePage; n: number } | null = null;
       for (const pc of e.pages.values()) if (!best || pc.n > best.n) best = pc;
       if (!best) return;
+      pageKeystones.add(`${role}|${championKey}|${best.page.keystone}`);
       out.runePages.push({
         patch,
         region,
@@ -544,6 +524,34 @@ function aggregateSlice(
       });
     });
   }
+
+  // --- emit keystone win rates ---
+  // Weighted like role stats, so the rank/region correction carries over. The
+  // floor is a noise guard, not a scarcity one: a champion realistically runs
+  // three to six keystones, so the arms are fat wherever the champion itself
+  // has a usable sample.
+  // Parity with the pages: a keystone whose page is on display must appear
+  // here too (Ashe showed a Press the Attack page while this list had only
+  // Lethal Tempo — the mirror image of the Lucian contradiction). The page
+  // floor already vouches for the sample; the games count is shown either way.
+  for (const [key, t] of keystoneAgg) {
+    if (t.games < MIN_KEYSTONE_GAMES && !(pageKeystones.has(key) && t.games >= MIN_RUNE_PAGE_GAMES))
+      continue;
+    const [role, championKey, keystone] = key.split('|') as [Role, string, string];
+    out.keystones.push({
+      patch,
+      region,
+      rank,
+      role,
+      championKey,
+      keystone: Number(keystone),
+      games: t.games,
+      wins: t.wins,
+      winRate: t.wWins / t.wGames,
+      wilsonLower: wilsonLowerBound(t.wWins, t.wGames),
+    });
+  }
+
 
   // --- emit the champion's own "most common build": per-item frequency ---
   // Requiring 20+ games of an *identical* full item set almost never triggers on
