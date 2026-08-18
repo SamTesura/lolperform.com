@@ -116,7 +116,7 @@ export const runePageStatsSchema = z.object({
   role: roleSchema,
   championKey: championKeySchema,
   /** 1 = most played page, 2 = second most played. */
-  slot: z.number().int().min(1).max(2),
+  slot: z.number().int().min(1).max(4),
   runes: z.lazy(() => runePageSchema),
   games: z.number().int().nonnegative(),
   wins: z.number().int().nonnegative(),

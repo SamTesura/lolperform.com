@@ -299,7 +299,11 @@ function RunePages({
                 : 'border-border-subtle text-text-muted hover:text-text-primary'
             }`}
           >
-            {i === 0 ? 'Most played' : 'Alternative'}
+            {i === 0
+              ? 'Most played'
+              : p.runes.keystone !== usable[0]!.runes.keystone
+                ? (catalog?.keystones?.[String(p.runes.keystone)]?.name ?? 'Alternative')
+                : 'Alternative'}
             <span className="stat ml-2 text-text-secondary">{formatPercent(p.winRate)}</span>
             <span className="stat ml-1.5 text-2xs text-text-muted">
               {p.games.toLocaleString('en-US')}g

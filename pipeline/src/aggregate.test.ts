@@ -98,6 +98,42 @@ describe('aggregate rune pages', () => {
   });
 });
 
+describe('aggregate keystone-page coverage', () => {
+  it('adds a page for a listed keystone the top-two signatures miss', () => {
+    // 270 games on the fixture keystone split across two secondary styles
+    // (150 + 120) plus 105 First Strike games: the two biggest signatures both
+    // run the same keystone, so First Strike would appear in the keystone
+    // list (>=100 games) with no page — the Lucian contradiction. Coverage
+    // must emit its page as slot 3.
+    const matches = botLaneMatches(375, 200).map((m, i) => {
+      const runes =
+        i < 150
+          ? null // fixture page: keystone 8005, sub 8400
+          : i < 270
+            ? { keystone: 8005, primaryStyle: 8000, subStyle: 8100 }
+            : { keystone: 8369, primaryStyle: 8300, subStyle: 8000 };
+      return runes === null
+        ? m
+        : {
+            ...m,
+            participants: m.participants.map((pt) =>
+              pt.championKey === '51' ? { ...pt, runes: { ...pt.runes, ...runes } } : pt,
+            ),
+          };
+    });
+    const result = aggregate(matches);
+    const pages = result.runePages.filter(
+      (r) => r.championKey === '51' && r.role === 'BOTTOM' && r.rank === 'emerald_plus',
+    );
+    expect(pages).toHaveLength(3);
+    expect(pages.find((r) => r.slot === 1)!.runes.keystone).toBe(8005);
+    expect(pages.find((r) => r.slot === 2)!.runes.keystone).toBe(8005);
+    const covered = pages.find((r) => r.slot === 3)!;
+    expect(covered.runes.keystone).toBe(8369);
+    expect(covered.games).toBe(105);
+  });
+});
+
 describe('aggregate core build archetypes', () => {
   it('groups by first item so small continuation forks do not starve the row', () => {
     // 60 Kraken-first games splitting into two continuations (35 + 25) plus
