@@ -499,17 +499,33 @@ function aggregateSlice(
     });
   }
 
-  // --- emit the champion's two most common rune pages ---
+  // --- emit the champion's rune pages: two most common + keystone coverage ---
   // Signature = keystone + both styles (fat arms); the stored page is the most
   // common full page inside the signature, and games/wins are the signature's
   // own — a pre-lock sample, so the win rate is honest to show.
+  //
+  // Coverage rule: every keystone strong enough for the keystone list
+  // (MIN_KEYSTONE_GAMES) must have a page here. Without it the two sections
+  // contradict each other — Lucian listed First Strike while both displayed
+  // pages ran Press the Attack, which reads as mentioning a rune the pages
+  // don't have.
   for (const [key, sigs2] of runePageAgg) {
     const [role, championKey] = key.split('|') as [Role, string];
     const ranked2 = [...sigs2.values()]
       .filter((e) => e.tally.games >= MIN_RUNE_PAGE_GAMES)
-      .sort((a, b) => b.tally.games - a.tally.games)
-      .slice(0, 2);
-    ranked2.forEach((e, i) => {
+      .sort((a, b) => b.tally.games - a.tally.games);
+    const chosen = ranked2.slice(0, 2);
+    const covered = new Set(chosen.map((e) => [...e.pages.values()][0]?.page.keystone));
+    for (const e of ranked2.slice(2)) {
+      if (chosen.length >= 4) break;
+      const ks = [...e.pages.values()][0]?.page.keystone;
+      if (ks === undefined || covered.has(ks)) continue;
+      const ksGames = keystoneAgg.get(`${role}|${championKey}|${ks}`)?.games ?? 0;
+      if (ksGames < MIN_KEYSTONE_GAMES) continue;
+      chosen.push(e);
+      covered.add(ks);
+    }
+    chosen.forEach((e, i) => {
       let best: { page: RunePage; n: number } | null = null;
       for (const pc of e.pages.values()) if (!best || pc.n > best.n) best = pc;
       if (!best) return;
@@ -519,7 +535,7 @@ function aggregateSlice(
         rank,
         role,
         championKey,
-        slot: (i + 1) as 1 | 2,
+        slot: i + 1,
         runes: best.page,
         games: e.tally.games,
         wins: e.tally.wins,
