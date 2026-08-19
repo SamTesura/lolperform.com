@@ -16,17 +16,23 @@
 // XSS surface is low. Everything non-ad stays tightly scoped.
 const GOOGLE_ADS = 'https://*.googlesyndication.com https://*.googleadservices.com https://*.google.com https://*.doubleclick.net';
 
+// Cloudflare Web Analytics: the zone auto-injects its beacon script into HTML
+// responses, and the beacon posts its measurements back to cloudflareinsights.
+// Without both entries the console shows a CSP violation on every page load.
+const CF_INSIGHTS_SCRIPT = 'https://static.cloudflareinsights.com';
+const CF_INSIGHTS_CONNECT = 'https://cloudflareinsights.com';
+
 const CSP = [
   "default-src 'self'",
   "base-uri 'self'",
   `img-src 'self' data: https://ddragon.leagueoflegends.com https://*.gstatic.com ${GOOGLE_ADS}`,
-  `script-src 'self' 'unsafe-inline' https://adservice.google.com https://*.googletagservices.com ${GOOGLE_ADS}`,
+  `script-src 'self' 'unsafe-inline' ${CF_INSIGHTS_SCRIPT} https://adservice.google.com https://*.googletagservices.com ${GOOGLE_ADS}`,
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
   // Data Dragon in connect-src: the item tooltips fetch item.json (names +
   // short descriptions) client-side from the same read-only static CDN that
   // already serves all champion/item art.
-  `connect-src 'self' https://ddragon.leagueoflegends.com ${GOOGLE_ADS}`,
+  `connect-src 'self' https://ddragon.leagueoflegends.com ${CF_INSIGHTS_CONNECT} ${GOOGLE_ADS}`,
   `frame-src ${GOOGLE_ADS}`,
   "form-action 'self'",
   "frame-ancestors 'none'",
@@ -39,7 +45,7 @@ export const SECURITY_HEADERS: Record<string, string> = {
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), browsing-topics=()',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   'Cross-Origin-Opener-Policy': 'same-origin',
   'Cross-Origin-Resource-Policy': 'same-origin',
   'X-Frame-Options': 'DENY',
