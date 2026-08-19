@@ -9,6 +9,17 @@ describe('security headers', () => {
     expect(csp).toContain('https://ddragon.leagueoflegends.com');
     // AdSense domains are allowlisted for monetization.
     expect(csp).toContain('https://*.googlesyndication.com');
+    // Cloudflare Web Analytics: the injected beacon script and its
+    // measurement endpoint must both pass CSP or every page logs a violation.
+    expect(csp).toMatch(/script-src [^;]*https:\/\/static\.cloudflareinsights\.com/);
+    expect(csp).toMatch(/connect-src [^;]*https:\/\/cloudflareinsights\.com/);
+  });
+
+  it('names no Permissions-Policy feature browsers do not recognize', () => {
+    // browsing-topics never shipped broadly; Chrome logs "Unrecognized
+    // feature" for it on every load.
+    expect(SECURITY_HEADERS['Permissions-Policy']).not.toContain('browsing-topics');
+    expect(SECURITY_HEADERS['Permissions-Policy']).toContain('camera=()');
   });
 
   it('sets HSTS and anti-sniffing headers', () => {
