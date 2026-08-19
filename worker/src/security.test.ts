@@ -7,8 +7,10 @@ describe('security headers', () => {
     expect(csp).toContain("script-src 'self'");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain('https://ddragon.leagueoflegends.com');
-    // AdSense domains are allowlisted for monetization.
+    // AdSense domains are allowlisted for monetization, including Google's
+    // ad-traffic-quality (sodar) endpoint, which lives on its own domain.
     expect(csp).toContain('https://*.googlesyndication.com');
+    expect(csp).toContain('https://*.adtrafficquality.google');
     // Cloudflare Web Analytics: the injected beacon script and its
     // measurement endpoint must both pass CSP or every page logs a violation.
     expect(csp).toMatch(/script-src [^;]*https:\/\/static\.cloudflareinsights\.com/);

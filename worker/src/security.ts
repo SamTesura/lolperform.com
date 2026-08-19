@@ -14,7 +14,7 @@
 // deliberate tradeoff for monetization; the site renders no user-supplied HTML
 // (all data is numeric/enum from our own D1, escaped by React), so the residual
 // XSS surface is low. Everything non-ad stays tightly scoped.
-const GOOGLE_ADS = 'https://*.googlesyndication.com https://*.googleadservices.com https://*.google.com https://*.doubleclick.net';
+const GOOGLE_ADS = 'https://*.googlesyndication.com https://*.googleadservices.com https://*.google.com https://*.doubleclick.net https://*.adtrafficquality.google';
 
 // Cloudflare Web Analytics: the zone auto-injects its beacon script into HTML
 // responses, and the beacon posts its measurements back to cloudflareinsights.
