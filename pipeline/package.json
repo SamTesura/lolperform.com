@@ -7,6 +7,7 @@
     "crawl": "tsx src/run.ts",
     "detect-patch": "tsx src/detect-patch.ts",
     "load": "tsx src/load.ts",
+    "backfill": "tsx src/backfill.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
