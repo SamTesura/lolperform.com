@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildLoadSql, type LoadInput } from './load.js';
+import {
+  buildLoadSql,
+  estimateRowWrites,
+  trimPayload,
+  type LoadInput,
+} from './load.js';
 
 const input: LoadInput = {
   meta: {
@@ -129,16 +134,46 @@ const input: LoadInput = {
   ],
 };
 
+/** Parse the payload literal for one champion_slice row out of the emitted SQL. */
+function payloadFor(sql: string, championKey: string, role: string): Record<string, unknown> {
+  const rowStart = sql.indexOf(`'${championKey}', '${role}', '{`);
+  expect(rowStart).toBeGreaterThan(-1);
+  const open = sql.indexOf("'{", rowStart);
+  const close = sql.indexOf("}'", open);
+  const json = sql.slice(open + 1, close + 1).replace(/''/g, "'");
+  return JSON.parse(json) as Record<string, unknown>;
+}
+
 describe('buildLoadSql', () => {
   const sql = buildLoadSql(input);
 
-  it('clears the patch before inserting (idempotent)', () => {
-    expect(sql).toContain("DELETE FROM role_stats WHERE patch = '16.12';");
-    // Every per-patch table must be cleared before reload or the insert
-    // collides with its own primary key on the next crawl.
-    expect(sql).toContain("DELETE FROM keystone_stats WHERE patch = '16.12';");
-    expect(sql).toContain("DELETE FROM rune_pages WHERE patch = '16.12';");
-    expect(sql).toContain("DELETE FROM patches WHERE patch = '16.12';");
+  it('upserts the slice tables instead of clearing the patch first', () => {
+    for (const t of ['patches', 'champions', 'champion_slice', 'role_slice', 'duo_slice']) {
+      expect(sql).toContain(`INSERT OR REPLACE INTO ${t}`);
+    }
+    // A DELETE costs a row write exactly like an INSERT on the free plan, so
+    // wiping the patch before rewriting it doubled the bill. Rows are upserted
+    // by primary key instead.
+    expect(sql).not.toContain("DELETE FROM champion_slice WHERE patch = '16.12';");
+    expect(sql).not.toContain('DELETE FROM matchups');
+    expect(sql).not.toContain('DELETE FROM champions;');
+  });
+
+  it('prunes only rows an earlier run left behind', () => {
+    for (const t of ['champion_slice', 'role_slice', 'duo_slice']) {
+      expect(sql).toContain(
+        `DELETE FROM ${t} WHERE patch = '16.12' AND loaded_at <> '2026-06-17T00:00:00.000Z';`,
+      );
+    }
+  });
+
+  it('keeps a bounded patch retention window', () => {
+    expect(sql).toContain('DELETE FROM champion_slice WHERE patch NOT IN');
+    expect(sql).toContain('ORDER BY generated_at DESC LIMIT 3');
+    // patches rows go last so the survivor subquery still names them
+    expect(sql.lastIndexOf('DELETE FROM patches')).toBeGreaterThan(
+      sql.lastIndexOf('DELETE FROM champion_slice'),
+    );
   });
 
   it('escapes single quotes in champion names', () => {
@@ -146,25 +181,28 @@ describe('buildLoadSql', () => {
     expect(sql).not.toContain("'Kai'Sa'");
   });
 
-  it('writes each table with INSERT OR REPLACE', () => {
-    for (const t of ['patches', 'champions', 'role_stats', 'matchups', 'duos', 'builds']) {
-      expect(sql).toContain(`INSERT OR REPLACE INTO ${t}`);
-    }
+  it('folds a champion’s matchups, builds, keystones and rune pages into one row', () => {
+    const payload = payloadFor(sql, '145', 'BOTTOM');
+    expect(payload.matchups).toHaveLength(1);
+    expect(payload.builds).toHaveLength(1);
+    expect(payload.keystones).toHaveLength(1);
+    expect(payload.runePages).toHaveLength(1);
+    // keystone rows keep their OWN sample, not the champion's totals
+    expect((payload.keystones as { games: number }[])[0]!.games).toBe(420);
+    expect(JSON.stringify(payload.builds)).toContain('3006');
   });
 
-  it('serializes build items/runes as JSON and maps null opponent to "-"', () => {
-    expect(sql).toContain("'[3006,6672,3094]'");
-    expect(sql).toContain('"keystone":8008');
+  it('files a duo under both the ADC and the support', () => {
+    expect((payloadFor(sql, '145', 'BOTTOM').duos as unknown[]).length).toBe(1);
+    expect((payloadFor(sql, '412', 'UTILITY').duos as unknown[]).length).toBe(1);
   });
 
-  it('writes keystone rows carrying their own sample, not champion totals', () => {
-    // The whole point of the table: a keystone row carries the games and wins
-    // observed on THAT keystone. Borrowing the champion's totals is the
-    // mistake the build card made.
-    expect(sql).toContain('INSERT OR REPLACE INTO keystone_stats');
-    expect(sql).toContain("'BOTTOM', '145', 8008, 420, 231");
-    // null opponent build stored under the '-' sentinel
-    expect(sql).toMatch(/INSERT OR REPLACE INTO builds[\s\S]*'-'/);
+  it('stores role stats ungraded, one row per role slice', () => {
+    const start = sql.indexOf('INSERT OR REPLACE INTO role_slice');
+    const chunk = sql.slice(start, sql.indexOf(';', start));
+    expect(chunk).toContain("'na1', 'emerald_plus', 'BOTTOM'");
+    expect(chunk).toContain('"championKey":"145"');
+    expect(chunk).toContain('"pickRate":0.2');
   });
 
   it('never emits a NaN literal', () => {
@@ -172,8 +210,9 @@ describe('buildLoadSql', () => {
   });
 
   it('keeps every statement under the D1 100 KB cap even with fat JSON rows', () => {
-    // Run 31641932893 died on SQLITE_TOOBIG: 100 builds rows per statement
-    // crossed D1's 100 KB statement limit once slot/boot/spell JSON landed.
+    // Run 31641932893 died on SQLITE_TOOBIG: 100 rows per statement crossed
+    // D1's 100 KB statement limit once slot/boot/spell JSON landed. Payload
+    // rows are far fatter, so the byte cap has to hold on its own.
     const fatOptions = Array.from({ length: 3 }, () =>
       Array.from({ length: 40 }, (_, i) => ({ item: 3000 + i, share: 0.0123, games: 1234 })),
     );
@@ -192,10 +231,48 @@ describe('buildLoadSql', () => {
     for (const st of statements) {
       expect(Buffer.byteLength(st, 'utf8')).toBeLessThan(100_000);
     }
-    // nothing lost to the chunking: every row still present exactly once
+    // nothing lost to the chunking: every champion still has its row
     const joined = statements.join(';');
     for (let i = 0; i < 200; i++) {
-      expect(joined).toContain(`'${i}', '-'`);
+      expect(joined).toContain(`'${i}', 'BOTTOM'`);
     }
+  });
+
+  it('trims a payload that would blow the statement cap, thinnest sample first', () => {
+    const matchups = Array.from({ length: 400 }, (_, i) => ({
+      opponentKey: String(i),
+      games: i + 1,
+      wins: i,
+      winRate: 0.5,
+      wilsonLower: 0.4,
+    }));
+    const trimmed = trimPayload(
+      { matchups, builds: [], keystones: [], runePages: [], duos: [] },
+      2_000,
+    );
+    expect(Buffer.byteLength(JSON.stringify(trimmed), 'utf8')).toBeLessThanOrEqual(2_000);
+    expect(trimmed.matchups.length).toBeLessThan(matchups.length);
+    // what survives is the fattest sample, not an arbitrary slice
+    expect(trimmed.matchups[0]!.games).toBe(400);
+  });
+});
+
+describe('estimateRowWrites', () => {
+  it('counts one row per slice, not one per aggregated record', () => {
+    // 1 patch + 1 champion + 2 champion_slice rows (145 BOTTOM, 412 UTILITY)
+    // + 1 role_slice + 1 duo_slice
+    expect(estimateRowWrites(input)).toBe(6);
+  });
+
+  it('scales with champions and slices, not with matchup fan-out', () => {
+    const wide: LoadInput = {
+      ...input,
+      matchups: Array.from({ length: 5_000 }, (_, i) => ({
+        ...input.matchups[0]!,
+        opponentKey: String(i),
+      })),
+    };
+    // 5,000 extra matchups all land in the one champion row they belong to
+    expect(estimateRowWrites(wide)).toBe(estimateRowWrites(input));
   });
 });

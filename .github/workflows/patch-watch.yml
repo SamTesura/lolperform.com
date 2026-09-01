@@ -4,6 +4,12 @@ name: Patch Watch
 # by match id), so same-patch runs grow the sample instead of being skipped —
 # on a rate-limited key, volume comes from cadence. Patch detection is kept for
 # the logs; the pipeline itself tags the dataset by the dominant patch present.
+#
+# The D1 load runs on a slower clock than the crawl (see "Decide"). Crawling is
+# free; a load costs ~19k of the 100,000 D1 rows the Workers Free plan allows
+# per day, and D1 started rejecting writes past that ceiling on 2026-09-01.
+# Twice a day plus patch flips keeps a full day's budget at ~40% with room for
+# a manual re-run.
 
 on:
   schedule:
@@ -15,6 +21,11 @@ on:
     # Wednesday — off-week runs are just ordinary crawls.
     - cron: '0 15 * * 3'
   workflow_dispatch:
+    inputs:
+      force_load:
+        description: 'Load into D1 even outside the load window'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -70,15 +81,31 @@ jobs:
           # env values can't be interpreted as shell syntax.
           DD_PATCH: ${{ steps.ddragon.outputs.patch }}
           DB_PATCH: ${{ steps.loaded.outputs.patch }}
+          FORCE_LOAD: ${{ inputs.force_load }}
         run: |
           # Always crawl: accumulation makes same-patch runs valuable (the store
           # only grows), and the repo is public so Actions minutes are not the
           # constraint. The patch comparison above stays for observability.
           echo "run=true" >> "$GITHUB_OUTPUT"
+
+          # The D1 load is the metered half. Load on a patch flip (the site
+          # should roll over the moment the new patch is detectable), on the
+          # 00:00 and 12:00 UTC runs, or on demand — never on all four daily
+          # crawls, which would spend ~78% of the free write budget for data
+          # that moves very little between six-hour samples.
+          hour=$(date -u +%H)
           if [ "$DD_PATCH" != "$DB_PATCH" ]; then
-            echo "New patch $DD_PATCH (was $DB_PATCH) — store will roll over."
+            echo "New patch $DD_PATCH (was $DB_PATCH) — store will roll over; loading."
+            echo "load=true" >> "$GITHUB_OUTPUT"
+          elif [ "$FORCE_LOAD" = "true" ]; then
+            echo "Manual force_load — loading."
+            echo "load=true" >> "$GITHUB_OUTPUT"
+          elif [ "$hour" = "00" ] || [ "$hour" = "12" ]; then
+            echo "Patch $DD_PATCH unchanged — scheduled load window (${hour}:00 UTC)."
+            echo "load=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Patch $DD_PATCH unchanged — compounding the sample."
+            echo "Patch $DD_PATCH unchanged — compounding the sample, no D1 load this run."
+            echo "load=false" >> "$GITHUB_OUTPUT"
           fi
 
       # Pull the accumulated match store so this crawl compounds on prior runs.
@@ -131,12 +158,15 @@ jobs:
           fi
 
       - name: Generate load SQL
-        if: steps.decide.outputs.run == 'true'
+        if: steps.decide.outputs.load == 'true'
         run: pnpm --filter @lolperform/pipeline load
 
       # Retries ride out transient D1 import resets ({"D1_RESET_DO":true}).
+      # A failed load is not retried by a later crawl on its own: the next load
+      # window rewrites the same rows from the (larger) store, and the upsert is
+      # idempotent, so a lost load costs freshness, never consistency.
       - name: Load into D1
-        if: steps.decide.outputs.run == 'true'
+        if: steps.decide.outputs.load == 'true'
         run: |
           for attempt in 1 2 3; do
             if pnpm exec wrangler d1 execute lolperform --remote --file db/.generated/load.sql; then
@@ -152,4 +182,10 @@ jobs:
         if: steps.decide.outputs.run == 'true'
         env:
           DD_PATCH: ${{ steps.ddragon.outputs.patch }}
-        run: echo "Loaded patch $DD_PATCH into D1. Live API updates within the 10-min KV TTL."
+          DID_LOAD: ${{ steps.decide.outputs.load }}
+        run: |
+          if [ "$DID_LOAD" = "true" ]; then
+            echo "Loaded patch $DD_PATCH into D1. Live API updates within the 10-min KV TTL."
+          else
+            echo "Crawled patch $DD_PATCH into the R2 store; D1 load deferred to the next window."
+          fi
