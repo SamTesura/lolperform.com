@@ -20,6 +20,12 @@ import type { Env } from './env.js';
 
 /* ------------------------------------------------------------------ *
  * Row shapes (snake_case, as stored in D1)
+ *
+ * The per-champion tables (matchups, builds, keystone_stats, rune_pages) and
+ * role_stats were folded into JSON payloads in migration 0011 — D1 bills per
+ * row written, and the fan-out cost ~1M row writes per refresh against a free
+ * ceiling of 100k/day. What is left is three slice tables whose payloads are
+ * parsed here. See db/migrations/0011_slice_tables.sql.
  * ------------------------------------------------------------------ */
 
 interface PatchRow {
@@ -35,209 +41,93 @@ interface ChampionRow {
   title: string;
   version: string;
 }
-interface RoleStatsRow {
-  patch: string;
-  region: string;
-  rank: string;
-  role: string;
-  champion_key: string;
-  games: number;
-  wins: number;
-  win_rate: number;
-  pick_rate: number;
-  ban_rate: number;
-  wilson_lower: number;
-  score: number;
-  tier: string;
-  adjusted_win_rate: number | null;
-  player_pool_delta: number | null;
+interface SliceRow {
+  payload: string;
 }
-interface KeystoneRow {
-  patch: string;
-  region: string;
-  rank: string;
+interface ChampionSliceRow extends SliceRow {
   role: string;
-  champion_key: string;
-  keystone: number;
-  games: number;
-  wins: number;
-  win_rate: number;
-  wilson_lower: number;
-}
-interface RunePageRow {
-  patch: string;
-  region: string;
-  rank: string;
-  role: string;
-  champion_key: string;
-  slot: number;
-  runes: string;
-  games: number;
-  wins: number;
-  win_rate: number;
-  wilson_lower: number;
-}
-interface MatchupRow {
-  patch: string;
-  region: string;
-  rank: string;
-  role: string;
-  champion_key: string;
-  opponent_key: string;
-  games: number;
-  wins: number;
-  win_rate: number;
-  wilson_lower: number;
-}
-interface DuoRow {
-  patch: string;
-  region: string;
-  rank: string;
-  adc_key: string;
-  support_key: string;
-  games: number;
-  wins: number;
-  win_rate: number;
-  wilson_lower: number;
-}
-interface BuildRow {
-  patch: string;
-  region: string;
-  rank: string;
-  role: string;
-  champion_key: string;
-  opponent_key: string;
-  items: string;
-  runes: string;
-  games: number;
-  wins: number;
-  win_rate: number;
-  slot_options: string | null;
-  boot_options: string | null;
-  spell_options: string | null;
-  core_options: string | null;
-  start_options: string | null;
 }
 interface CounterRow {
   champion_key: string;
+  games: number;
   win_rate: number;
   wilson_lower: number;
+}
+
+/* ------------------------------------------------------------------ *
+ * Payload shapes — mirrors of the writer in pipeline/src/load.ts.
+ * ------------------------------------------------------------------ */
+
+export interface StoredMatchup {
+  opponentKey: string;
   games: number;
+  wins: number;
+  winRate: number;
+  wilsonLower: number;
+}
+export interface StoredBuild {
+  opponentKey: string | null;
+  items: number[];
+  runes: RunePage;
+  games: number;
+  wins: number;
+  winRate: number;
+  slotOptions: BuildPath['slotOptions'];
+  bootOptions: BuildPath['bootOptions'];
+  spellOptions: BuildPath['spellOptions'];
+  coreOptions: BuildPath['coreOptions'];
+  startOptions: BuildPath['startOptions'];
+}
+export interface StoredKeystone {
+  keystone: number;
+  games: number;
+  wins: number;
+  winRate: number;
+  wilsonLower: number;
+}
+export interface StoredRunePage {
+  slot: number;
+  runes: RunePage;
+  games: number;
+  wins: number;
+  winRate: number;
+  wilsonLower: number;
+}
+export interface StoredDuo {
+  adcKey: string;
+  supportKey: string;
+  games: number;
+  wins: number;
+  winRate: number;
+  wilsonLower: number;
+}
+export interface ChampionPayload {
+  matchups: StoredMatchup[];
+  builds: StoredBuild[];
+  keystones: StoredKeystone[];
+  runePages: StoredRunePage[];
+  duos: StoredDuo[];
+}
+export interface StoredRoleStat {
+  championKey: string;
+  games: number;
+  wins: number;
+  winRate: number;
+  pickRate: number;
+  banRate: number;
+  wilsonLower: number;
+  adjustedWinRate: number | null;
+  playerPoolDelta: number | null;
+  score: number;
   tier: string;
 }
 
 /* ------------------------------------------------------------------ *
- * Pure row -> shared-type mappers (unit tested)
+ * Payload parsers — tolerant by design (unit tested)
+ *
+ * A payload is written by our own pipeline, but a truncated or half-migrated
+ * row must degrade to "no data" rather than 500 the whole champion page.
  * ------------------------------------------------------------------ */
-
-export function mapChampion(r: ChampionRow): ChampionMeta {
-  return { key: r.champion_key, id: r.id, name: r.name, title: r.title, roles: [] };
-}
-
-export function mapRoleStats(r: RoleStatsRow): RoleStats {
-  return {
-    patch: r.patch,
-    region: r.region as Region,
-    rank: r.rank as RankBracket,
-    role: r.role as Role,
-    championKey: r.champion_key,
-    games: r.games,
-    wins: r.wins,
-    winRate: r.win_rate,
-    pickRate: r.pick_rate,
-    banRate: r.ban_rate,
-    wilsonLower: r.wilson_lower,
-    adjustedWinRate: r.adjusted_win_rate,
-    playerPoolDelta: r.player_pool_delta,
-    score: r.score,
-    tier: r.tier as FullTierGrade,
-    // Recomputed live by getGradedRoleStats, which blends in the prior patch
-    // for under-threshold champions; a bare mapRoleStats call has no prior to
-    // check against, so it defaults to false.
-    provisional: false,
-    deltaWinRate: null,
-    deltaTier: null,
-  };
-}
-
-export function mapMatchup(r: MatchupRow): Matchup {
-  return {
-    patch: r.patch,
-    region: r.region as Region,
-    rank: r.rank as RankBracket,
-    role: r.role as Role,
-    championKey: r.champion_key,
-    opponentKey: r.opponent_key,
-    games: r.games,
-    wins: r.wins,
-    winRate: r.win_rate,
-    wilsonLower: r.wilson_lower,
-  };
-}
-
-export function mapDuo(r: DuoRow): DuoSynergy {
-  return {
-    patch: r.patch,
-    region: r.region as Region,
-    rank: r.rank as RankBracket,
-    adcKey: r.adc_key,
-    supportKey: r.support_key,
-    games: r.games,
-    wins: r.wins,
-    winRate: r.win_rate,
-    wilsonLower: r.wilson_lower,
-  };
-}
-
-export function mapBuild(r: BuildRow): BuildPath {
-  return {
-    patch: r.patch,
-    region: r.region as Region,
-    rank: r.rank as RankBracket,
-    role: r.role as Role,
-    championKey: r.champion_key,
-    opponentKey: r.opponent_key === '-' ? null : r.opponent_key,
-    items: safeJsonArray(r.items),
-    runes: safeRunes(r.runes),
-    games: r.games,
-    wins: r.wins,
-    winRate: r.win_rate,
-    slotOptions: safeJsonOrNull<BuildPath['slotOptions']>(r.slot_options),
-    bootOptions: safeJsonOrNull<BuildPath['bootOptions']>(r.boot_options),
-    spellOptions: safeJsonOrNull<BuildPath['spellOptions']>(r.spell_options),
-    coreOptions: safeJsonOrNull<BuildPath['coreOptions']>(r.core_options),
-    startOptions: safeJsonOrNull<BuildPath['startOptions']>(r.start_options),
-  };
-}
-
-/** Nullable JSON column: corrupt or missing yields null, never a 500. */
-function safeJsonOrNull<T>(value: string | null | undefined): T | null {
-  if (!value) return null;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return null;
-  }
-}
-
-export function mapCounter(r: CounterRow): CounterPick {
-  return {
-    championKey: r.champion_key,
-    winRate: r.win_rate,
-    wilsonLower: r.wilson_lower,
-    games: r.games,
-    tier: r.tier as FullTierGrade,
-  };
-}
-
-function safeJsonArray(value: string): number[] {
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? (parsed as number[]) : [];
-  } catch {
-    return [];
-  }
-}
 
 const EMPTY_RUNES: RunePage = {
   keystone: 0,
@@ -248,14 +138,191 @@ const EMPTY_RUNES: RunePage = {
   shards: [],
 };
 
-/** One corrupt runes row must not 500 the whole champion response. */
-function safeRunes(value: string): RunePage {
+function parseJson<T>(value: string | null | undefined): T | null {
+  if (!value) return null;
   try {
-    const parsed = JSON.parse(value) as RunePage;
-    return parsed && typeof parsed === 'object' ? parsed : EMPTY_RUNES;
+    return JSON.parse(value) as T;
   } catch {
-    return EMPTY_RUNES;
+    return null;
   }
+}
+
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function asRunes(value: unknown): RunePage {
+  return value && typeof value === 'object' ? (value as RunePage) : EMPTY_RUNES;
+}
+
+/** One champion_slice payload, with every list guaranteed present. */
+export function parseChampionPayload(payload: string | null | undefined): ChampionPayload {
+  const raw = parseJson<Partial<ChampionPayload>>(payload) ?? {};
+  return {
+    matchups: asArray<StoredMatchup>(raw.matchups),
+    builds: asArray<StoredBuild>(raw.builds),
+    keystones: asArray<StoredKeystone>(raw.keystones),
+    runePages: asArray<StoredRunePage>(raw.runePages),
+    duos: asArray<StoredDuo>(raw.duos),
+  };
+}
+
+/** One role_slice payload: the slice's ungraded role stats. */
+export function parseRoleSlice(payload: string | null | undefined): StoredRoleStat[] {
+  const raw = parseJson<{ stats?: unknown }>(payload);
+  return asArray<StoredRoleStat>(raw?.stats);
+}
+
+/** One duo_slice payload: the slice-wide duo board. */
+export function parseDuoSlice(payload: string | null | undefined): StoredDuo[] {
+  const raw = parseJson<{ duos?: unknown }>(payload);
+  return asArray<StoredDuo>(raw?.duos);
+}
+
+/* ------------------------------------------------------------------ *
+ * Pure hydrators: payload entry + its slice key -> shared type
+ * ------------------------------------------------------------------ */
+
+export function mapChampion(r: ChampionRow): ChampionMeta {
+  return { key: r.champion_key, id: r.id, name: r.name, title: r.title, roles: [] };
+}
+
+export function hydrateRoleStats(stat: StoredRoleStat, slice: Slice, role: Role): RoleStats {
+  return {
+    patch: slice.patch,
+    region: slice.region,
+    rank: slice.rank,
+    role,
+    championKey: stat.championKey,
+    games: stat.games,
+    wins: stat.wins,
+    winRate: stat.winRate,
+    pickRate: stat.pickRate,
+    banRate: stat.banRate,
+    wilsonLower: stat.wilsonLower,
+    adjustedWinRate: stat.adjustedWinRate ?? null,
+    playerPoolDelta: stat.playerPoolDelta ?? null,
+    score: stat.score,
+    tier: stat.tier as FullTierGrade,
+    // Recomputed by getGradedRoleStats, which blends in the prior patch for
+    // under-threshold champions; a bare hydrate has no prior to check against.
+    provisional: false,
+    deltaWinRate: null,
+    deltaTier: null,
+  };
+}
+
+export function hydrateMatchup(
+  m: StoredMatchup,
+  slice: Slice,
+  role: Role,
+  championKey: string,
+): Matchup {
+  return {
+    patch: slice.patch,
+    region: slice.region,
+    rank: slice.rank,
+    role,
+    championKey,
+    opponentKey: m.opponentKey,
+    games: m.games,
+    wins: m.wins,
+    winRate: m.winRate,
+    wilsonLower: m.wilsonLower,
+  };
+}
+
+export function hydrateBuild(
+  b: StoredBuild,
+  slice: Slice,
+  role: Role,
+  championKey: string,
+): BuildPath {
+  return {
+    patch: slice.patch,
+    region: slice.region,
+    rank: slice.rank,
+    role,
+    championKey,
+    // '-' was the pre-0011 sentinel for "no opponent"; payloads write null, but
+    // a backfilled row can still carry the sentinel through.
+    opponentKey: b.opponentKey && b.opponentKey !== '-' ? b.opponentKey : null,
+    items: asArray<number>(b.items),
+    runes: asRunes(b.runes),
+    games: b.games,
+    wins: b.wins,
+    winRate: b.winRate,
+    slotOptions: b.slotOptions ?? null,
+    bootOptions: b.bootOptions ?? null,
+    spellOptions: b.spellOptions ?? null,
+    coreOptions: b.coreOptions ?? null,
+    startOptions: b.startOptions ?? null,
+  };
+}
+
+export function hydrateKeystone(
+  k: StoredKeystone,
+  slice: Slice,
+  role: Role,
+  championKey: string,
+): KeystoneStats {
+  return {
+    patch: slice.patch,
+    region: slice.region,
+    rank: slice.rank,
+    role,
+    championKey,
+    keystone: k.keystone,
+    games: k.games,
+    wins: k.wins,
+    winRate: k.winRate,
+    wilsonLower: k.wilsonLower,
+  };
+}
+
+export function hydrateRunePage(
+  r: StoredRunePage,
+  slice: Slice,
+  role: Role,
+  championKey: string,
+): RunePageStats {
+  return {
+    patch: slice.patch,
+    region: slice.region,
+    rank: slice.rank,
+    role,
+    championKey,
+    slot: r.slot as RunePageStats['slot'],
+    runes: asRunes(r.runes),
+    games: r.games,
+    wins: r.wins,
+    winRate: r.winRate,
+    wilsonLower: r.wilsonLower,
+  };
+}
+
+export function hydrateDuo(d: StoredDuo, slice: Slice): DuoSynergy {
+  return {
+    patch: slice.patch,
+    region: slice.region,
+    rank: slice.rank,
+    adcKey: d.adcKey,
+    supportKey: d.supportKey,
+    games: d.games,
+    wins: d.wins,
+    winRate: d.winRate,
+    wilsonLower: d.wilsonLower,
+  };
+}
+
+export function mapCounter(r: CounterRow, tier: string | undefined): CounterPick {
+  return {
+    championKey: r.champion_key,
+    winRate: r.win_rate,
+    wilsonLower: r.wilson_lower,
+    games: r.games,
+    tier: (tier ?? 'D') as FullTierGrade,
+  };
 }
 
 /* ------------------------------------------------------------------ *
@@ -274,8 +341,8 @@ export async function getLatestPatch(env: Env): Promise<PatchRow | null> {
   ).first<PatchRow>();
 }
 
-/** The patch immediately before `patch`, if one is still on hand (old-patch
- *  rows aren't deleted on flip — see buildLoadSql). Null once none remains. */
+/** The patch immediately before `patch`, if one is still on hand (the loader
+ *  keeps a short retention window — see buildLoadSql). Null once none remains. */
 async function getPreviousPatch(env: Env, patch: string): Promise<string | null> {
   const row = await env.DB.prepare(
     'SELECT patch FROM patches WHERE patch != ? ORDER BY generated_at DESC LIMIT 1',
@@ -285,19 +352,48 @@ async function getPreviousPatch(env: Env, patch: string): Promise<string | null>
   return row?.patch ?? null;
 }
 
-async function fetchRoleStatsRows(
+/** One role's stored (ungraded) stats — a single row read on the primary key. */
+async function fetchRoleSlice(
   env: Env,
   patch: string,
   region: Region,
   rank: RankBracket,
   role: Role,
-): Promise<RoleStatsRow[]> {
-  const { results } = await env.DB.prepare(
-    'SELECT * FROM role_stats WHERE patch = ? AND region = ? AND rank = ? AND role = ?',
+): Promise<StoredRoleStat[]> {
+  const row = await env.DB.prepare(
+    'SELECT payload FROM role_slice WHERE patch = ? AND region = ? AND rank = ? AND role = ?',
   )
     .bind(patch, region, rank, role)
-    .all<RoleStatsRow>();
+    .first<SliceRow>();
+  return parseRoleSlice(row?.payload);
+}
+
+/** Every role a champion appears in for this slice — a primary-key prefix scan. */
+async function fetchChampionRows(
+  env: Env,
+  slice: Slice,
+  championKey: string,
+): Promise<ChampionSliceRow[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT role, payload FROM champion_slice
+     WHERE patch = ? AND region = ? AND rank = ? AND champion_key = ?`,
+  )
+    .bind(slice.patch, slice.region, slice.rank, championKey)
+    .all<ChampionSliceRow>();
   return results;
+}
+
+/**
+ * Everything one champion has in one slice, hydrated once and reused by the
+ * champion page's five lists. Each call is ~5 row reads (one per role played).
+ */
+async function fetchChampionPayloads(
+  env: Env,
+  slice: Slice,
+  championKey: string,
+): Promise<{ role: Role; payload: ChampionPayload }[]> {
+  const rows = await fetchChampionRows(env, slice, championKey);
+  return rows.map((r) => ({ role: r.role as Role, payload: parseChampionPayload(r.payload) }));
 }
 
 /**
@@ -308,35 +404,35 @@ async function fetchRoleStatsRows(
  * ranking inputs and resulting tier/score/provisional are blended.
  */
 async function getGradedRoleStats(env: Env, slice: Slice, role: Role): Promise<RoleStats[]> {
-  const current = await fetchRoleStatsRows(env, slice.patch, slice.region, slice.rank, role);
+  const current = await fetchRoleSlice(env, slice.patch, slice.region, slice.rank, role);
   if (current.length === 0) return [];
 
   const priorPatch = await getPreviousPatch(env, slice.patch);
-  const priorByChamp = new Map<string, RoleStatsRow>();
+  const priorByChamp = new Map<string, StoredRoleStat>();
   if (priorPatch) {
-    const prior = await fetchRoleStatsRows(env, priorPatch, slice.region, slice.rank, role);
-    for (const row of prior) priorByChamp.set(row.champion_key, row);
+    const prior = await fetchRoleSlice(env, priorPatch, slice.region, slice.rank, role);
+    for (const stat of prior) priorByChamp.set(stat.championKey, stat);
   }
 
   const champions = await getChampions(env);
   const idByKey = new Map(champions.map((c) => [c.key, c.id]));
 
-  const inputs: GradeInput[] = current.map((r) => {
-    const prior = priorByChamp.get(r.champion_key);
+  const inputs: GradeInput[] = current.map((stat) => {
+    const prior = priorByChamp.get(stat.championKey);
     return {
-      winRate: r.win_rate,
-      pickRate: r.pick_rate,
-      banRate: r.ban_rate,
-      games: r.games,
-      wilsonLower: r.wilson_lower,
-      adjustedWinRate: r.adjusted_win_rate,
-      skillFloor: skillFloorFor(idByKey.get(r.champion_key) ?? ''),
+      winRate: stat.winRate,
+      pickRate: stat.pickRate,
+      banRate: stat.banRate,
+      games: stat.games,
+      wilsonLower: stat.wilsonLower,
+      adjustedWinRate: stat.adjustedWinRate ?? null,
+      skillFloor: skillFloorFor(idByKey.get(stat.championKey) ?? ''),
       priorPatch: prior
         ? {
-            winRate: prior.win_rate,
-            pickRate: prior.pick_rate,
-            banRate: prior.ban_rate,
-            wilsonLower: prior.wilson_lower,
+            winRate: prior.winRate,
+            pickRate: prior.pickRate,
+            banRate: prior.banRate,
+            wilsonLower: prior.wilsonLower,
             games: prior.games,
           }
         : undefined,
@@ -345,8 +441,8 @@ async function getGradedRoleStats(env: Env, slice: Slice, role: Role): Promise<R
 
   const graded = gradeSlice(inputs);
   return current
-    .map((r, i) => ({
-      ...mapRoleStats(r),
+    .map((stat, i) => ({
+      ...hydrateRoleStats(stat, slice, role),
       tier: graded[i]!.grade,
       score: graded[i]!.score,
       provisional: graded[i]!.provisional,
@@ -377,13 +473,8 @@ export async function getRoleStatsForChampion(
   slice: Slice,
   championKey: string,
 ): Promise<RoleStats[]> {
-  const { results } = await env.DB.prepare(
-    `SELECT DISTINCT role FROM role_stats
-     WHERE patch = ? AND region = ? AND rank = ? AND champion_key = ?`,
-  )
-    .bind(slice.patch, slice.region, slice.rank, championKey)
-    .all<{ role: string }>();
-  const roles = results.map((r) => r.role as Role);
+  const rows = await fetchChampionRows(env, slice, championKey);
+  const roles = rows.map((r) => r.role as Role);
 
   const graded = await Promise.all(roles.map((role) => getGradedRoleStats(env, slice, role)));
   return graded
@@ -397,14 +488,12 @@ export async function getMatchupsForChampion(
   slice: Slice,
   championKey: string,
 ): Promise<Matchup[]> {
-  const { results } = await env.DB.prepare(
-    `SELECT * FROM matchups
-     WHERE patch = ? AND region = ? AND rank = ? AND champion_key = ?
-     ORDER BY games DESC`,
-  )
-    .bind(slice.patch, slice.region, slice.rank, championKey)
-    .all<MatchupRow>();
-  return results.map(mapMatchup);
+  const rows = await fetchChampionPayloads(env, slice, championKey);
+  return rows
+    .flatMap(({ role, payload }) =>
+      payload.matchups.map((m) => hydrateMatchup(m, slice, role, championKey)),
+    )
+    .sort((a, b) => b.games - a.games);
 }
 
 export async function getDuosForChampion(
@@ -412,29 +501,19 @@ export async function getDuosForChampion(
   slice: Slice,
   championKey: string,
 ): Promise<DuoSynergy[]> {
-  const { results } = await env.DB.prepare(
-    `SELECT * FROM duos
-     WHERE patch = ? AND region = ? AND rank = ? AND (adc_key = ? OR support_key = ?)
-     ORDER BY games DESC`,
-  )
-    .bind(slice.patch, slice.region, slice.rank, championKey, championKey)
-    .all<DuoRow>();
-  return results.map(mapDuo);
-}
-
-function mapKeystone(r: KeystoneRow): KeystoneStats {
-  return {
-    patch: r.patch,
-    region: r.region as Region,
-    rank: r.rank as RankBracket,
-    role: r.role as Role,
-    championKey: r.champion_key,
-    keystone: r.keystone,
-    games: r.games,
-    wins: r.wins,
-    winRate: r.win_rate,
-    wilsonLower: r.wilson_lower,
-  };
+  const rows = await fetchChampionPayloads(env, slice, championKey);
+  // A champion that plays both bot roles carries the same duo on both rows.
+  const seen = new Set<string>();
+  const duos: DuoSynergy[] = [];
+  for (const { payload } of rows) {
+    for (const d of payload.duos) {
+      const key = `${d.adcKey}|${d.supportKey}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      duos.push(hydrateDuo(d, slice));
+    }
+  }
+  return duos.sort((a, b) => b.games - a.games);
 }
 
 export async function getKeystonesForChampion(
@@ -442,14 +521,12 @@ export async function getKeystonesForChampion(
   slice: Slice,
   championKey: string,
 ): Promise<KeystoneStats[]> {
-  const { results } = await env.DB.prepare(
-    `SELECT * FROM keystone_stats
-     WHERE patch = ? AND region = ? AND rank = ? AND champion_key = ?
-     ORDER BY games DESC`,
-  )
-    .bind(slice.patch, slice.region, slice.rank, championKey)
-    .all<KeystoneRow>();
-  return results.map(mapKeystone);
+  const rows = await fetchChampionPayloads(env, slice, championKey);
+  return rows
+    .flatMap(({ role, payload }) =>
+      payload.keystones.map((k) => hydrateKeystone(k, slice, role, championKey)),
+    )
+    .sort((a, b) => b.games - a.games);
 }
 
 export async function getRunePagesForChampion(
@@ -457,26 +534,12 @@ export async function getRunePagesForChampion(
   slice: Slice,
   championKey: string,
 ): Promise<RunePageStats[]> {
-  const { results } = await env.DB.prepare(
-    `SELECT * FROM rune_pages
-     WHERE patch = ? AND region = ? AND rank = ? AND champion_key = ?
-     ORDER BY slot ASC`,
-  )
-    .bind(slice.patch, slice.region, slice.rank, championKey)
-    .all<RunePageRow>();
-  return results.map((r) => ({
-    patch: r.patch,
-    region: r.region as Region,
-    rank: r.rank as RankBracket,
-    role: r.role as Role,
-    championKey: r.champion_key,
-    slot: r.slot as 1 | 2,
-    runes: safeRunes(r.runes),
-    games: r.games,
-    wins: r.wins,
-    winRate: r.win_rate,
-    wilsonLower: r.wilson_lower,
-  }));
+  const rows = await fetchChampionPayloads(env, slice, championKey);
+  return rows
+    .flatMap(({ role, payload }) =>
+      payload.runePages.map((r) => hydrateRunePage(r, slice, role, championKey)),
+    )
+    .sort((a, b) => a.slot - b.slot);
 }
 
 export async function getBuildsForChampion(
@@ -484,28 +547,31 @@ export async function getBuildsForChampion(
   slice: Slice,
   championKey: string,
 ): Promise<BuildPath[]> {
-  const { results } = await env.DB.prepare(
-    `SELECT * FROM builds
-     WHERE patch = ? AND region = ? AND rank = ? AND champion_key = ?
-     ORDER BY games DESC`,
-  )
-    .bind(slice.patch, slice.region, slice.rank, championKey)
-    .all<BuildRow>();
-  return results.map(mapBuild);
+  const rows = await fetchChampionPayloads(env, slice, championKey);
+  return rows
+    .flatMap(({ role, payload }) =>
+      payload.builds.map((b) => hydrateBuild(b, slice, role, championKey)),
+    )
+    .sort((a, b) => b.games - a.games);
 }
 
 export async function getDuos(env: Env, slice: Slice): Promise<DuoSynergy[]> {
-  const { results } = await env.DB.prepare(
-    `SELECT * FROM duos
-     WHERE patch = ? AND region = ? AND rank = ?
-     ORDER BY games DESC LIMIT 500`,
+  const row = await env.DB.prepare(
+    'SELECT payload FROM duo_slice WHERE patch = ? AND region = ? AND rank = ?',
   )
     .bind(slice.patch, slice.region, slice.rank)
-    .all<DuoRow>();
-  return results.map(mapDuo);
+    .first<SliceRow>();
+  // Stored pre-sorted and already capped at the board size.
+  return parseDuoSlice(row?.payload).map((d) => hydrateDuo(d, slice));
 }
 
-/** Counter picks: champions with the best record against `opponentKey` in `role`. */
+/**
+ * Counter picks: champions with the best record against `opponentKey` in `role`.
+ *
+ * The matchups live inside champion payloads, so this scans the slice's rows —
+ * but json_each projects the matching matchup out in SQL, so only the 24 rows
+ * that survive the sort cross the wire instead of every payload in the slice.
+ */
 export async function getCounters(
   env: Env,
   slice: Slice,
@@ -513,17 +579,23 @@ export async function getCounters(
   opponentKey: string,
 ): Promise<CounterPick[]> {
   const { results } = await env.DB.prepare(
-    `SELECT m.champion_key, m.win_rate, m.wilson_lower, m.games,
-            COALESCE(rs.tier, 'D') AS tier
-     FROM matchups m
-     LEFT JOIN role_stats rs
-       ON rs.patch = m.patch AND rs.region = m.region AND rs.rank = m.rank
-       AND rs.role = m.role AND rs.champion_key = m.champion_key
-     WHERE m.patch = ? AND m.region = ? AND m.rank = ? AND m.role = ? AND m.opponent_key = ?
-     ORDER BY m.wilson_lower DESC
+    `SELECT cs.champion_key AS champion_key,
+            CAST(json_extract(m.value, '$.games') AS INTEGER) AS games,
+            json_extract(m.value, '$.winRate') AS win_rate,
+            json_extract(m.value, '$.wilsonLower') AS wilson_lower
+     FROM champion_slice cs,
+          json_each(json_extract(cs.payload, '$.matchups')) m
+     WHERE cs.patch = ? AND cs.region = ? AND cs.rank = ? AND cs.role = ?
+       AND json_extract(m.value, '$.opponentKey') = ?
+     ORDER BY wilson_lower DESC
      LIMIT 24`,
   )
     .bind(slice.patch, slice.region, slice.rank, role, opponentKey)
     .all<CounterRow>();
-  return results.map(mapCounter);
+  if (results.length === 0) return [];
+
+  // Tier comes from the stored (ungraded) role stats, as the pre-0011 join did.
+  const stats = await fetchRoleSlice(env, slice.patch, slice.region, slice.rank, role);
+  const tierByChamp = new Map(stats.map((stat) => [stat.championKey, stat.tier]));
+  return results.map((r) => mapCounter(r, tierByChamp.get(r.champion_key)));
 }
