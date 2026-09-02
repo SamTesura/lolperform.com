@@ -9,7 +9,7 @@
   "dependencies": {
     "@lolperform/shared": "workspace:*",
     "itty-router": "5.0.24",
-    "zod": "4.4.3"
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260823.1",
