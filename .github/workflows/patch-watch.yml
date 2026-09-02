@@ -93,9 +93,12 @@ jobs:
           DB_LOADED_AT: ${{ steps.loaded.outputs.loaded_at }}
           FORCE_LOAD: ${{ inputs.force_load }}
           # Hours a D1 load is allowed to age before the next run refreshes it.
-          # Runs are ~6h apart, so 11h yields about two loads a day (~39% of the
-          # free write budget) whatever the schedule drift.
-          MAX_LOAD_AGE_HOURS: '11'
+          # 5h: every ~6h scheduled run loads, only a back-to-back manual dispatch
+          # skips. This was 11h (about two loads a day, ~39% of the Free plan's
+          # 100k rows_written/day) until the account moved to Workers Paid on
+          # 2026-09-02; four ~19.4k-row loads a day are ~2.3M rows a month against
+          # the plan's 50M, so the site refreshes every crawl again.
+          MAX_LOAD_AGE_HOURS: '5'
         run: |
           # Always crawl: accumulation makes same-patch runs valuable (the store
           # only grows), and the repo is public so Actions minutes are not the
