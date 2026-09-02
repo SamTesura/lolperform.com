@@ -8,8 +8,8 @@ name: Patch Watch
 # The D1 load runs on a slower clock than the crawl (see "Decide"). Crawling is
 # free; a load costs ~19k of the 100,000 D1 rows the Workers Free plan allows
 # per day, and D1 started rejecting writes past that ceiling on 2026-09-01.
-# Twice a day plus patch flips keeps a full day's budget at ~40% with room for
-# a manual re-run.
+# Loading whenever the last load is 11h+ old (about twice a day) plus patch
+# flips keeps a full day's budget at ~40%, with room for a manual re-run.
 
 on:
   schedule:
@@ -69,10 +69,19 @@ jobs:
         id: loaded
         run: |
           json=$(pnpm exec wrangler d1 execute lolperform --remote --json \
-            --command "SELECT patch FROM patches ORDER BY generated_at DESC LIMIT 1" 2>/dev/null || echo '[]')
+            --command "SELECT patch, generated_at FROM patches ORDER BY generated_at DESC LIMIT 1" 2>/dev/null || echo '[]')
           loaded=$(echo "$json" | jq -r '.[0].results[0].patch // ""')
+          # generated_at is the dataset timestamp the loader stamps on every load,
+          # so it doubles as "when D1 was last loaded".
+          loaded_at=$(echo "$json" | jq -r '.[0].results[0].generated_at // ""')
+          # Same guard as the ddragon string: never let unvalidated remote text
+          # reach $GITHUB_OUTPUT.
+          case "$loaded_at" in
+            ''|*[!0-9TZ:.-]*) loaded_at="";;
+          esac
           echo "patch=$loaded" >> "$GITHUB_OUTPUT"
-          echo "Loaded patch: ${loaded:-<none>}"
+          echo "loaded_at=$loaded_at" >> "$GITHUB_OUTPUT"
+          echo "Loaded patch: ${loaded:-<none>} (generated ${loaded_at:-<unknown>})"
 
       - name: Decide
         id: decide
@@ -81,7 +90,12 @@ jobs:
           # env values can't be interpreted as shell syntax.
           DD_PATCH: ${{ steps.ddragon.outputs.patch }}
           DB_PATCH: ${{ steps.loaded.outputs.patch }}
+          DB_LOADED_AT: ${{ steps.loaded.outputs.loaded_at }}
           FORCE_LOAD: ${{ inputs.force_load }}
+          # Hours a D1 load is allowed to age before the next run refreshes it.
+          # Runs are ~6h apart, so 11h yields about two loads a day (~39% of the
+          # free write budget) whatever the schedule drift.
+          MAX_LOAD_AGE_HOURS: '11'
         run: |
           # Always crawl: accumulation makes same-patch runs valuable (the store
           # only grows), and the repo is public so Actions minutes are not the
@@ -89,22 +103,33 @@ jobs:
           echo "run=true" >> "$GITHUB_OUTPUT"
 
           # The D1 load is the metered half. Load on a patch flip (the site
-          # should roll over the moment the new patch is detectable), on the
-          # 00:00 and 12:00 UTC runs, or on demand — never on all four daily
+          # should roll over the moment the new patch is detectable), on demand,
+          # or once the last load is old enough — never on all four daily
           # crawls, which would spend ~78% of the free write budget for data
           # that moves very little between six-hour samples.
-          hour=$(date -u +%H)
+          #
+          # Age, not wall-clock hour: the concurrency group queues runs behind
+          # the ~5.5h crawl and GitHub delays scheduled runs under load, so a
+          # run "for" 12:00 can start at 16:14 (run #326 did). Gating on the
+          # start hour skipped loads indefinitely once the drift set in.
+          age_hours=999
+          if [ -n "$DB_LOADED_AT" ]; then
+            loaded_epoch=$(date -u -d "$DB_LOADED_AT" +%s 2>/dev/null || echo 0)
+            if [ "$loaded_epoch" -gt 0 ]; then
+              age_hours=$(( ( $(date -u +%s) - loaded_epoch ) / 3600 ))
+            fi
+          fi
           if [ "$DD_PATCH" != "$DB_PATCH" ]; then
             echo "New patch $DD_PATCH (was $DB_PATCH) — store will roll over; loading."
             echo "load=true" >> "$GITHUB_OUTPUT"
           elif [ "$FORCE_LOAD" = "true" ]; then
             echo "Manual force_load — loading."
             echo "load=true" >> "$GITHUB_OUTPUT"
-          elif [ "$hour" = "00" ] || [ "$hour" = "12" ]; then
-            echo "Patch $DD_PATCH unchanged — scheduled load window (${hour}:00 UTC)."
+          elif [ "$age_hours" -ge "$MAX_LOAD_AGE_HOURS" ]; then
+            echo "Patch $DD_PATCH unchanged — last load is ${age_hours}h old (limit ${MAX_LOAD_AGE_HOURS}h); loading."
             echo "load=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Patch $DD_PATCH unchanged — compounding the sample, no D1 load this run."
+            echo "Patch $DD_PATCH unchanged — last load is ${age_hours}h old; compounding the sample, no D1 load this run."
             echo "load=false" >> "$GITHUB_OUTPUT"
           fi
 
