@@ -10,14 +10,14 @@
     "typecheck": "astro check"
   },
   "dependencies": {
-    "@astrojs/mdx": "7.0.7",
+    "@astrojs/mdx": "7.0.8",
     "@astrojs/react": "6.0.4",
     "@astrojs/sitemap": "3.7.3",
     "@lolperform/shared": "workspace:*",
     "@tailwindcss/vite": "4.3.3",
-    "@tanstack/react-query": "5.102.1",
-    "astro": "7.2.4",
-    "lucide-react": "1.33.0",
+    "@tanstack/react-query": "5.102.8",
+    "astro": "7.2.9",
+    "lucide-react": "1.37.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "tailwindcss": "4.3.3"
