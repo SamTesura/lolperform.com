@@ -33,6 +33,26 @@ export function haveBinary(name) {
   return spawnSync(probe, { shell: true, stdio: 'ignore' }).status === 0;
 }
 
+/**
+ * Finding gitleaks without requiring everyone to install it system-wide.
+ * Checked in order: an explicit GITLEAKS_PATH, the PATH, a copy vendored
+ * beside the repo in the shared kit, or one dropped into .quality-gates/bin.
+ * Returns a shell-safe invocation, or null when there is genuinely none.
+ */
+export function resolveGitleaks(root) {
+  // Both spellings in every location: the same checkout gets used from Windows,
+  // from a Linux VM over the same mount, and from CI, and a vendored copy is
+  // useless if it is only looked for under one platform's filename.
+  const names = ['gitleaks.exe', 'gitleaks'];
+  const dirs = [join(root, '.quality-gates', 'bin'), join(root, '..', '.quality-gates-kit', 'bin')];
+  const candidates = [process.env.GITLEAKS_PATH];
+  for (const d of dirs) for (const n of names) candidates.push(join(d, n));
+  for (const c of candidates.filter(Boolean)) {
+    if (existsSync(c)) return `"${c}"`;
+  }
+  return haveBinary('gitleaks') ? 'gitleaks' : null;
+}
+
 function run(command, cwd) {
   const res = spawnSync(command, {
     cwd,
@@ -60,7 +80,8 @@ function run(command, cwd) {
  * mode 'history' — scan all of git history (what CI wants, and the one-time audit)
  */
 export function scanSecrets(root, mode = 'files') {
-  if (!haveBinary('gitleaks')) return { available: false, findings: [] };
+  const bin = resolveGitleaks(root);
+  if (!bin) return { available: false, findings: [] };
 
   /**
    * gitleaks renamed its subcommands at v8.19: `detect` became `git`, and
@@ -68,10 +89,10 @@ export function scanSecrets(root, mode = 'files') {
    * accepted but scans nothing and exits 0 — a silent no-op that reports
    * success. Probe for the modern commands rather than trusting either.
    */
-  const modern = spawnSync('gitleaks dir --help', { shell: true, stdio: 'ignore' }).status === 0;
+  const modern = spawnSync(`${bin} dir --help`, { shell: true, stdio: 'ignore' }).status === 0;
   const cmd = modern
-    ? `gitleaks ${mode === 'history' ? 'git' : 'dir'} "${root}"`
-    : `gitleaks detect --source "${root}"${mode === 'history' ? '' : ' --no-git'}`;
+    ? `${bin} ${mode === 'history' ? 'git' : 'dir'} "${root}"`
+    : `${bin} detect --source "${root}"${mode === 'history' ? '' : ' --no-git'}`;
 
   const dir = mkdtempSync(join(tmpdir(), 'gl-'));
   const report = join(dir, 'gitleaks.json');
@@ -210,6 +231,25 @@ export function scanSast(root, config = 'p/ci') {
     doc = JSON.parse(text);
   } catch (err) {
     return { available: true, error: `unreadable semgrep output: ${err.message}`, findings: [] };
+  }
+
+  /**
+   * semgrep exits 0 and emits well-formed JSON with zero results when it could
+   * not fetch its ruleset — a network block, a bad config name, an expired
+   * token. That reads identically to "your code is clean". Its own `errors`
+   * array is the only thing that distinguishes them, so an error there is a
+   * scanner failure, never a pass.
+   */
+  const errs = Array.isArray(doc.errors) ? doc.errors : [];
+  if (errs.length) {
+    const first = errs
+      .slice(0, 3)
+      .map((e) => e.message ?? e.type ?? JSON.stringify(e))
+      .join('; ');
+    return { available: true, error: `semgrep reported ${errs.length} error(s): ${first}`, findings: [] };
+  }
+  if (!Array.isArray(doc.results)) {
+    return { available: true, error: 'semgrep output had no results array', findings: [] };
   }
 
   const SEVERE = new Set(['ERROR', 'WARNING']);
