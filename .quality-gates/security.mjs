@@ -69,6 +69,39 @@ function run(command, cwd) {
   };
 }
 
+/**
+ * A working-tree scan sees everything on disk, including files git is told to
+ * ignore: .env, .dev.vars, dist/, build output. Those can never reach the
+ * remote, so failing a pre-push gate on them is pure noise — and noise in a
+ * security gate is how people learn to bypass it. Findings in ignored files
+ * are dropped; findings in untracked-but-not-ignored files are kept, because
+ * those are one `git add` away from being pushed.
+ *
+ * History scans skip this entirely: if it is already in a commit, ignoring it
+ * now does not un-leak it.
+ */
+function dropIgnored(root, findings) {
+  if (findings.length === 0) return findings;
+  const paths = [...new Set(findings.map((f) => f.file).filter(Boolean))];
+  const res = spawnSync('git check-ignore --stdin', {
+    cwd: root,
+    shell: true,
+    input: paths.join('\n'),
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'ignore'],
+  });
+  // Exit 0 = some paths ignored, 1 = none ignored, 128 = not a repo. Only a
+  // clean 0 or 1 is trustworthy; anything else, keep every finding.
+  if (res.status !== 0 && res.status !== 1) return findings;
+  const ignored = new Set(
+    (res.stdout ?? '')
+      .split('\n')
+      .map((l) => l.trim().replace(/\\/g, '/'))
+      .filter(Boolean),
+  );
+  return findings.filter((f) => !ignored.has(f.file));
+}
+
 /* ------------------------------------------------------------------ secrets */
 
 /**
@@ -140,7 +173,7 @@ export function scanSecrets(root, mode = 'files') {
         detail: f.Description ?? f.RuleID ?? 'secret detected',
       };
     });
-    return { available: true, findings };
+    return { available: true, findings: mode === 'history' ? findings : dropIgnored(root, findings) };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
