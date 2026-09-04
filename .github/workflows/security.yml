@@ -1,0 +1,65 @@
+name: security
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  schedule:
+    # 03:20 ET — dependency advisories land continuously, so re-scan unchanged
+    # code too. A repo nobody touched can become vulnerable overnight.
+    - cron: '20 7 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Secret scanning needs the history, not just the tip. A secret that
+          # was committed and then removed is still a burned secret.
+          fetch-depth: 0
+
+      - name: Detect package manager
+        id: pm
+        run: |
+          if [ -f pnpm-lock.yaml ]; then echo "pm=pnpm" >> "$GITHUB_OUTPUT"
+          elif [ -f yarn.lock ]; then echo "pm=yarn" >> "$GITHUB_OUTPUT"
+          else echo "pm=npm" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: pnpm/action-setup@v4
+        if: steps.pm.outputs.pm == 'pnpm'
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install gitleaks
+        run: |
+          VERSION=8.28.0
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Install semgrep
+        run: pipx install semgrep || pip install --user semgrep
+
+      - name: Install dependencies
+        run: |
+          case "${{ steps.pm.outputs.pm }}" in
+            pnpm) pnpm install --frozen-lockfile ;;
+            yarn) yarn install --frozen-lockfile ;;
+            *) npm ci || npm install ;;
+          esac
+
+      - name: Run security scanners
+        env:
+          CI: 'true'
+        run: node .quality-gates/run-gates.mjs --security-only

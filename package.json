@@ -22,7 +22,8 @@
     "cf:dev": "wrangler dev",
     "deploy": "pnpm --filter @lolperform/web build && wrangler deploy",
     "gates": "node .quality-gates/run-gates.mjs --report",
-    "mutation": "stryker run"
+    "mutation": "stryker run",
+    "security": "node .quality-gates/run-gates.mjs --security-only"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

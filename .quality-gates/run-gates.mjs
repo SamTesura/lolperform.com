@@ -3,8 +3,9 @@
  * Deterministic quality gates.
  *
  * Runs the checks a script can prove — tests pass, lint is clean, types check,
- * coverage did not fall, complexity and CRAP did not get worse — and either
- * reports them (warn mode) or rejects the push (block mode).
+ * coverage did not fall, complexity and CRAP did not get worse, no secrets, no
+ * known-vulnerable dependencies, no SAST findings — and either reports them
+ * (warn mode) or rejects the push (block mode).
  *
  * The point is that nothing here asks an LLM whether the code is good. Every
  * number comes from a tool, and the thresholds ratchet: a repo can only get
@@ -13,6 +14,7 @@
  *   node .quality-gates/run-gates.mjs            # run the gates
  *   node .quality-gates/run-gates.mjs --record   # re-record the baseline
  *   node .quality-gates/run-gates.mjs --report   # print numbers, never fail
+ *   node .quality-gates/run-gates.mjs --security-only   # just the scanners
  */
 
 import { spawnSync } from 'node:child_process';
@@ -23,6 +25,12 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
 const CONFIG_PATH = join(HERE, 'gates.config.json');
+const ALLOWLIST_PATH = join(HERE, 'security-allowlist.json');
+
+const argv = new Set(process.argv.slice(2));
+const FORCE_RECORD = argv.has('--record');
+const REPORT_ONLY = argv.has('--report');
+const SECURITY_ONLY = argv.has('--security-only');
 
 /**
  * If the gate script itself breaks — a bug in this file, a malformed config, a
@@ -34,6 +42,7 @@ const CONFIG_PATH = join(HERE, 'gates.config.json');
  * because the parsed config may be exactly what failed.
  */
 function blockingNow() {
+  if (REPORT_ONLY) return false; // report mode promises never to fail. Including here.
   try {
     const raw = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
     return Boolean(raw.blockAfter) && Date.now() >= new Date(`${raw.blockAfter}T00:00:00Z`).getTime();
@@ -50,16 +59,13 @@ for (const event of ['uncaughtException', 'unhandledRejection']) {
       console.error('\nPush rejected: gates are in blocking mode and could not run.');
       process.exit(1);
     }
-    console.error('\n\u26a0 warn mode — push allowed despite the gate failing to run.\n');
+    console.error('\n⚠ warn mode — push allowed despite the gate failing to run.\n');
     process.exit(0);
   });
 }
 
 const { analyzeCoverage, formatReport } = await import('./crap.mjs');
-
-const argv = new Set(process.argv.slice(2));
-const FORCE_RECORD = argv.has('--record');
-const REPORT_ONLY = argv.has('--report');
+const security = await import('./security.mjs');
 
 const C = process.stdout.isTTY
   ? { red: '\x1b[31m', green: '\x1b[32m', yellow: '\x1b[33m', dim: '\x1b[2m', bold: '\x1b[1m', off: '\x1b[0m' }
@@ -81,11 +87,32 @@ const pm = existsSync(join(ROOT, 'pnpm-lock.yaml'))
 const blockAfter = config.blockAfter ? new Date(`${config.blockAfter}T00:00:00Z`) : null;
 const BLOCKING = !REPORT_ONLY && blockAfter !== null && Date.now() >= blockAfter.getTime();
 
+/**
+ * CI checks out, runs, and throws the working tree away. Anything written here
+ * is discarded, so CI must never be the thing that records a baseline.
+ */
+const inCI = Boolean(process.env.CI);
+
+/**
+ * Node's default maxBuffer for spawnSync is 1MB. A verbose suite or a lint run
+ * with many warnings overruns it, at which point the child is killed, `status`
+ * comes back null, and a passing command reads as a failing gate. Repos with a
+ * few hundred tests hit this. Raise it, and surface spawn errors explicitly so
+ * an environment problem is never reported as a code defect.
+ */
+const MAX_BUFFER = 64 * 1024 * 1024;
+
 function run(label, command) {
   process.stdout.write(`${C.dim}· ${label}${C.off}\n`);
-  const res = spawnSync(command, { cwd: ROOT, shell: true, encoding: 'utf8', stdio: 'pipe' });
+  const res = spawnSync(command, {
+    cwd: ROOT,
+    shell: true,
+    encoding: 'utf8',
+    stdio: 'pipe',
+    maxBuffer: MAX_BUFFER,
+  });
   const output = `${res.stdout ?? ''}${res.stderr ?? ''}`;
-  return { ok: res.status === 0, code: res.status, output };
+  return { ok: res.status === 0, code: res.status, output, spawnError: res.error ?? null };
 }
 
 const failures = [];
@@ -109,27 +136,39 @@ if (depsInstalled && !pmAvailable) {
 }
 const canRun = depsInstalled && pmAvailable;
 
-// ---------------------------------------------------------------- lint
-if (config.gates?.lint !== false && scripts.lint && canRun) {
-  const r = run('lint', `${pm} run lint`);
-  if (!r.ok) {
-    fail('lint', r.output.trim().split('\n').slice(-25).join('\n'));
+let testsRan = false;
+let testsPassed = false;
+
+if (!SECURITY_ONLY) {
+  // -------------------------------------------------------------- lint
+  if (config.gates?.lint !== false && scripts.lint && canRun) {
+    const r = run('lint', `${pm} run lint`);
+    if (!r.ok) {
+      fail('lint', r.spawnError ? `could not run lint: ${r.spawnError.message}` : r.output.trim().split('\n').slice(-25).join('\n'));
+    }
+  } else if (config.gates?.lint !== false && scripts.lint) {
+    // There is a lint script; it was skipped for environment reasons, not
+    // because the repo has none. Saying otherwise sends people looking for a
+    // missing script that is right there in package.json.
+    notes.push('lint: skipped — dependencies or package manager unavailable here');
+  } else {
+    notes.push('lint: no `lint` script — skipped');
   }
-} else {
-  notes.push('lint: no `lint` script — skipped');
+
+  // ---------------------------------------------------------- typecheck
+  if (config.gates?.typecheck !== false && scripts.typecheck && canRun) {
+    const r = run('typecheck', `${pm} run typecheck`);
+    if (!r.ok) {
+      fail('typecheck', r.spawnError ? `could not run typecheck: ${r.spawnError.message}` : r.output.trim().split('\n').slice(-25).join('\n'));
+    }
+  } else if (config.gates?.typecheck !== false && scripts.typecheck) {
+    notes.push('typecheck: skipped — dependencies or package manager unavailable here');
+  } else if (config.gates?.typecheck !== false && existsSync(join(ROOT, 'tsconfig.json'))) {
+    notes.push('typecheck: tsconfig.json present but no `typecheck` script — skipped');
+  }
 }
 
-// ------------------------------------------------------------ typecheck
-if (config.gates?.typecheck !== false && scripts.typecheck && canRun) {
-  const r = run('typecheck', `${pm} run typecheck`);
-  if (!r.ok) {
-    fail('typecheck', r.output.trim().split('\n').slice(-25).join('\n'));
-  }
-} else if (config.gates?.typecheck !== false && existsSync(join(ROOT, 'tsconfig.json')) && !scripts.typecheck) {
-  notes.push('typecheck: tsconfig.json present but no `typecheck` script — skipped');
-}
-
-// ----------------------------------------------------- tests + coverage
+// --------------------------------------------------- tests + coverage
 let analysis = null;
 const wantCoverage = config.gates?.coverage !== false;
 
@@ -149,7 +188,9 @@ const toolingReady =
 const coverageProviderReady =
   !wantCoverage || existsSync(join(ROOT, 'node_modules', '@vitest', 'coverage-v8'));
 
-if (config.gates?.test !== false && scripts.test && !toolingReady) {
+if (SECURITY_ONLY) {
+  // skip
+} else if (config.gates?.test !== false && scripts.test && !toolingReady) {
   notes.push(`tests: test runner not installed — run \`${pm} install\`. CI still enforces this gate.`);
 } else if (config.gates?.test !== false && scripts.test && !coverageProviderReady) {
   notes.push(
@@ -204,7 +245,7 @@ if (config.gates?.test !== false && scripts.test && !toolingReady) {
    * the binary directly so the flags cannot be lost in translation.
    */
   const VITEST_BIN = join(ROOT, 'node_modules', 'vitest', 'vitest.mjs');
-  const plainVitest = /^vitest(\s+run)?(\s+--[\w-]+)*\s*$/.test((scripts.test ?? '').trim());
+  const plainVitest = /^vitest(\s+run)?(\s+--[\w-]+(=\S+)?)*\s*$/.test((scripts.test ?? '').trim());
   const passWithNoTests = (scripts.test ?? '').includes('--passWithNoTests')
     ? ' --passWithNoTests'
     : '';
@@ -229,8 +270,15 @@ if (config.gates?.test !== false && scripts.test && !toolingReady) {
   }
 
   const r = run(wantCoverage ? 'tests + coverage' : 'tests', command);
+  testsRan = true;
+  testsPassed = r.ok;
   if (!r.ok) {
-    fail('tests', r.output.trim().split('\n').slice(-30).join('\n'));
+    fail(
+      'tests',
+      r.spawnError
+        ? `could not run the test suite: ${r.spawnError.message}`
+        : r.output.trim().split('\n').slice(-30).join('\n'),
+    );
   }
   if (wantCoverage) {
     analysis = analyzeCoverage(join(ROOT, 'coverage', 'coverage-final.json'));
@@ -254,7 +302,7 @@ if (config.gates?.test !== false && scripts.test && !toolingReady) {
   notes.push('tests: no `test` script — skipped');
 }
 
-// -------------------------------------------------- ratchet comparisons
+// ------------------------------------------------ ratchet comparisons
 const measured = analysis
   ? {
       coverage: Number(analysis.totalCoverage.toFixed(4)),
@@ -270,16 +318,19 @@ const crapMax = th.crapMax ?? 30;
 const complexityMax = th.complexityMax ?? 6;
 
 /**
- * CI checks out, runs, and throws the working tree away. If an absent baseline
- * were quietly recorded there, every run would re-anchor to whatever it just
- * measured and the ratchets would never fire — coverage could slide to zero and
- * still "pass". A baseline only means something once it is committed, so in CI
- * an absent one is reported loudly rather than invented.
+ * A baseline taken from a run whose tests failed is worthless — the suite may
+ * have died halfway and written a partial report — and it becomes the permanent
+ * floor. Refuse rather than enshrine a bad number.
  */
-const inCI = Boolean(process.env.CI);
+const measurementTrustworthy = measured !== null && testsRan && testsPassed;
 
 if (measured) {
-  if (FORCE_RECORD || (!baseline && !inCI)) {
+  const wantRecord = FORCE_RECORD || (!baseline && !inCI);
+  if (wantRecord && inCI) {
+    notes.push('baseline not recorded: CI discards its working tree, so recording there is a no-op.');
+  } else if (wantRecord && !measurementTrustworthy) {
+    notes.push('baseline not recorded: the test suite did not pass, so this measurement is not trustworthy.');
+  } else if (wantRecord) {
     config.baseline = { ...measured, recordedAt: new Date().toISOString().slice(0, 10) };
     writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`);
     notes.push(
@@ -291,7 +342,7 @@ if (measured) {
       'no committed baseline — the coverage, CRAP and complexity ratchets are INACTIVE. ' +
       'Run `node .quality-gates/run-gates.mjs --record` locally and commit gates.config.json.';
     if (BLOCKING) fail('baseline', msg);
-    else notes.push(`\u26a0 ${msg}`);
+    else notes.push(`⚠ ${msg}`);
   } else {
     if (th.coverageRatchet !== false && measured.coverage < baseline.coverage - 0.005) {
       fail(
@@ -307,10 +358,118 @@ if (measured) {
     if (measured.maxComplexity > ccCeiling) {
       fail('complexity', `max cyclomatic complexity ${measured.maxComplexity} exceeds ceiling ${ccCeiling}`);
     }
+
+    /**
+     * The ratchet is supposed to be one-way. Anchoring it at install time and
+     * never moving it means a repo that improves keeps the slack it earned and
+     * can silently slide back to where it started. When a clean run measures
+     * better than the committed baseline, tighten it — coverage floor up, CRAP
+     * and complexity ceilings down, never the reverse. Local only: CI's tree is
+     * discarded, so a tightening written there would be lost, and a tightening
+     * written on a failing run would be based on nothing.
+     */
+    const autoTighten = th.autoTighten !== false && !inCI && !REPORT_ONLY && measurementTrustworthy;
+    if (autoTighten && failures.length === 0) {
+      const next = { ...baseline };
+      let moved = [];
+      if (measured.coverage > baseline.coverage + 0.005) {
+        next.coverage = measured.coverage;
+        moved.push(`coverage floor ${(baseline.coverage * 100).toFixed(2)}% → ${(measured.coverage * 100).toFixed(2)}%`);
+      }
+      if (measured.worstCrap < baseline.worstCrap) {
+        next.worstCrap = measured.worstCrap;
+        moved.push(`CRAP ceiling ${baseline.worstCrap} → ${measured.worstCrap}`);
+      }
+      if (measured.maxComplexity < baseline.maxComplexity) {
+        next.maxComplexity = measured.maxComplexity;
+        moved.push(`complexity ceiling ${baseline.maxComplexity} → ${measured.maxComplexity}`);
+      }
+      if (moved.length) {
+        next.functions = measured.functions;
+        next.recordedAt = new Date().toISOString().slice(0, 10);
+        config.baseline = next;
+        writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`);
+        notes.push(`ratchet tightened: ${moved.join('; ')} — commit gates.config.json to keep it.`);
+      }
+    }
   }
 }
 
-// ------------------------------------------------------------- report
+// ---------------------------------------------------------- security
+/**
+ * Scanners are deterministic and their findings are compared against a
+ * committed allowlist. The allowlist is never written automatically, by any
+ * code path: an absent or empty allowlist means nothing is accepted, so the
+ * gate fails closed. Accepting a finding is a deliberate, reviewed commit.
+ */
+const secCfg = config.security ?? {};
+if (config.gates?.security !== false) {
+  const allowlist = security.loadAllowlist(ALLOWLIST_PATH) ?? [];
+  const findings = [];
+  const scannerProblems = [];
+
+  const wantSecrets = secCfg.secrets !== false;
+  const wantDeps = secCfg.dependencies !== false && (inCI || SECURITY_ONLY);
+  const wantSast = secCfg.sast === true && (inCI || SECURITY_ONLY);
+
+  if (wantSecrets) {
+    const mode = inCI || SECURITY_ONLY ? 'history' : 'files';
+    const res = security.scanSecrets(ROOT, mode);
+    if (!res.available) scannerProblems.push('gitleaks is not installed');
+    else if (res.error) scannerProblems.push(`gitleaks: ${res.error}`);
+    else {
+      findings.push(...res.findings);
+      notes.push(`secrets: gitleaks scanned ${mode === 'history' ? 'full history' : 'the working tree'}`);
+    }
+  }
+
+  if (wantDeps) {
+    const res = security.scanDependencies(ROOT, pm);
+    if (!res.available) scannerProblems.push(`${pm} audit unavailable`);
+    else if (res.error) scannerProblems.push(`${pm} audit: ${res.error}`);
+    else findings.push(...res.findings);
+  }
+
+  if (wantSast) {
+    const res = security.scanSast(ROOT, secCfg.semgrepConfig ?? 'p/ci');
+    if (!res.available) scannerProblems.push('semgrep is not installed');
+    else if (res.error) scannerProblems.push(`semgrep: ${res.error}`);
+    else findings.push(...res.findings);
+  }
+
+  const { live, accepted, expired } = security.partitionFindings(findings, allowlist);
+
+  for (const e of expired) {
+    notes.push(`⚠ allowlist entry expired ${e.expiredOn} — ${e.id} is live again`);
+  }
+  if (accepted.length) {
+    notes.push(`security: ${accepted.length} finding(s) suppressed by the committed allowlist`);
+  }
+
+  if (live.length) {
+    const bySeverity = (a, b) => (a.severity === 'critical' ? -1 : b.severity === 'critical' ? 1 : 0);
+    fail(
+      'security',
+      [...live].sort(bySeverity).slice(0, 25).map((f) =>
+        `[${f.tool}] ${f.detail}\n      ${f.file}${f.line ? `:${f.line}` : ''}\n      allowlist id: ${f.id}`,
+      ).join('\n'),
+    );
+  }
+
+  /**
+   * A scanner that is missing locally is an environment gap. A scanner that is
+   * missing in CI means the security gate measured nothing while reporting
+   * success — the exact failure this stack exists to prevent — so once the
+   * gates are blocking, CI treats it as a failure.
+   */
+  if (scannerProblems.length) {
+    const msg = scannerProblems.join('\n');
+    if (inCI && BLOCKING) fail('security-tooling', msg);
+    else notes.push(`security scanners unavailable — ${scannerProblems.join('; ')}`);
+  }
+}
+
+// ----------------------------------------------------------- report
 const repo = pkg.name ?? ROOT.split(/[/\\]/).pop();
 console.info(`\n${C.bold}quality gates${C.off} ${C.dim}${repo}${C.off}`);
 
