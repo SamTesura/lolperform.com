@@ -19,11 +19,43 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { analyzeCoverage, formatReport } from './crap.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
 const CONFIG_PATH = join(HERE, 'gates.config.json');
+
+/**
+ * If the gate script itself breaks — a bug in this file, a malformed config, a
+ * broken import — that is not evidence the code under test is bad. During the
+ * warn ramp it must never block work. Once the gates are blocking, a gate that
+ * cannot run is treated as a failure rather than waved through.
+ *
+ * Registered before anything that can throw, and it reads `blockAfter` itself,
+ * because the parsed config may be exactly what failed.
+ */
+function blockingNow() {
+  try {
+    const raw = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
+    return Boolean(raw.blockAfter) && Date.now() >= new Date(`${raw.blockAfter}T00:00:00Z`).getTime();
+  } catch {
+    return false;
+  }
+}
+
+for (const event of ['uncaughtException', 'unhandledRejection']) {
+  process.on(event, (err) => {
+    console.error('\nquality gates: the gate script itself failed —');
+    console.error(err?.stack ?? String(err));
+    if (blockingNow()) {
+      console.error('\nPush rejected: gates are in blocking mode and could not run.');
+      process.exit(1);
+    }
+    console.error('\n\u26a0 warn mode — push allowed despite the gate failing to run.\n');
+    process.exit(0);
+  });
+}
+
+const { analyzeCoverage, formatReport } = await import('./crap.mjs');
 
 const argv = new Set(process.argv.slice(2));
 const FORCE_RECORD = argv.has('--record');
@@ -65,8 +97,20 @@ if (!depsInstalled) {
   notes.push(`dependencies not installed — run \`${pm} install\`. CI still enforces every gate.`);
 }
 
+/**
+ * The lockfile picks the package manager, but the machine running the hook may
+ * not have it on PATH. Reporting three failed gates in that case is noise, not
+ * signal — it says nothing about the code.
+ */
+const pmAvailable =
+  spawnSync(`${pm} --version`, { cwd: ROOT, shell: true, stdio: 'ignore' }).status === 0;
+if (depsInstalled && !pmAvailable) {
+  notes.push(`${pm} is not on PATH here — local gates skipped. CI still enforces every gate.`);
+}
+const canRun = depsInstalled && pmAvailable;
+
 // ---------------------------------------------------------------- lint
-if (config.gates?.lint !== false && scripts.lint && depsInstalled) {
+if (config.gates?.lint !== false && scripts.lint && canRun) {
   const r = run('lint', `${pm} run lint`);
   if (!r.ok) {
     fail('lint', r.output.trim().split('\n').slice(-25).join('\n'));
@@ -76,7 +120,7 @@ if (config.gates?.lint !== false && scripts.lint && depsInstalled) {
 }
 
 // ------------------------------------------------------------ typecheck
-if (config.gates?.typecheck !== false && scripts.typecheck && depsInstalled) {
+if (config.gates?.typecheck !== false && scripts.typecheck && canRun) {
   const r = run('typecheck', `${pm} run typecheck`);
   if (!r.ok) {
     fail('typecheck', r.output.trim().split('\n').slice(-25).join('\n'));
@@ -96,13 +140,21 @@ const wantCoverage = config.gates?.coverage !== false;
  * from the lockfile and enforces the gate for real.
  */
 const toolingReady =
-  depsInstalled &&
+  canRun &&
   ['vitest', 'vitest.cmd', 'vitest.CMD'].some((bin) =>
     existsSync(join(ROOT, 'node_modules', '.bin', bin)),
   );
+// The coverage provider is a separate package; vitest exits non-zero without it,
+// which would otherwise read as a failing test suite rather than a missing dep.
+const coverageProviderReady =
+  !wantCoverage || existsSync(join(ROOT, 'node_modules', '@vitest', 'coverage-v8'));
 
 if (config.gates?.test !== false && scripts.test && !toolingReady) {
   notes.push(`tests: test runner not installed — run \`${pm} install\`. CI still enforces this gate.`);
+} else if (config.gates?.test !== false && scripts.test && !coverageProviderReady) {
+  notes.push(
+    `tests: @vitest/coverage-v8 not installed — run \`${pm} install\`. CI still enforces this gate.`,
+  );
 } else if (config.gates?.test !== false && scripts.test) {
   /**
    * `--coverage.all` plus explicit include globs is the difference between a
@@ -128,6 +180,8 @@ if (config.gates?.test !== false && scripts.test && !toolingReady) {
     '**/dist/**',
     '**/build/**',
     '**/.wrangler/**',
+    '**/.stryker-tmp/**',
+    '**/reports/**',
     '**/*.d.ts',
     '**/*.config.*',
     '**/test/**',
