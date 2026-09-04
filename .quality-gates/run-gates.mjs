@@ -371,7 +371,7 @@ if (measured) {
     const autoTighten = th.autoTighten !== false && !inCI && !REPORT_ONLY && measurementTrustworthy;
     if (autoTighten && failures.length === 0) {
       const next = { ...baseline };
-      let moved = [];
+      const moved = [];
       if (measured.coverage > baseline.coverage + 0.005) {
         next.coverage = measured.coverage;
         moved.push(`coverage floor ${(baseline.coverage * 100).toFixed(2)}% → ${(measured.coverage * 100).toFixed(2)}%`);

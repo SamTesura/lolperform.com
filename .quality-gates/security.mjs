@@ -155,7 +155,7 @@ export function scanDependencies(root, pm = 'npm') {
   }
 
   // npm emits one JSON object; pnpm emits an object; yarn berry emits NDJSON.
-  let docs = [];
+  let docs;
   try {
     docs = [JSON.parse(text)];
   } catch {
