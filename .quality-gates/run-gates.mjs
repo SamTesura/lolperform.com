@@ -79,7 +79,7 @@ const pm = existsSync(join(ROOT, 'pnpm-lock.yaml'))
 
 /** Block mode kicks in once the ramp date passes. */
 const blockAfter = config.blockAfter ? new Date(`${config.blockAfter}T00:00:00Z`) : null;
-const BLOCKING = !REPORT_ONLY && blockAfter != null && Date.now() >= blockAfter.getTime();
+const BLOCKING = !REPORT_ONLY && blockAfter !== null && Date.now() >= blockAfter.getTime();
 
 function run(label, command) {
   process.stdout.write(`${C.dim}· ${label}${C.off}\n`);
@@ -196,16 +196,59 @@ if (config.gates?.test !== false && scripts.test && !toolingReady) {
     ...(includes.length ? EXCLUDE.map((g) => `--coverage.exclude='${g}'`) : []),
   ].join(' ');
 
-  const coverageArgs = wantCoverage
-    ? ` -- --coverage --coverage.all ${globArgs} --coverage.reporter=json --coverage.reporter=text-summary`
+  /**
+   * Package managers disagree about forwarding `-- <flags>` to a script: npm
+   * passes them through, pnpm does not reliably, and the failure is silent —
+   * the suite runs, the coverage flags evaporate, no report is written, and the
+   * CRAP gate quietly skips. When the test script is a plain vitest call, drive
+   * the binary directly so the flags cannot be lost in translation.
+   */
+  const VITEST_BIN = join(ROOT, 'node_modules', 'vitest', 'vitest.mjs');
+  const plainVitest = /^vitest(\s+run)?(\s+--[\w-]+)*\s*$/.test((scripts.test ?? '').trim());
+  const passWithNoTests = (scripts.test ?? '').includes('--passWithNoTests')
+    ? ' --passWithNoTests'
     : '';
-  const r = run(wantCoverage ? 'tests + coverage' : 'tests', `${pm} run test${coverageArgs}`);
+
+  const coverageFlags = wantCoverage
+    ? ` --coverage --coverage.all ${globArgs} --coverage.reporter=json --coverage.reporter=text-summary`
+    : '';
+
+  // pnpm links `node_modules/vitest` rather than unpacking it, so fall back to
+  // npx, which resolves the .bin shim whatever the layout or platform.
+  const hasBinShim = ['vitest', 'vitest.cmd', 'vitest.CMD', 'vitest.ps1'].some((b) =>
+    existsSync(join(ROOT, 'node_modules', '.bin', b)),
+  );
+
+  let command;
+  if (plainVitest && existsSync(VITEST_BIN)) {
+    command = `node "${VITEST_BIN}" run${passWithNoTests}${coverageFlags}`;
+  } else if (plainVitest && hasBinShim) {
+    command = `npx --no-install vitest run${passWithNoTests}${coverageFlags}`;
+  } else {
+    command = `${pm} run test${coverageFlags ? ` --${coverageFlags}` : ''}`;
+  }
+
+  const r = run(wantCoverage ? 'tests + coverage' : 'tests', command);
   if (!r.ok) {
     fail('tests', r.output.trim().split('\n').slice(-30).join('\n'));
   }
   if (wantCoverage) {
     analysis = analyzeCoverage(join(ROOT, 'coverage', 'coverage-final.json'));
-    if (!analysis) notes.push('coverage: no coverage/coverage-final.json produced — CRAP gate skipped');
+    if (!analysis) {
+      /**
+       * The runner asked for coverage, the tooling was present, and the suite
+       * ran — so an absent report means something went wrong, not that there
+       * was nothing to measure. Reporting that as a passing note is how a gate
+       * ends up silently measuring nothing, which is worse than no gate at all.
+       */
+      fail(
+        'coverage',
+        'coverage was requested but coverage/coverage-final.json was not produced.\n' +
+          'The suite ran, so this is a tooling problem — most often the coverage flags\n' +
+          'not reaching vitest, or @vitest/coverage-v8 failing to load.\n' +
+          `Reproduce with: ${command}`,
+      );
+    }
   }
 } else {
   notes.push('tests: no `test` script — skipped');
@@ -226,14 +269,29 @@ const th = config.thresholds ?? {};
 const crapMax = th.crapMax ?? 30;
 const complexityMax = th.complexityMax ?? 6;
 
+/**
+ * CI checks out, runs, and throws the working tree away. If an absent baseline
+ * were quietly recorded there, every run would re-anchor to whatever it just
+ * measured and the ratchets would never fire — coverage could slide to zero and
+ * still "pass". A baseline only means something once it is committed, so in CI
+ * an absent one is reported loudly rather than invented.
+ */
+const inCI = Boolean(process.env.CI);
+
 if (measured) {
-  if (!baseline || FORCE_RECORD) {
+  if (FORCE_RECORD || (!baseline && !inCI)) {
     config.baseline = { ...measured, recordedAt: new Date().toISOString().slice(0, 10) };
     writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`);
     notes.push(
       `baseline recorded: coverage ${(measured.coverage * 100).toFixed(1)}%, ` +
         `worst CRAP ${measured.worstCrap}, max complexity ${measured.maxComplexity}`,
     );
+  } else if (!baseline) {
+    const msg =
+      'no committed baseline — the coverage, CRAP and complexity ratchets are INACTIVE. ' +
+      'Run `node .quality-gates/run-gates.mjs --record` locally and commit gates.config.json.';
+    if (BLOCKING) fail('baseline', msg);
+    else notes.push(`\u26a0 ${msg}`);
   } else {
     if (th.coverageRatchet !== false && measured.coverage < baseline.coverage - 0.005) {
       fail(
@@ -254,41 +312,41 @@ if (measured) {
 
 // ------------------------------------------------------------- report
 const repo = pkg.name ?? ROOT.split(/[/\\]/).pop();
-console.log(`\n${C.bold}quality gates${C.off} ${C.dim}${repo}${C.off}`);
+console.info(`\n${C.bold}quality gates${C.off} ${C.dim}${repo}${C.off}`);
 
 if (measured) {
   const b = config.baseline;
-  console.log(
+  console.info(
     `  coverage       ${(measured.coverage * 100).toFixed(2)}%` +
       (b ? `${C.dim}  floor ${(b.coverage * 100).toFixed(2)}%${C.off}` : ''),
   );
-  console.log(
+  console.info(
     `  worst CRAP     ${measured.worstCrap}` +
       (b ? `${C.dim}  ceiling ${Math.max(b.worstCrap, crapMax)}${C.off}` : ''),
   );
-  console.log(
+  console.info(
     `  max complexity ${measured.maxComplexity}` +
       (b ? `${C.dim}  ceiling ${Math.max(b.maxComplexity, complexityMax)}${C.off}` : ''),
   );
-  console.log(`  functions      ${measured.functions}`);
+  console.info(`  functions      ${measured.functions}`);
   const offenders = formatReport(analysis, { crapMax, complexityMax });
   if (!offenders.includes('within CRAP')) {
-    console.log(`\n${C.yellow}  worst offenders${C.off}`);
-    console.log(offenders);
+    console.info(`\n${C.yellow}  worst offenders${C.off}`);
+    console.info(offenders);
   }
 }
 
-for (const n of notes) console.log(`  ${C.dim}${n}${C.off}`);
+for (const n of notes) console.info(`  ${C.dim}${n}${C.off}`);
 
 if (failures.length === 0) {
-  console.log(`\n${C.green}✓ all gates passed${C.off}\n`);
+  console.info(`\n${C.green}✓ all gates passed${C.off}\n`);
   process.exit(0);
 }
 
-console.log(`\n${C.red}✗ ${failures.length} gate(s) failed${C.off}`);
+console.info(`\n${C.red}✗ ${failures.length} gate(s) failed${C.off}`);
 for (const f of failures) {
-  console.log(`\n${C.red}  [${f.gate}]${C.off}`);
-  console.log(
+  console.info(`\n${C.red}  [${f.gate}]${C.off}`);
+  console.info(
     f.detail
       .split('\n')
       .map((l) => `    ${l}`)
@@ -297,17 +355,17 @@ for (const f of failures) {
 }
 
 if (REPORT_ONLY) {
-  console.log(`\n${C.dim}report mode — not failing${C.off}\n`);
+  console.info(`\n${C.dim}report mode — not failing${C.off}\n`);
   process.exit(0);
 }
 
 if (!BLOCKING) {
   const when = config.blockAfter ?? 'never';
-  console.log(
+  console.info(
     `\n${C.yellow}⚠ warn mode — these become blocking on ${when}. Push allowed.${C.off}\n`,
   );
   process.exit(0);
 }
 
-console.log(`\n${C.red}Push rejected. Fix the above, or run with --report to inspect.${C.off}\n`);
+console.info(`\n${C.red}Push rejected. Fix the above, or run with --report to inspect.${C.off}\n`);
 process.exit(1);

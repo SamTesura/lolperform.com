@@ -11,5 +11,11 @@
     "test": true,
     "coverage": true
   },
-  "baseline": null
+  "baseline": {
+    "coverage": 0.6258,
+    "worstCrap": 240,
+    "maxComplexity": 81,
+    "functions": 275,
+    "recordedAt": "2026-09-04"
+  }
 }

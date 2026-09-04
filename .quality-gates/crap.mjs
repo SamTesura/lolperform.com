@@ -17,7 +17,8 @@
 import { readFileSync } from 'node:fs';
 
 const inRange = (loc, outer) => {
-  if (!loc?.start || !outer?.start || loc.start.line == null || outer.start.line == null) return false;
+  if (!loc?.start || !outer?.start) return false;
+  if (typeof loc.start.line !== 'number' || typeof outer.start.line !== 'number') return false;
   const afterStart =
     loc.start.line > outer.start.line ||
     (loc.start.line === outer.start.line && (loc.start.column ?? 0) >= (outer.start.column ?? 0));
@@ -126,8 +127,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.error(`No coverage report at ${path}`);
     process.exit(2);
   }
-  console.log(`Functions analyzed: ${analysis.functions.length}`);
-  console.log(`Overall statement coverage: ${(analysis.totalCoverage * 100).toFixed(2)}%`);
-  console.log(`Worst CRAP: ${analysis.worstCrap}   Max complexity: ${analysis.maxComplexity}`);
-  console.log(formatReport(analysis, { crapMax: 30, complexityMax: 6 }));
+  console.info(`Functions analyzed: ${analysis.functions.length}`);
+  console.info(`Overall statement coverage: ${(analysis.totalCoverage * 100).toFixed(2)}%`);
+  console.info(`Worst CRAP: ${analysis.worstCrap}   Max complexity: ${analysis.maxComplexity}`);
+  console.info(formatReport(analysis, { crapMax: 30, complexityMax: 6 }));
 }
