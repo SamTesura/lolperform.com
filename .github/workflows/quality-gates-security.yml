@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           # Secret scanning needs the history, not just the tip. A secret that
           # was committed and then removed is still a burned secret.
@@ -36,12 +36,12 @@ jobs:
           elif [ -f package-lock.json ]; then echo "pm=npm" >> "$GITHUB_OUTPUT"; echo "cache=npm" >> "$GITHUB_OUTPUT"
           else echo "pm=npm" >> "$GITHUB_OUTPUT"; echo "cache=" >> "$GITHUB_OUTPUT"; fi
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
         if: steps.pm.outputs.pm == 'pnpm'
         with:
           run_install: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: 22
 
