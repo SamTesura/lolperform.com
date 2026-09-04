@@ -28,9 +28,13 @@ jobs:
       - name: Detect package manager
         id: pm
         run: |
-          if [ -f pnpm-lock.yaml ]; then echo "pm=pnpm" >> "$GITHUB_OUTPUT"
-          elif [ -f yarn.lock ]; then echo "pm=yarn" >> "$GITHUB_OUTPUT"
-          else echo "pm=npm" >> "$GITHUB_OUTPUT"; fi
+          # `cache` is deliberately separate from `pm`: setup-node's cache needs a
+          # lockfile and hard-fails in seconds without one, which reads as a failing
+          # gate when the job never even started. Empty means "do not cache".
+          if [ -f pnpm-lock.yaml ]; then echo "pm=pnpm" >> "$GITHUB_OUTPUT"; echo "cache=pnpm" >> "$GITHUB_OUTPUT"
+          elif [ -f yarn.lock ]; then echo "pm=yarn" >> "$GITHUB_OUTPUT"; echo "cache=yarn" >> "$GITHUB_OUTPUT"
+          elif [ -f package-lock.json ]; then echo "pm=npm" >> "$GITHUB_OUTPUT"; echo "cache=npm" >> "$GITHUB_OUTPUT"
+          else echo "pm=npm" >> "$GITHUB_OUTPUT"; echo "cache=" >> "$GITHUB_OUTPUT"; fi
 
       - uses: pnpm/action-setup@v4
         if: steps.pm.outputs.pm == 'pnpm'
