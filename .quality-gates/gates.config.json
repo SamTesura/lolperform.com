@@ -1,0 +1,28 @@
+{
+  "blockAfter": "2026-09-18",
+  "thresholds": {
+    "crapMax": 30,
+    "complexityMax": 6,
+    "coverageRatchet": true,
+    "autoTighten": true
+  },
+  "gates": {
+    "lint": true,
+    "typecheck": true,
+    "test": true,
+    "coverage": true,
+    "security": true
+  },
+  "baseline": {
+    "coverage": 0.6258,
+    "worstCrap": 240,
+    "maxComplexity": 81,
+    "functions": 275,
+    "recordedAt": "2026-09-04"
+  },
+  "security": {
+    "secrets": true,
+    "dependencies": true,
+    "sast": false
+  }
+}

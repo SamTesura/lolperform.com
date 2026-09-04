@@ -1,0 +1,15 @@
+{
+  "$comment": [
+    "Accepted security findings. A finding listed here is suppressed until it expires.",
+    "This file is NEVER written automatically, by any code path — an absent or empty",
+    "allowlist means nothing is accepted and the gate fails closed. Adding an entry is",
+    "a deliberate, reviewed commit.",
+    "",
+    "Each entry: { id, reason, addedBy, added, expires }",
+    "  id       the 'allowlist id' printed next to the finding",
+    "  reason   why this is acceptable — not 'false positive', but why",
+    "  expires  YYYY-MM-DD. On that date the finding comes back for review.",
+    "           An accepted risk that never returns is a hole with paperwork."
+  ],
+  "accepted": []
+}

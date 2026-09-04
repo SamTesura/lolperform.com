@@ -20,7 +20,10 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "cf:dev": "wrangler dev",
-    "deploy": "pnpm --filter @lolperform/web build && wrangler deploy"
+    "deploy": "pnpm --filter @lolperform/web build && wrangler deploy",
+    "gates": "node .quality-gates/run-gates.mjs --report",
+    "mutation": "stryker run",
+    "security": "node .quality-gates/run-gates.mjs --security-only"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -35,7 +38,9 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.69.0",
     "vitest": "4.1.11",
-    "wrangler": "4.127.1"
+    "wrangler": "4.127.1",
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/vitest-runner": "^9.6.1"
   },
   "pnpm": {
     "overrides": {
