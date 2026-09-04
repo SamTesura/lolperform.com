@@ -49,14 +49,14 @@ jobs:
           gitleaks version
 
       - name: Install semgrep
-        run: pipx install semgrep || pip install --user semgrep
+        run: pipx install semgrep || pip install --break-system-packages semgrep
 
       - name: Install dependencies
         run: |
           case "${{ steps.pm.outputs.pm }}" in
             pnpm) pnpm install --frozen-lockfile ;;
             yarn) yarn install --frozen-lockfile ;;
-            *) npm ci || npm install ;;
+            *) npm ci || npm install --legacy-peer-deps ;;
           esac
 
       - name: Run security scanners

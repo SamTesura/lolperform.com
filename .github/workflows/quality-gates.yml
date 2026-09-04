@@ -38,7 +38,7 @@ jobs:
           case "${{ steps.pm.outputs.pm }}" in
             pnpm) pnpm install --no-frozen-lockfile ;;
             yarn) yarn install ;;
-            *) npm ci || npm install ;;
+            *) npm ci || npm install --legacy-peer-deps ;;
           esac
 
       - name: Run quality gates
