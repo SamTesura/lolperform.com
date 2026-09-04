@@ -43,14 +43,18 @@ export function resolveGitleaks(root) {
   // Both spellings in every location: the same checkout gets used from Windows,
   // from a Linux VM over the same mount, and from CI, and a vendored copy is
   // useless if it is only looked for under one platform's filename.
-  const names = ['gitleaks.exe', 'gitleaks'];
+  // Native spelling first, and every candidate must actually run: a Linux VM
+  // over the same mount sees the vendored gitleaks.exe, and picking it would
+  // fail with ENOEXEC and read as a scanner failure instead of falling through.
+  const names = process.platform === 'win32' ? ['gitleaks.exe', 'gitleaks'] : ['gitleaks', 'gitleaks.exe'];
   const dirs = [join(root, '.quality-gates', 'bin'), join(root, '..', '.quality-gates-kit', 'bin')];
   const candidates = [process.env.GITLEAKS_PATH];
   for (const d of dirs) for (const n of names) candidates.push(join(d, n));
+  const runs = (cmd) => spawnSync(`${cmd} version`, { shell: true, stdio: 'ignore' }).status === 0;
   for (const c of candidates.filter(Boolean)) {
-    if (existsSync(c)) return `"${c}"`;
+    if (existsSync(c) && runs(`"${c}"`)) return `"${c}"`;
   }
-  return haveBinary('gitleaks') ? 'gitleaks' : null;
+  return runs('gitleaks') ? 'gitleaks' : null;
 }
 
 function run(command, cwd) {
