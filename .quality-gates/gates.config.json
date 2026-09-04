@@ -1,0 +1,15 @@
+{
+  "blockAfter": "2026-09-18",
+  "thresholds": {
+    "crapMax": 30,
+    "complexityMax": 6,
+    "coverageRatchet": true
+  },
+  "gates": {
+    "lint": true,
+    "typecheck": true,
+    "test": true,
+    "coverage": true
+  },
+  "baseline": null
+}

@@ -1,0 +1,86 @@
+name: mutation testing
+
+# Coverage proves a line ran. Mutation proves a test would have NOTICED if that
+# line were wrong. It is far slower than the normal gates, so it runs nightly
+# and on demand — never in the pre-push hook.
+
+on:
+  schedule:
+    - cron: '0 7 * * *' # 03:00 America/New_York
+  workflow_dispatch:
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect package manager
+        id: pm
+        run: |
+          if [ -f pnpm-lock.yaml ]; then echo "pm=pnpm" >> "$GITHUB_OUTPUT"
+          elif [ -f yarn.lock ]; then echo "pm=yarn" >> "$GITHUB_OUTPUT"
+          else echo "pm=npm" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: pnpm/action-setup@v4
+        if: steps.pm.outputs.pm == 'pnpm'
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: ${{ steps.pm.outputs.pm }}
+
+      - name: Install
+        run: |
+          case "${{ steps.pm.outputs.pm }}" in
+            pnpm) pnpm install --no-frozen-lockfile ;;
+            yarn) yarn install ;;
+            *) npm ci || npm install ;;
+          esac
+
+      - name: Run Stryker
+        run: npx stryker run
+
+      - name: Summarize
+        if: always()
+        run: |
+          if [ -f reports/mutation/report.json ]; then
+            node -e "
+              const r = require('./reports/mutation/report.json');
+              let killed=0,total=0,survived=[];
+              for (const [file, f] of Object.entries(r.files ?? {})) {
+                for (const m of f.mutants ?? []) {
+                  if (m.status === 'Ignored' || m.status === 'CompileError') continue;
+                  total++;
+                  if (m.status === 'Killed' || m.status === 'Timeout') killed++;
+                  else survived.push(\`\${file}:\${m.location.start.line} \${m.mutatorName}\`);
+                }
+              }
+              const score = total ? (killed/total*100).toFixed(2) : 'n/a';
+              const out = [];
+              out.push('## Mutation score: ' + score + '%  (' + killed + '/' + total + ' killed)');
+              if (survived.length) {
+                out.push('', '<details><summary>' + survived.length + ' survived</summary>', '');
+                out.push('\`\`\`'); out.push(...survived.slice(0,200)); out.push('\`\`\`');
+                out.push('</details>');
+              }
+              require('fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, out.join('\n'));
+            "
+          else
+            echo 'No mutation report produced.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload mutation report
+        if: always() && hashFiles('reports/mutation/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: reports/mutation/
+          retention-days: 14

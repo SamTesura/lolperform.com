@@ -1,0 +1,11 @@
+#!/bin/sh
+# Quality gates — installed by the gate kit.
+# Bypass in a genuine emergency with: git push --no-verify
+# (CI runs the same gates on the PR, so a bypass here does not get it merged.)
+
+if [ -z "$(command -v node)" ]; then
+  echo "quality gates: node not found on PATH — skipping local gates (CI will still run them)"
+  exit 0
+fi
+
+node .quality-gates/run-gates.mjs
