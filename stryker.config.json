@@ -32,7 +32,7 @@
   "thresholds": {
     "high": 80,
     "low": 60,
-    "break": null
+    "break": 33
   },
   "timeoutMS": 20000,
   "tempDirName": ".stryker-tmp",
