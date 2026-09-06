@@ -23,9 +23,12 @@ jobs:
       - name: Detect package manager
         id: pm
         run: |
-          if [ -f pnpm-lock.yaml ]; then echo "pm=pnpm" >> "$GITHUB_OUTPUT"
-          elif [ -f yarn.lock ]; then echo "pm=yarn" >> "$GITHUB_OUTPUT"
-          else echo "pm=npm" >> "$GITHUB_OUTPUT"; fi
+          # `cache` is separate from `pm`: setup-node's cache hard-fails in seconds
+          # without a lockfile, and the job reports as failed before Stryker ever runs.
+          if [ -f pnpm-lock.yaml ]; then echo "pm=pnpm" >> "$GITHUB_OUTPUT"; echo "cache=pnpm" >> "$GITHUB_OUTPUT"
+          elif [ -f yarn.lock ]; then echo "pm=yarn" >> "$GITHUB_OUTPUT"; echo "cache=yarn" >> "$GITHUB_OUTPUT"
+          elif [ -f package-lock.json ]; then echo "pm=npm" >> "$GITHUB_OUTPUT"; echo "cache=npm" >> "$GITHUB_OUTPUT"
+          else echo "pm=npm" >> "$GITHUB_OUTPUT"; echo "cache=" >> "$GITHUB_OUTPUT"; fi
 
       - uses: pnpm/action-setup@fe02b34f77f8bc703788d5817da081398fad5dd2 # v4.0.0
         if: steps.pm.outputs.pm == 'pnpm'
@@ -35,15 +38,23 @@ jobs:
       - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: 22
-          cache: ${{ steps.pm.outputs.pm }}
+          cache: ${{ steps.pm.outputs.cache }}
 
       - name: Install
         run: |
           case "${{ steps.pm.outputs.pm }}" in
             pnpm) pnpm install --no-frozen-lockfile ;;
             yarn) yarn install ;;
-            *) npm ci || npm install ;;
+            *) npm ci || npm install --legacy-peer-deps ;;
           esac
+
+      # Stryker's sandbox preprocessor imports `typescript` whenever a tsconfig.json
+      # is present, and Astro projects do not ship it as a resolvable dependency.
+      # First nightly run: "Cannot find package 'typescript'" after instrumenting
+      # 1,265 mutants. --no-save keeps it out of package.json and the lockfile.
+      - name: Stryker needs typescript when a tsconfig is present
+        if: hashFiles('tsconfig.json') != ''
+        run: node -e "require.resolve('typescript')" 2>/dev/null || npm install --no-save --legacy-peer-deps typescript
 
       - name: Run Stryker
         run: npx stryker run
