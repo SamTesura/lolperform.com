@@ -48,14 +48,6 @@ jobs:
             *) npm ci || npm install --legacy-peer-deps ;;
           esac
 
-      # Stryker's sandbox preprocessor imports `typescript` whenever a tsconfig.json
-      # is present, and Astro projects do not ship it as a resolvable dependency.
-      # First nightly run: "Cannot find package 'typescript'" after instrumenting
-      # 1,265 mutants. --no-save keeps it out of package.json and the lockfile.
-      - name: Stryker needs typescript when a tsconfig is present
-        if: hashFiles('tsconfig.json') != ''
-        run: node -e "require.resolve('typescript')" 2>/dev/null || npm install --no-save --legacy-peer-deps typescript
-
       - name: Run Stryker
         run: npx stryker run
 
