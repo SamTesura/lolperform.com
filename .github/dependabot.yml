@@ -12,6 +12,15 @@ updates:
       # Revisit when @astrojs/check supports TS 7.
       - dependency-name: typescript
         update-types: ['version-update:semver-major']
+      # Vitest 5 silently breaks mutation testing: @stryker-mutator/vitest-runner
+      # 10 declares `vitest: ">=2.0.0"` but cannot drive v5's test filtering, so
+      # it runs 0 tests per mutant and every mutant "survives" — the nightly
+      # score fell from passing to 7.41% on the 5.0.0 bump while the suite itself
+      # stayed green. Revisit when the runner declares real v5 support.
+      - dependency-name: vitest
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@vitest/coverage-v8'
+        update-types: ['version-update:semver-major']
     groups:
       dev-dependencies:
         dependency-type: development
