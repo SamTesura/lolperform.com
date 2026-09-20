@@ -15,6 +15,7 @@
  *   node .quality-gates/run-gates.mjs --record   # re-record the baseline
  *   node .quality-gates/run-gates.mjs --report   # print numbers, never fail
  *   node .quality-gates/run-gates.mjs --security-only   # just the scanners
+ *   node .quality-gates/run-gates.mjs --no-security     # everything but the scanners
  */
 
 import { spawnSync } from 'node:child_process';
@@ -31,6 +32,18 @@ const argv = new Set(process.argv.slice(2));
 const FORCE_RECORD = argv.has('--record');
 const REPORT_ONLY = argv.has('--report');
 const SECURITY_ONLY = argv.has('--security-only');
+
+/**
+ * The scanners need binaries the correctness gates do not (gitleaks, semgrep)
+ * and history the correctness gates do not check out. Where a run is split
+ * across two jobs, the one that does not install them says so explicitly
+ * rather than letting a missing scanner decide how much was measured.
+ */
+const NO_SECURITY = argv.has('--no-security');
+if (SECURITY_ONLY && NO_SECURITY) {
+  console.error('quality gates: --security-only and --no-security are mutually exclusive.');
+  process.exit(1);
+}
 
 /**
  * If the gate script itself breaks — a bug in this file, a malformed config, a
@@ -403,7 +416,7 @@ if (measured) {
  * gate fails closed. Accepting a finding is a deliberate, reviewed commit.
  */
 const secCfg = config.security ?? {};
-if (config.gates?.security !== false) {
+if (config.gates?.security !== false && !NO_SECURITY) {
   const allowlist = security.loadAllowlist(ALLOWLIST_PATH) ?? [];
   const findings = [];
   const scannerProblems = [];
@@ -467,6 +480,11 @@ if (config.gates?.security !== false) {
     if (inCI && BLOCKING) fail('security-tooling', msg);
     else notes.push(`security scanners unavailable — ${scannerProblems.join('; ')}`);
   }
+} else if (NO_SECURITY) {
+  // Said out loud, every run. A scanner-less run that prints nothing about it
+  // reads as "security passed", which is the same false confidence a missing
+  // scanner would have given.
+  notes.push('security: skipped (--no-security) — the security job scans separately');
 }
 
 // ----------------------------------------------------------- report
