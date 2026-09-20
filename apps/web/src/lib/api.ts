@@ -55,12 +55,8 @@ export const fetchTierList = (region: Region, rank: RankBracket, role: Role) =>
 export const fetchChampion = (id: string, region: Region, rank: RankBracket) =>
   get<ChampionDetailResponse>(`/champion/${encodeURIComponent(id)}`, { region, rank });
 
-export const fetchCounters = (
-  region: Region,
-  rank: RankBracket,
-  role: Role,
-  opponentKey: string,
-) => get<CountersResult>('/counters', { region, rank, role, opponentKey });
+export const fetchCounters = (region: Region, rank: RankBracket, role: Role, opponentKey: string) =>
+  get<CountersResult>('/counters', { region, rank, role, opponentKey });
 
 export const fetchDuos = (region: Region, rank: RankBracket) =>
   get<DuosResult>('/duos', { region, rank });

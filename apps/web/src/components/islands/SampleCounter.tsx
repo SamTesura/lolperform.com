@@ -24,7 +24,10 @@ function Counter() {
               on patch <span className="stat text-text-secondary">{patch}</span>
             </span>
           ) : null}
-          <span> — the sample grows every few hours. Sampled, not full-ladder — and honest about it. </span>
+          <span>
+            {' '}
+            — the sample grows every few hours. Sampled, not full-ladder — and honest about it.{' '}
+          </span>
         </>
       ) : (
         <span>Sampled, not full-ladder — and honest about it. </span>

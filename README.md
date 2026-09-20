@@ -22,7 +22,7 @@
 
 ## 🚀 Overview
 
-**LoL Performance** is a production stats platform that answers the question most League sites bury under a wall of numbers: *what should I actually pick, and how sure are we?* It crawls ranked ladders across **eight regions** through the **Riot Games API**, aggregates matches into tier lists, ADC matchups, ADC↔Support synergy, and counter picks — and attaches an **honest sample size and confidence treatment to every single stat**. Champions without enough games sit in an explicit *Unranked* section instead of masquerading as a grade.
+**LoL Performance** is a production stats platform that answers the question most League sites bury under a wall of numbers: _what should I actually pick, and how sure are we?_ It crawls ranked ladders across **eight regions** through the **Riot Games API**, aggregates matches into tier lists, ADC matchups, ADC↔Support synergy, and counter picks — and attaches an **honest sample size and confidence treatment to every single stat**. Champions without enough games sit in an explicit _Unranked_ section instead of masquerading as a grade.
 
 **🔗 Live Application:** **[https://lolperform.com](https://lolperform.com)**
 
@@ -31,24 +31,28 @@
 ## ✨ Key Features
 
 ### 📊 A Tier List You Can Actually Read
+
 - Fine-grained **S+ → D−** grades assigned by **rank percentile** within each lane, not fixed win-rate cutoffs — S+ always means "top of this patch's meta"
 - Champions ranked by two combined signals: **strength** — the Wilson score lower bound, so a 60%-over-10-games champion never outranks a 53%-over-5,000-games one — and **meta presence** (pick + ban rate), weighted at a third of strength because how contested a champion is isn't how good it is
-- **Player-pool correction**: a win rate measures the champion *and* whoever picked it, and within a single rank the popular blind picks are played by weaker players than niche specialist picks are. Each match carries one observation of how strong the picking player is, taken from their career ranked record, so a champion carried by strong players gives that advantage back — an identity-free correction, deliberately an under-correction, published next to the win rate rather than hidden in a score
-- **50-game floor**: below it a champion is *Unranked*, never mislabeled D−
+- **Player-pool correction**: a win rate measures the champion _and_ whoever picked it, and within a single rank the popular blind picks are played by weaker players than niche specialist picks are. Each match carries one observation of how strong the picking player is, taken from their career ranked record, so a champion carried by strong players gives that advantage back — an identity-free correction, deliberately an under-correction, published next to the win rate rather than hidden in a score
+- **50-game floor**: below it a champion is _Unranked_, never mislabeled D−
 - Confidence dimming + sample-size chips on every tile; three levels of disclosure (grid → champion → matchup)
 
 ### 🎯 Bot-Lane Depth
+
 - **ADC matchup lists** — best and toughest are disjoint by construction (only matchups you actually win / lose)
 - **Head-to-head lane pages** — both perspectives from the same game pool, with verdict and sample size
 - **ADC + Support duo synergy** ranked by confidence-corrected win rate
 - **Counter-pick recommender** — curated, stable counter knowledge ("enemy locked X → pick Y") enriched with live win rates
 
 ### 🌍 Eight Regions, Pooled by Default
+
 - NA · EUW · EUNE · KR · JP · BR · OCE · VN
 - **All Regions** view pools every ladder into the largest, steadiest sample — adding regions enriches the default instead of thinning each slice
 - Patch-over-patch **▲▼ trends** per champion
 
 ### 🤖 Compounding Data Pipeline
+
 - **GitHub Actions** cron crawls every 6 hours; each run **accumulates** into an R2 match store (deduplicated by match ID) so the sample grows continuously
 - **Per-endpoint rate limiters** sized to Riot's documented method limits, with 429/Retry-After backoff
 - Dataset tagged by the **dominant patch actually present in the data** — immune to Data Dragon version drift
@@ -58,16 +62,17 @@
 
 ## 🛠️ Tech Stack
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Frontend** | Astro (SSG) + React islands + Tailwind v4 | 181 prerendered pages for SEO; islands only where interactivity is needed |
-| **Edge** | Cloudflare Workers (Static Assets) | Serves the site + `/api/v1` from 300+ locations, no origin server |
-| **Database** | Cloudflare D1 (SQLite) + KV + R2 | D1 = history of record · KV = hot API cache · R2 = accumulated match store |
-| **Pipeline** | TypeScript + GitHub Actions | Crawl → accumulate → aggregate → load, fully automated |
-| **Contracts** | Zod schemas (`packages/shared`) | One typed contract across pipeline ↔ API ↔ UI — nothing drifts |
-| **Quality** | TS strict, ESLint, Vitest, gitleaks, Dependabot | Tests + secret scanning + dependency audit on every PR |
+| Layer         | Technology                                      | Purpose                                                                    |
+| ------------- | ----------------------------------------------- | -------------------------------------------------------------------------- |
+| **Frontend**  | Astro (SSG) + React islands + Tailwind v4       | 181 prerendered pages for SEO; islands only where interactivity is needed  |
+| **Edge**      | Cloudflare Workers (Static Assets)              | Serves the site + `/api/v1` from 300+ locations, no origin server          |
+| **Database**  | Cloudflare D1 (SQLite) + KV + R2                | D1 = history of record · KV = hot API cache · R2 = accumulated match store |
+| **Pipeline**  | TypeScript + GitHub Actions                     | Crawl → accumulate → aggregate → load, fully automated                     |
+| **Contracts** | Zod schemas (`packages/shared`)                 | One typed contract across pipeline ↔ API ↔ UI — nothing drifts             |
+| **Quality**   | TS strict, ESLint, Vitest, gitleaks, Dependabot | Tests + secret scanning + dependency audit on every PR                     |
 
 ### Why a Sampled Dataset?
+
 - **Honesty over false precision**: Riot's API has no aggregated stats endpoint — every site crawls. Instead of pretending at full-ladder scale, LoL Performance surfaces the sample behind every number
 - **Statistics that respect the sample**: Wilson lower bound for ranking, explicit confidence tiers, an Unranked floor
 - **Compounding, not static**: the accumulation store grows the sample every 6 hours between patches

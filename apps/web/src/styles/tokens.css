@@ -13,21 +13,21 @@
      without the muddy charcoal of a generic dark theme. Elevation rises by
      +~4% L* per layer so depth reads even in glare.
      --------------------------------------------------------------------------- */
-  --color-bg-base: #07090d;          /* page background */
-  --color-bg-surface: #0d1118;       /* default card / panel */
-  --color-bg-elevated: #141923;      /* hovered card, popovers */
-  --color-bg-overlay: #1c2230;       /* modals, dropdown menus */
-  --color-bg-inset: #04060a;         /* inputs, code, deeply recessed */
+  --color-bg-base: #07090d; /* page background */
+  --color-bg-surface: #0d1118; /* default card / panel */
+  --color-bg-elevated: #141923; /* hovered card, popovers */
+  --color-bg-overlay: #1c2230; /* modals, dropdown menus */
+  --color-bg-inset: #04060a; /* inputs, code, deeply recessed */
 
-  --color-border-subtle: #1a2030;    /* dividers between rows */
-  --color-border-default: #232b3d;   /* card outlines */
-  --color-border-strong: #364259;    /* focused inputs, emphasized borders */
+  --color-border-subtle: #1a2030; /* dividers between rows */
+  --color-border-default: #232b3d; /* card outlines */
+  --color-border-strong: #364259; /* focused inputs, emphasized borders */
 
-  --color-text-primary: #e8ecf3;     /* body + headings.   Ratio 14.8:1 on base */
-  --color-text-secondary: #a7b0c2;   /* secondary copy.    Ratio  7.2:1 on base */
-  --color-text-muted: #7e8a9e;       /* labels, captions. ~5.4:1 on base, ~4.6:1 on elevated (AA) */
-  --color-text-disabled: #434b5c;    /* disabled states */
-  --color-text-inverse: #07090d;     /* text on accent / tier fills */
+  --color-text-primary: #e8ecf3; /* body + headings.   Ratio 14.8:1 on base */
+  --color-text-secondary: #a7b0c2; /* secondary copy.    Ratio  7.2:1 on base */
+  --color-text-muted: #7e8a9e; /* labels, captions. ~5.4:1 on base, ~4.6:1 on elevated (AA) */
+  --color-text-disabled: #434b5c; /* disabled states */
+  --color-text-inverse: #07090d; /* text on accent / tier fills */
 
   /* ---------------------------------------------------------------------------
      COLOR — Accent (single decisive hue: "Hextech Cyan")
@@ -35,33 +35,33 @@
      Riot's exact palette. High chroma against the indigo base = pre-attentive
      CTA pop. One accent only — discipline beats variety here.
      --------------------------------------------------------------------------- */
-  --color-accent: #4ee0c8;           /* primary CTA, focus, links.  7.9:1 on base */
-  --color-accent-hover: #6eebd5;     /* hover lift */
-  --color-accent-active: #2dc4ac;    /* pressed state */
-  --color-accent-subtle: #0f2a28;    /* tinted background chip */
-  --color-accent-border: #1e5a52;    /* outlined accent buttons */
-  --color-accent-fg: #04221d;        /* text placed ON the accent fill */
+  --color-accent: #4ee0c8; /* primary CTA, focus, links.  7.9:1 on base */
+  --color-accent-hover: #6eebd5; /* hover lift */
+  --color-accent-active: #2dc4ac; /* pressed state */
+  --color-accent-subtle: #0f2a28; /* tinted background chip */
+  --color-accent-border: #1e5a52; /* outlined accent buttons */
+  --color-accent-fg: #04221d; /* text placed ON the accent fill */
 
-  --color-focus-ring: #7df0db;       /* :focus-visible ring */
+  --color-focus-ring: #7df0db; /* :focus-visible ring */
 
   /* ---------------------------------------------------------------------------
      COLOR — Semantic (win/loss/warning/info)
      Colorblind safety: win uses cyan-leaning green; loss uses warm amber-red.
      Never rely on hue alone — components MUST pair these with icon + position.
      --------------------------------------------------------------------------- */
-  --color-positive: #46d39a;         /* WR > 50%, ▲ rising.  6.9:1 on base */
+  --color-positive: #46d39a; /* WR > 50%, ▲ rising.  6.9:1 on base */
   --color-positive-subtle: #0e2b22;
   --color-positive-fg: #04140f;
 
-  --color-negative: #ff6b6b;         /* WR < 50%, ▼ falling. 5.5:1 on base */
+  --color-negative: #ff6b6b; /* WR < 50%, ▼ falling. 5.5:1 on base */
   --color-negative-subtle: #2c1116;
   --color-negative-fg: #1a0608;
 
-  --color-warning: #f5b544;          /* low sample size.     9.8:1 on base */
+  --color-warning: #f5b544; /* low sample size.     9.8:1 on base */
   --color-warning-subtle: #2a1f0a;
   --color-warning-fg: #1a1305;
 
-  --color-info: #6ab8ff;             /* informational.       7.4:1 on base */
+  --color-info: #6ab8ff; /* informational.       7.4:1 on base */
   --color-info-subtle: #0d1e30;
   --color-info-fg: #051320;
 
@@ -74,23 +74,23 @@
      for its label text — every tier tile also carries the literal letter, so
      hue is reinforcement, never the sole channel).
      --------------------------------------------------------------------------- */
-  --color-tier-s: #ffd166;           /* gold.        label uses --color-text-inverse, 13.5:1 */
+  --color-tier-s: #ffd166; /* gold.        label uses --color-text-inverse, 13.5:1 */
   --color-tier-s-fg: #1a1405;
   --color-tier-s-soft: #2a2210;
 
-  --color-tier-a: #b388ff;           /* lavender.    label inverse, 8.9:1 */
+  --color-tier-a: #b388ff; /* lavender.    label inverse, 8.9:1 */
   --color-tier-a-fg: #160a2e;
   --color-tier-a-soft: #1c1530;
 
-  --color-tier-b: #4ee0c8;           /* hextech cyan (accent family). 7.9:1 */
+  --color-tier-b: #4ee0c8; /* hextech cyan (accent family). 7.9:1 */
   --color-tier-b-fg: #04221d;
   --color-tier-b-soft: #0f2a28;
 
-  --color-tier-c: #6ab8ff;           /* sky blue.    7.4:1 */
+  --color-tier-c: #6ab8ff; /* sky blue.    7.4:1 */
   --color-tier-c-fg: #051320;
   --color-tier-c-soft: #0d1e30;
 
-  --color-tier-d: #8693a8;           /* slate. intentionally desaturated to read as "weak". 6.0:1 */
+  --color-tier-d: #8693a8; /* slate. intentionally desaturated to read as "weak". 6.0:1 */
   --color-tier-d-fg: #0a0d14;
   --color-tier-d-soft: #1a1f29;
 
@@ -113,21 +113,26 @@
      --------------------------------------------------------------------------- */
   /* TODO(sam): add @fontsource/space-grotesk when ready; replace 'Space Grotesk'
      entry below stays harmless — system will fall back. */
-  --font-sans: 'Inter var', ui-sans-serif, system-ui, -apple-system, 'Segoe UI Variable', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-display: 'Space Grotesk', 'Inter var', ui-sans-serif, system-ui, -apple-system, 'Segoe UI Variable', 'Segoe UI', Roboto, sans-serif;
-  --font-mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --font-sans:
+    'Inter var', ui-sans-serif, system-ui, -apple-system, 'Segoe UI Variable', 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-display:
+    'Space Grotesk', 'Inter var', ui-sans-serif, system-ui, -apple-system, 'Segoe UI Variable',
+    'Segoe UI', Roboto, sans-serif;
+  --font-mono:
+    ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
   /* Modular type scale — 1.200 (minor third). Calm hierarchy for dense data. */
-  --text-2xs: 0.6875rem;   /* 11px — micro labels, confidence chip */
-  --text-xs:  0.75rem;     /* 12px — table caption, filter pill */
-  --text-sm:  0.8125rem;   /* 13px — table body, stat label */
-  --text-base: 0.9375rem;  /* 15px — body copy (slightly < 16 for data density) */
-  --text-md:  1rem;        /* 16px — emphasized body */
-  --text-lg:  1.1875rem;   /* 19px — card title */
-  --text-xl:  1.4375rem;   /* 23px — section heading */
-  --text-2xl: 1.75rem;     /* 28px — page H2 */
-  --text-3xl: 2.125rem;    /* 34px — page H1 */
-  --text-4xl: 2.625rem;    /* 42px — hero stat */
+  --text-2xs: 0.6875rem; /* 11px — micro labels, confidence chip */
+  --text-xs: 0.75rem; /* 12px — table caption, filter pill */
+  --text-sm: 0.8125rem; /* 13px — table body, stat label */
+  --text-base: 0.9375rem; /* 15px — body copy (slightly < 16 for data density) */
+  --text-md: 1rem; /* 16px — emphasized body */
+  --text-lg: 1.1875rem; /* 19px — card title */
+  --text-xl: 1.4375rem; /* 23px — section heading */
+  --text-2xl: 1.75rem; /* 28px — page H2 */
+  --text-3xl: 2.125rem; /* 34px — page H1 */
+  --text-4xl: 2.625rem; /* 42px — hero stat */
 
   /* Line-height tokens (Tailwind v4 maps these to leading-*). */
   --leading-tight: 1.15;
@@ -146,20 +151,20 @@
      --------------------------------------------------------------------------- */
   --spacing-0: 0;
   --spacing-px: 1px;
-  --spacing-0_5: 0.125rem;   /* 2 */
-  --spacing-1: 0.25rem;      /* 4 */
-  --spacing-1_5: 0.375rem;   /* 6 */
-  --spacing-2: 0.5rem;       /* 8 */
-  --spacing-3: 0.75rem;      /* 12 */
-  --spacing-4: 1rem;         /* 16 */
-  --spacing-5: 1.25rem;      /* 20 */
-  --spacing-6: 1.5rem;       /* 24 */
-  --spacing-8: 2rem;         /* 32 */
-  --spacing-10: 2.5rem;      /* 40 */
-  --spacing-12: 3rem;        /* 48 */
-  --spacing-16: 4rem;        /* 64 */
-  --spacing-20: 5rem;        /* 80 */
-  --spacing-24: 6rem;        /* 96 */
+  --spacing-0_5: 0.125rem; /* 2 */
+  --spacing-1: 0.25rem; /* 4 */
+  --spacing-1_5: 0.375rem; /* 6 */
+  --spacing-2: 0.5rem; /* 8 */
+  --spacing-3: 0.75rem; /* 12 */
+  --spacing-4: 1rem; /* 16 */
+  --spacing-5: 1.25rem; /* 20 */
+  --spacing-6: 1.5rem; /* 24 */
+  --spacing-8: 2rem; /* 32 */
+  --spacing-10: 2.5rem; /* 40 */
+  --spacing-12: 3rem; /* 48 */
+  --spacing-16: 4rem; /* 64 */
+  --spacing-20: 5rem; /* 80 */
+  --spacing-24: 6rem; /* 96 */
 
   /* ---------------------------------------------------------------------------
      RADII — restrained. Sharp enough to read "data tool", soft enough to feel
@@ -168,9 +173,9 @@
   --radius-none: 0;
   --radius-xs: 2px;
   --radius-sm: 4px;
-  --radius-md: 6px;     /* tier tile, stat badge */
-  --radius-lg: 10px;    /* cards, panels */
-  --radius-xl: 14px;    /* hero / featured */
+  --radius-md: 6px; /* tier tile, stat badge */
+  --radius-lg: 10px; /* cards, panels */
+  --radius-xl: 14px; /* hero / featured */
   --radius-2xl: 20px;
   --radius-full: 9999px; /* only for chips + avatars */
 
@@ -201,7 +206,7 @@
   --container-sm: 40rem;
   --container-md: 56rem;
   --container-lg: 72rem;
-  --container-xl: 88rem;   /* tier-grid + bot-lane matrix */
+  --container-xl: 88rem; /* tier-grid + bot-lane matrix */
   --container-2xl: 96rem;
 }
 
@@ -223,30 +228,26 @@
   --confidence-low-opacity: 0.88;
 
   --confidence-medium-rule: 1px dashed var(--color-border-strong);
-  --confidence-low-hatch:
-    repeating-linear-gradient(
-      135deg,
-      transparent 0 6px,
-      rgba(245, 181, 68, 0.08) 6px 7px
-    );
+  --confidence-low-hatch: repeating-linear-gradient(
+    135deg,
+    transparent 0 6px,
+    rgba(245, 181, 68, 0.08) 6px 7px
+  );
 
   /* Gradients ---------------------------------------------------------------- */
   --gradient-accent: linear-gradient(135deg, #4ee0c8 0%, #6ab8ff 100%);
   --gradient-tier-s: linear-gradient(135deg, #ffd166 0%, #f5b544 100%);
   --gradient-surface-fade: linear-gradient(180deg, #0d1118 0%, #07090d 100%);
-  --gradient-broadcast-rule:
-    linear-gradient(
-      90deg,
-      transparent 0%,
-      var(--color-border-strong) 20%,
-      var(--color-border-strong) 80%,
-      transparent 100%
-    );
+  --gradient-broadcast-rule: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-border-strong) 20%,
+    var(--color-border-strong) 80%,
+    transparent 100%
+  );
 
   /* Focus ring composite — used on every interactive element.                */
-  --focus-ring:
-    0 0 0 2px var(--color-bg-base),
-    0 0 0 4px var(--color-focus-ring);
+  --focus-ring: 0 0 0 2px var(--color-bg-base), 0 0 0 4px var(--color-focus-ring);
 
   /* Tier-tile metadata — exposed so JS can map "S" → token values if needed. */
   --tier-s-bg: var(--color-tier-s);

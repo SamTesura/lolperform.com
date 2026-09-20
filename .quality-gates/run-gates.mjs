@@ -58,7 +58,9 @@ function blockingNow() {
   if (REPORT_ONLY) return false; // report mode promises never to fail. Including here.
   try {
     const raw = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
-    return Boolean(raw.blockAfter) && Date.now() >= new Date(`${raw.blockAfter}T00:00:00Z`).getTime();
+    return (
+      Boolean(raw.blockAfter) && Date.now() >= new Date(`${raw.blockAfter}T00:00:00Z`).getTime()
+    );
   } catch {
     return false;
   }
@@ -81,7 +83,14 @@ const { analyzeCoverage, formatReport } = await import('./crap.mjs');
 const security = await import('./security.mjs');
 
 const C = process.stdout.isTTY
-  ? { red: '\x1b[31m', green: '\x1b[32m', yellow: '\x1b[33m', dim: '\x1b[2m', bold: '\x1b[1m', off: '\x1b[0m' }
+  ? {
+      red: '\x1b[31m',
+      green: '\x1b[32m',
+      yellow: '\x1b[33m',
+      dim: '\x1b[2m',
+      bold: '\x1b[1m',
+      off: '\x1b[0m',
+    }
   : { red: '', green: '', yellow: '', dim: '', bold: '', off: '' };
 
 const config = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
@@ -157,7 +166,12 @@ if (!SECURITY_ONLY) {
   if (config.gates?.lint !== false && scripts.lint && canRun) {
     const r = run('lint', `${pm} run lint`);
     if (!r.ok) {
-      fail('lint', r.spawnError ? `could not run lint: ${r.spawnError.message}` : r.output.trim().split('\n').slice(-25).join('\n'));
+      fail(
+        'lint',
+        r.spawnError
+          ? `could not run lint: ${r.spawnError.message}`
+          : r.output.trim().split('\n').slice(-25).join('\n'),
+      );
     }
   } else if (config.gates?.lint !== false && scripts.lint) {
     // There is a lint script; it was skipped for environment reasons, not
@@ -172,7 +186,12 @@ if (!SECURITY_ONLY) {
   if (config.gates?.typecheck !== false && scripts.typecheck && canRun) {
     const r = run('typecheck', `${pm} run typecheck`);
     if (!r.ok) {
-      fail('typecheck', r.spawnError ? `could not run typecheck: ${r.spawnError.message}` : r.output.trim().split('\n').slice(-25).join('\n'));
+      fail(
+        'typecheck',
+        r.spawnError
+          ? `could not run typecheck: ${r.spawnError.message}`
+          : r.output.trim().split('\n').slice(-25).join('\n'),
+      );
     }
   } else if (config.gates?.typecheck !== false && scripts.typecheck) {
     notes.push('typecheck: skipped — dependencies or package manager unavailable here');
@@ -204,7 +223,9 @@ const coverageProviderReady =
 if (SECURITY_ONLY) {
   // skip
 } else if (config.gates?.test !== false && scripts.test && !toolingReady) {
-  notes.push(`tests: test runner not installed — run \`${pm} install\`. CI still enforces this gate.`);
+  notes.push(
+    `tests: test runner not installed — run \`${pm} install\`. CI still enforces this gate.`,
+  );
 } else if (config.gates?.test !== false && scripts.test && !coverageProviderReady) {
   notes.push(
     `tests: @vitest/coverage-v8 not installed — run \`${pm} install\`. CI still enforces this gate.`,
@@ -244,7 +265,9 @@ if (SECURITY_ONLY) {
   const includes =
     config.coverageInclude === false
       ? []
-      : (Array.isArray(config.coverageInclude) ? config.coverageInclude : DEFAULT_INCLUDE);
+      : Array.isArray(config.coverageInclude)
+        ? config.coverageInclude
+        : DEFAULT_INCLUDE;
   const globArgs = [
     ...includes.map((g) => `--coverage.include='${g}'`),
     ...(includes.length ? EXCLUDE.map((g) => `--coverage.exclude='${g}'`) : []),
@@ -340,9 +363,13 @@ const measurementTrustworthy = measured !== null && testsRan && testsPassed;
 if (measured) {
   const wantRecord = FORCE_RECORD || (!baseline && !inCI);
   if (wantRecord && inCI) {
-    notes.push('baseline not recorded: CI discards its working tree, so recording there is a no-op.');
+    notes.push(
+      'baseline not recorded: CI discards its working tree, so recording there is a no-op.',
+    );
   } else if (wantRecord && !measurementTrustworthy) {
-    notes.push('baseline not recorded: the test suite did not pass, so this measurement is not trustworthy.');
+    notes.push(
+      'baseline not recorded: the test suite did not pass, so this measurement is not trustworthy.',
+    );
   } else if (wantRecord) {
     config.baseline = { ...measured, recordedAt: new Date().toISOString().slice(0, 10) };
     writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`);
@@ -369,7 +396,10 @@ if (measured) {
     }
     const ccCeiling = Math.max(baseline.maxComplexity, complexityMax);
     if (measured.maxComplexity > ccCeiling) {
-      fail('complexity', `max cyclomatic complexity ${measured.maxComplexity} exceeds ceiling ${ccCeiling}`);
+      fail(
+        'complexity',
+        `max cyclomatic complexity ${measured.maxComplexity} exceeds ceiling ${ccCeiling}`,
+      );
     }
 
     /**
@@ -387,7 +417,9 @@ if (measured) {
       const moved = [];
       if (measured.coverage > baseline.coverage + 0.005) {
         next.coverage = measured.coverage;
-        moved.push(`coverage floor ${(baseline.coverage * 100).toFixed(2)}% → ${(measured.coverage * 100).toFixed(2)}%`);
+        moved.push(
+          `coverage floor ${(baseline.coverage * 100).toFixed(2)}% → ${(measured.coverage * 100).toFixed(2)}%`,
+        );
       }
       if (measured.worstCrap < baseline.worstCrap) {
         next.worstCrap = measured.worstCrap;
@@ -432,7 +464,9 @@ if (config.gates?.security !== false && !NO_SECURITY) {
     else if (res.error) scannerProblems.push(`gitleaks: ${res.error}`);
     else {
       findings.push(...res.findings);
-      notes.push(`secrets: gitleaks scanned ${mode === 'history' ? 'full history' : 'the working tree'}`);
+      notes.push(
+        `secrets: gitleaks scanned ${mode === 'history' ? 'full history' : 'the working tree'}`,
+      );
     }
   }
 
@@ -460,12 +494,18 @@ if (config.gates?.security !== false && !NO_SECURITY) {
   }
 
   if (live.length) {
-    const bySeverity = (a, b) => (a.severity === 'critical' ? -1 : b.severity === 'critical' ? 1 : 0);
+    const bySeverity = (a, b) =>
+      a.severity === 'critical' ? -1 : b.severity === 'critical' ? 1 : 0;
     fail(
       'security',
-      [...live].sort(bySeverity).slice(0, 25).map((f) =>
-        `[${f.tool}] ${f.detail}\n      ${f.file}${f.line ? `:${f.line}` : ''}\n      allowlist id: ${f.id}`,
-      ).join('\n'),
+      [...live]
+        .sort(bySeverity)
+        .slice(0, 25)
+        .map(
+          (f) =>
+            `[${f.tool}] ${f.detail}\n      ${f.file}${f.line ? `:${f.line}` : ''}\n      allowlist id: ${f.id}`,
+        )
+        .join('\n'),
     );
   }
 

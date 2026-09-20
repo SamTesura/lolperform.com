@@ -24,10 +24,7 @@ export function patchLabel(version: string): string {
 }
 
 interface ChampionJson {
-  data: Record<
-    string,
-    { key: string; id: string; name: string; title: string }
-  >;
+  data: Record<string, { key: string; id: string; name: string; title: string }>;
 }
 
 /**

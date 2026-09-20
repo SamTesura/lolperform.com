@@ -27,7 +27,10 @@ export function RoleTabsInteractive({
   onChange: (role: Role) => void;
 }) {
   return (
-    <nav aria-label="Role" className="flex items-center gap-1 overflow-x-auto border-b border-border-subtle">
+    <nav
+      aria-label="Role"
+      className="flex items-center gap-1 overflow-x-auto border-b border-border-subtle"
+    >
       {ROLES.map((role) => {
         const Icon = ROLE_ICONS[role];
         const active = role === value;
@@ -96,8 +99,20 @@ export function RegionRankControls({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-4">
-      <Select label="Rank" value={rank} options={RANK_BRACKETS} labels={RANK_BRACKET_LABELS} onChange={onRank} />
-      <Select label="Region" value={region} options={REGIONS} labels={REGION_LABELS} onChange={onRegion} />
+      <Select
+        label="Rank"
+        value={rank}
+        options={RANK_BRACKETS}
+        labels={RANK_BRACKET_LABELS}
+        onChange={onRank}
+      />
+      <Select
+        label="Region"
+        value={region}
+        options={REGIONS}
+        labels={REGION_LABELS}
+        onChange={onRegion}
+      />
     </div>
   );
 }

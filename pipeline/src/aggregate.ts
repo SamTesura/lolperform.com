@@ -151,11 +151,13 @@ export function aggregate(
     const allowed = new Set(BRACKET_TIERS[bracket]);
     if (pool) {
       const pooled = matches.filter((m) => allowed.has(m.tier));
-      if (pooled.length > 0) aggregateSlice(pooled, bracket, 'all', out, skillFloors, completedItems, bootItems);
+      if (pooled.length > 0)
+        aggregateSlice(pooled, bracket, 'all', out, skillFloors, completedItems, bootItems);
     }
     for (const region of regions) {
       const slice = matches.filter((m) => m.region === region && allowed.has(m.tier));
-      if (slice.length > 0) aggregateSlice(slice, bracket, region, out, skillFloors, completedItems, bootItems);
+      if (slice.length > 0)
+        aggregateSlice(slice, bracket, region, out, skillFloors, completedItems, bootItems);
     }
   }
   return out;
@@ -566,7 +568,6 @@ function aggregateSlice(
       wilsonLower: wilsonLowerBound(t.wWins, t.wGames),
     });
   }
-
 
   // --- emit the champion's own "most common build": per-item frequency ---
   // Requiring 20+ games of an *identical* full item set almost never triggers on

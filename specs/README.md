@@ -12,6 +12,7 @@ specs/NNN-slug/
 ```
 
 Rules that matter here:
+
 - `spec.md` carries no implementation detail. Requirements get IDs (R1...) and testable acceptance criteria.
 - **Only Sam approves.** Never implement a spec still marked Draft.
 - Tick a task only after its verify command passed (`pnpm test` / `pnpm run gates` for this repo).

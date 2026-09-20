@@ -47,7 +47,9 @@ function Side({
     >
       <ChampionPortrait championId={champ.id} name={champ.name} version={version} size={72} />
       <span className="text-sm font-semibold text-text-primary">{champ.name}</span>
-      <span className={`stat text-2xl font-bold ${winRate >= 0.5 ? 'text-positive' : 'text-negative'}`}>
+      <span
+        className={`stat text-2xl font-bold ${winRate >= 0.5 ? 'text-positive' : 'text-negative'}`}
+      >
         {formatPercent(winRate)}
       </span>
       <span className={`text-xs font-medium ${v.tone}`}>{v.label}</span>
@@ -85,9 +87,7 @@ function Matchup() {
     );
   }
 
-  const byId = new Map<string, ChampionMeta>(
-    (meta.data?.champions ?? []).map((c) => [c.id, c]),
-  );
+  const byId = new Map<string, ChampionMeta>((meta.data?.champions ?? []).map((c) => [c.id, c]));
   const version = meta.data?.version;
   const selfMeta = byId.get(params.self);
   const oppMeta = byId.get(params.opp);
@@ -140,11 +140,15 @@ function Matchup() {
       </div>
 
       <p className="text-sm text-text-secondary">
-        Over <span className="stat font-semibold text-text-primary">{m.games.toLocaleString('en-US')}</span>{' '}
-        games in {ROLE_LABELS[m.role]}, <span className="font-semibold text-text-primary">{selfMeta.name}</span>{' '}
-        wins <span className="stat font-semibold text-text-primary">{formatPercent(selfWr)}</span> of the lane
-        against <span className="font-semibold text-text-primary">{oppMeta.name}</span>. Win rates use the same
-        game pool from both perspectives.
+        Over{' '}
+        <span className="stat font-semibold text-text-primary">
+          {m.games.toLocaleString('en-US')}
+        </span>{' '}
+        games in {ROLE_LABELS[m.role]},{' '}
+        <span className="font-semibold text-text-primary">{selfMeta.name}</span> wins{' '}
+        <span className="stat font-semibold text-text-primary">{formatPercent(selfWr)}</span> of the
+        lane against <span className="font-semibold text-text-primary">{oppMeta.name}</span>. Win
+        rates use the same game pool from both perspectives.
       </p>
     </div>
   );

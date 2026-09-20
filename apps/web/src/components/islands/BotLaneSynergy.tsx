@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { DEFAULT_RANK_BRACKET, DEFAULT_REGION, type RankBracket, type Region } from '@lolperform/shared';
+import {
+  DEFAULT_RANK_BRACKET,
+  DEFAULT_REGION,
+  type RankBracket,
+  type Region,
+} from '@lolperform/shared';
 import { fetchDuos, fetchMeta } from '../../lib/api';
 import { championIndex } from '../../lib/champions';
 import { ChampionPortrait } from '../primitives/ChampionPortrait';
@@ -23,7 +28,10 @@ function Synergy() {
 
   const index = meta.data ? championIndex(meta.data.champions) : new Map();
   const version = meta.data?.version;
-  const top = (duos.data?.duos ?? []).slice().sort((a, b) => b.wilsonLower - a.wilsonLower).slice(0, 24);
+  const top = (duos.data?.duos ?? [])
+    .slice()
+    .sort((a, b) => b.wilsonLower - a.wilsonLower)
+    .slice(0, 24);
 
   return (
     <div className="space-y-4">
@@ -44,8 +52,18 @@ function Synergy() {
                 className="flex items-center gap-3 rounded-lg border border-border-subtle bg-bg-surface px-3 py-2"
               >
                 <div className="flex -space-x-2">
-                  <ChampionPortrait championId={adc.id} name={adc.name} version={version} size={40} />
-                  <ChampionPortrait championId={sup.id} name={sup.name} version={version} size={40} />
+                  <ChampionPortrait
+                    championId={adc.id}
+                    name={adc.name}
+                    version={version}
+                    size={40}
+                  />
+                  <ChampionPortrait
+                    championId={sup.id}
+                    name={sup.name}
+                    version={version}
+                    size={40}
+                  />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium text-text-primary">

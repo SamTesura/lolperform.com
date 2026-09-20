@@ -466,8 +466,8 @@ function StartingItems({
         })}
       </ul>
       <p className="text-2xs text-text-muted">
-        bought in the first 30 seconds — locked before the game develops, so the win rate is
-        fair. From a one-in-five timeline sample of games.
+        bought in the first 30 seconds — locked before the game develops, so the win rate is fair.
+        From a one-in-five timeline sample of games.
       </p>
     </div>
   );
@@ -577,8 +577,8 @@ function SlotBreakdown({
               ))}
             </ul>
             <p className="text-2xs text-text-muted">
-              grouped by first item bought; icons show each group's most common continuation —
-              win rate covers every game that started on that item
+              grouped by first item bought; icons show each group's most common continuation — win
+              rate covers every game that started on that item
             </p>
           </div>
         ) : core.length > 0 ? (

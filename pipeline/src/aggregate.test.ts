@@ -45,14 +45,22 @@ describe('aggregate post-stratification', () => {
     const oce = botLaneMatches(300, 120, 'oc1').map((m, i) => ({ ...m, matchId: `oc_${i}` }));
     const result = aggregate([...kr, ...oce]);
     const pooled = result.roleStats.find(
-      (r) => r.championKey === '51' && r.role === 'BOTTOM' && r.rank === 'emerald_plus' && r.region === 'all',
+      (r) =>
+        r.championKey === '51' &&
+        r.role === 'BOTTOM' &&
+        r.rank === 'emerald_plus' &&
+        r.region === 'all',
     )!;
     // untrimmed share-weighting says ≈0.590; the oc1 cell clamps at the 0.25
     // weight floor, landing ≈0.567 — still far from the raw-mix 0.45
     expect(pooled.winRate).toBeGreaterThan(0.55);
     expect(pooled.winRate).toBeLessThan(0.61);
     const oceOnly = result.roleStats.find(
-      (r) => r.championKey === '51' && r.role === 'BOTTOM' && r.rank === 'emerald_plus' && r.region === 'oc1',
+      (r) =>
+        r.championKey === '51' &&
+        r.role === 'BOTTOM' &&
+        r.rank === 'emerald_plus' &&
+        r.region === 'oc1',
     )!;
     expect(oceOnly.winRate).toBeCloseTo(0.4, 5);
   });
@@ -181,7 +189,9 @@ describe('aggregate starting items', () => {
     const result = aggregate(matches);
     const build = result.builds.find(
       (b) =>
-        b.championKey === '51' && b.role === 'BOTTOM' && b.rank === 'emerald_plus' &&
+        b.championKey === '51' &&
+        b.role === 'BOTTOM' &&
+        b.rank === 'emerald_plus' &&
         b.opponentKey === null,
     )!;
     expect(build.startOptions).not.toBeNull();
@@ -205,15 +215,15 @@ describe('aggregate core build archetypes', () => {
       const items = i < 35 ? [6672, 3031, 3094] : i < 60 ? [6672, 3036, 3094] : [6676, 3031, 3094];
       return {
         ...m,
-        participants: m.participants.map((pt) =>
-          pt.championKey === '51' ? { ...pt, items } : pt,
-        ),
+        participants: m.participants.map((pt) => (pt.championKey === '51' ? { ...pt, items } : pt)),
       };
     });
     const result = aggregate(matches);
     const build = result.builds.find(
       (b) =>
-        b.championKey === '51' && b.role === 'BOTTOM' && b.rank === 'emerald_plus' &&
+        b.championKey === '51' &&
+        b.role === 'BOTTOM' &&
+        b.rank === 'emerald_plus' &&
         b.opponentKey === null,
     )!;
     expect(build.coreOptions).not.toBeNull();
@@ -252,7 +262,9 @@ describe('aggregate', () => {
   it('emits each cumulative rank bracket for a Challenger-seeded slice', () => {
     const result = aggregate(matches);
     const brackets = new Set(
-      result.roleStats.filter((r) => r.championKey === '51' && r.role === 'BOTTOM').map((r) => r.rank),
+      result.roleStats
+        .filter((r) => r.championKey === '51' && r.role === 'BOTTOM')
+        .map((r) => r.rank),
     );
     expect(brackets).toEqual(new Set(RANK_BRACKETS));
   });
@@ -281,7 +293,11 @@ describe('aggregate', () => {
   it('emits a most-common build with runes for the carry', () => {
     const result = aggregate(matches);
     const build = result.builds.find(
-      (b) => b.championKey === '51' && b.role === 'BOTTOM' && b.opponentKey === null && b.rank === 'emerald_plus',
+      (b) =>
+        b.championKey === '51' &&
+        b.role === 'BOTTOM' &&
+        b.opponentKey === null &&
+        b.rank === 'emerald_plus',
     );
     expect(build).toBeDefined();
     expect(build!.items).toContain(6672);

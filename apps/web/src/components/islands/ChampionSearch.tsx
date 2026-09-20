@@ -63,7 +63,11 @@ export default function ChampionSearch({ champions, version }: Props) {
     const champs: Result[] = champions
       .flatMap((c) => {
         const name = norm(c.name);
-        const words = c.name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(norm);
+        const words = c.name
+          .toLowerCase()
+          .split(/[^a-z0-9]+/)
+          .filter(Boolean)
+          .map(norm);
         const score = name.startsWith(q)
           ? 0
           : words.some((w) => w.startsWith(q))

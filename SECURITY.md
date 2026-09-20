@@ -7,27 +7,27 @@ go-live hardening steps.
 
 ## Threat model & controls
 
-| Risk | Control |
-| --- | --- |
-| Secret leakage (Riot key) | Key lives only in GitHub Actions secrets + a gitignored `.dev.vars`; never in code or commits. **gitleaks** runs on every push/PR. A custom rule matches `RGAPI-` keys. |
-| SQL injection | All D1 access uses **prepared, bound statements** — no string concatenation of input. Column/`CHECK` constraints mirror the app's enums at the storage boundary. |
-| Malicious API input | Every `/api/v1` query parameter is validated against **Zod enums** at the edge; bad input returns `400` and never reaches D1. The champion `:id` path is regex-restricted to `[A-Za-z0-9]`. |
-| XSS / content injection | Strict **CSP**: `script-src 'self'` (no inline scripts), `object-src 'none'`, `frame-ancestors 'none'`, `base-uri 'self'`. Images limited to self + the Data Dragon CDN. No `dangerouslySetInnerHTML` of user/remote data. |
-| Clickjacking | `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`. |
-| MITM / downgrade | `Strict-Transport-Security` (2y, includeSubDomains, preload); Cloudflare TLS. |
-| MIME sniffing | `X-Content-Type-Options: nosniff`. |
-| Cross-origin data theft | `Cross-Origin-Opener-Policy` + `Cross-Origin-Resource-Policy: same-origin`; the API sets no permissive CORS headers (same-origin only). |
-| D1 / quota abuse | A **KV cache** (10-min TTL) absorbs repeat traffic so most requests never touch D1; the Workers free-tier request cap bounds total load. See go-live for a per-IP rate-limit rule. |
-| Info leak on error | The Worker returns generic `500`/`503` JSON — no stack traces or internals. |
-| Supply chain | Lockfile committed; **Dependabot** (grouped) auto-PRs updates; CI runs `pnpm audit --prod --audit-level high`; an `esbuild` override pins the patched build toolchain. |
+| Risk                      | Control                                                                                                                                                                                                                    |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Secret leakage (Riot key) | Key lives only in GitHub Actions secrets + a gitignored `.dev.vars`; never in code or commits. **gitleaks** runs on every push/PR. A custom rule matches `RGAPI-` keys.                                                    |
+| SQL injection             | All D1 access uses **prepared, bound statements** — no string concatenation of input. Column/`CHECK` constraints mirror the app's enums at the storage boundary.                                                           |
+| Malicious API input       | Every `/api/v1` query parameter is validated against **Zod enums** at the edge; bad input returns `400` and never reaches D1. The champion `:id` path is regex-restricted to `[A-Za-z0-9]`.                                |
+| XSS / content injection   | Strict **CSP**: `script-src 'self'` (no inline scripts), `object-src 'none'`, `frame-ancestors 'none'`, `base-uri 'self'`. Images limited to self + the Data Dragon CDN. No `dangerouslySetInnerHTML` of user/remote data. |
+| Clickjacking              | `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`.                                                                                                                                                                    |
+| MITM / downgrade          | `Strict-Transport-Security` (2y, includeSubDomains, preload); Cloudflare TLS.                                                                                                                                              |
+| MIME sniffing             | `X-Content-Type-Options: nosniff`.                                                                                                                                                                                         |
+| Cross-origin data theft   | `Cross-Origin-Opener-Policy` + `Cross-Origin-Resource-Policy: same-origin`; the API sets no permissive CORS headers (same-origin only).                                                                                    |
+| D1 / quota abuse          | A **KV cache** (10-min TTL) absorbs repeat traffic so most requests never touch D1; the Workers free-tier request cap bounds total load. See go-live for a per-IP rate-limit rule.                                         |
+| Info leak on error        | The Worker returns generic `500`/`503` JSON — no stack traces or internals.                                                                                                                                                |
+| Supply chain              | Lockfile committed; **Dependabot** (grouped) auto-PRs updates; CI runs `pnpm audit --prod --audit-level high`; an `esbuild` override pins the patched build toolchain.                                                     |
 
 ## Secrets
 
-| Secret | Where | Notes |
-| --- | --- | --- |
-| `RIOT_API_KEY` | GitHub Actions secret + local `.dev.vars` | `RGAPI-…`. Never committed. `riot.txt` is the **public** Riot verification token — unrelated. |
-| `CLOUDFLARE_API_TOKEN` | GitHub Actions secret | Scope: Account → D1 → Edit (least privilege for the loader). |
-| `CLOUDFLARE_ACCOUNT_ID` | GitHub Actions secret | Not secret per se, but kept out of the repo. |
+| Secret                  | Where                                     | Notes                                                                                         |
+| ----------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `RIOT_API_KEY`          | GitHub Actions secret + local `.dev.vars` | `RGAPI-…`. Never committed. `riot.txt` is the **public** Riot verification token — unrelated. |
+| `CLOUDFLARE_API_TOKEN`  | GitHub Actions secret                     | Scope: Account → D1 → Edit (least privilege for the loader).                                  |
+| `CLOUDFLARE_ACCOUNT_ID` | GitHub Actions secret                     | Not secret per se, but kept out of the repo.                                                  |
 
 ## Data & compliance
 

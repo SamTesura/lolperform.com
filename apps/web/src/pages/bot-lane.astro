@@ -23,13 +23,17 @@ const rosterChampions = champions.map((c) => ({ key: c.key, id: c.id, name: c.na
 
     <section class="space-y-3">
       <h2>Counter-pick recommender</h2>
-      <p class="text-sm text-text-muted">Pick the enemy; get the champions with the best record into them.</p>
+      <p class="text-sm text-text-muted">
+        Pick the enemy; get the champions with the best record into them.
+      </p>
       <CounterRecommender champions={rosterChampions} version={version} client:load />
     </section>
 
     <section class="space-y-3">
       <h2>ADC + Support synergy</h2>
-      <p class="text-sm text-text-muted">Top duo pairings by win rate, ranked with small-sample correction.</p>
+      <p class="text-sm text-text-muted">
+        Top duo pairings by win rate, ranked with small-sample correction.
+      </p>
       <BotLaneSynergy client:load />
     </section>
   </div>

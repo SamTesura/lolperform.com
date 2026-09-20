@@ -4,6 +4,7 @@
   "semi": true,
   "trailingComma": "all",
   "plugins": ["prettier-plugin-astro"],
+  "astroCompressHTML": "jsx",
   "overrides": [
     {
       "files": "*.astro",

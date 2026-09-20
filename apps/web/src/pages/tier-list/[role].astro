@@ -20,12 +20,14 @@ const label = ROLE_LABELS[role];
     <header class="space-y-1">
       <h1>{label} Tier List</h1>
       <p class="text-text-secondary">
-        Champions ranked within {label.toLowerCase()}. Only champions with a reliable sample are listed.
+        Champions ranked within {label.toLowerCase()}. Only champions with a reliable sample are
+        listed.
       </p>
       <p class="text-xs text-text-muted">
-        Sampled high-elo data across eight regions (All Regions pooled by default), not a full-ladder
-        dataset. Only champions with 1,000+ games this patch are ranked; the rest are omitted until
-        they reach that. Win rates use a small-sample-corrected score. <a href="/methodology">How this works →</a>
+        Sampled high-elo data across eight regions (All Regions pooled by default), not a
+        full-ladder dataset. Only champions with 1,000+ games this patch are ranked; the rest are
+        omitted until they reach that. Win rates use a small-sample-corrected score.{' '}
+        <a href="/methodology">How this works →</a>
       </p>
     </header>
     <TierGrid client:load initialRole={role} />

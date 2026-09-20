@@ -68,9 +68,7 @@ function Recommender({ champions, version }: Props) {
   // ever flexed into the lane — a 60-game Singed bot is not an enemy worth a
   // dropdown slot.
   const enemyKeys = new Set<string>(
-    (roleList.data?.champions ?? [])
-      .filter((s) => s.score > 0)
-      .map((s) => s.championKey),
+    (roleList.data?.champions ?? []).filter((s) => s.score > 0).map((s) => s.championKey),
   );
   for (const id of enemiesWithCounters(role)) {
     const m = idToMeta.get(id);
@@ -84,7 +82,9 @@ function Recommender({ champions, version }: Props) {
   const enemy = enemyKey ? keyToMeta.get(enemyKey) : undefined;
   const curated = enemy ? countersFor(enemy.id, role) : [];
   const dataPicks = (counters.data?.counters ?? [])
-    .filter((c) => c.games >= MIN_H2H_GAMES && c.championKey !== enemyKey && keyToMeta.has(c.championKey))
+    .filter(
+      (c) => c.games >= MIN_H2H_GAMES && c.championKey !== enemyKey && keyToMeta.has(c.championKey),
+    )
     .slice(0, 8);
 
   return (
@@ -125,7 +125,8 @@ function Recommender({ champions, version }: Props) {
           {curated.length > 0 ? (
             <div>
               <p className="mb-2 text-sm text-text-secondary">
-                Go-to picks into <span className="font-semibold text-text-primary">{enemy?.name}</span>:
+                Go-to picks into{' '}
+                <span className="font-semibold text-text-primary">{enemy?.name}</span>:
               </p>
               <ul className="divide-y divide-border-subtle overflow-hidden rounded-lg border border-border-default">
                 {curated.map((p) => {
@@ -143,11 +144,20 @@ function Recommender({ champions, version }: Props) {
                         href={`/champion/${m.id}`}
                         className="grid grid-cols-[40px_1fr_auto] items-center gap-3 bg-bg-surface px-3 py-2 transition-colors duration-150 hover:bg-bg-elevated"
                       >
-                        <ChampionPortrait championId={m.id} name={m.name} version={version} size={40} />
+                        <ChampionPortrait
+                          championId={m.id}
+                          name={m.name}
+                          version={version}
+                          size={40}
+                        />
                         <span className="min-w-0">
-                          <span className="block truncate text-sm font-medium text-text-primary">{m.name}</span>
+                          <span className="block truncate text-sm font-medium text-text-primary">
+                            {m.name}
+                          </span>
                           {p.note ? (
-                            <span className="block truncate text-2xs text-text-muted">{p.note}</span>
+                            <span className="block truncate text-2xs text-text-muted">
+                              {p.note}
+                            </span>
                           ) : null}
                         </span>
                         {hasStats ? (
@@ -167,7 +177,10 @@ function Recommender({ champions, version }: Props) {
                             </span>
                           </span>
                         ) : (
-                          <span className="text-2xs text-text-muted" title="Not enough games this patch">
+                          <span
+                            className="text-2xs text-text-muted"
+                            title="Not enough games this patch"
+                          >
                             —
                           </span>
                         )}
@@ -196,8 +209,15 @@ function Recommender({ champions, version }: Props) {
                         href={`/matchup?self=${m.id}&opp=${enemy?.id ?? ''}&role=${role}`}
                         className="grid grid-cols-[40px_1fr_auto] items-center gap-3 bg-bg-surface px-3 py-2 transition-colors duration-150 hover:bg-bg-elevated"
                       >
-                        <ChampionPortrait championId={m.id} name={m.name} version={version} size={40} />
-                        <span className="truncate text-sm font-medium text-text-primary">{m.name}</span>
+                        <ChampionPortrait
+                          championId={m.id}
+                          name={m.name}
+                          version={version}
+                          size={40}
+                        />
+                        <span className="truncate text-sm font-medium text-text-primary">
+                          {m.name}
+                        </span>
                         <span className="flex items-center gap-3">
                           <span className="text-2xs text-text-muted">
                             {c.games.toLocaleString('en-US')} games

@@ -46,7 +46,8 @@ export function resolveGitleaks(root) {
   // Native spelling first, and every candidate must actually run: a Linux VM
   // over the same mount sees the vendored gitleaks.exe, and picking it would
   // fail with ENOEXEC and read as a scanner failure instead of falling through.
-  const names = process.platform === 'win32' ? ['gitleaks.exe', 'gitleaks'] : ['gitleaks', 'gitleaks.exe'];
+  const names =
+    process.platform === 'win32' ? ['gitleaks.exe', 'gitleaks'] : ['gitleaks', 'gitleaks.exe'];
   const dirs = [join(root, '.quality-gates', 'bin'), join(root, '..', '.quality-gates-kit', 'bin')];
   const candidates = [process.env.GITLEAKS_PATH];
   for (const d of dirs) for (const n of names) candidates.push(join(d, n));
@@ -177,7 +178,10 @@ export function scanSecrets(root, mode = 'files') {
         detail: f.Description ?? f.RuleID ?? 'secret detected',
       };
     });
-    return { available: true, findings: mode === 'history' ? findings : dropIgnored(root, findings) };
+    return {
+      available: true,
+      findings: mode === 'history' ? findings : dropIgnored(root, findings),
+    };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -260,7 +264,11 @@ export function scanSast(root, config = 'p/ci') {
   const r = run(`semgrep scan --config ${config} --json --quiet --no-error --timeout 120`, root);
   const text = r.stdout.trim();
   if (!text) {
-    return { available: true, error: `semgrep produced no output.\n${r.stderr.slice(-400)}`, findings: [] };
+    return {
+      available: true,
+      error: `semgrep produced no output.\n${r.stderr.slice(-400)}`,
+      findings: [],
+    };
   }
 
   let doc;
@@ -283,7 +291,11 @@ export function scanSast(root, config = 'p/ci') {
       .slice(0, 3)
       .map((e) => e.message ?? e.type ?? JSON.stringify(e))
       .join('; ');
-    return { available: true, error: `semgrep reported ${errs.length} error(s): ${first}`, findings: [] };
+    return {
+      available: true,
+      error: `semgrep reported ${errs.length} error(s): ${first}`,
+      findings: [],
+    };
   }
   if (!Array.isArray(doc.results)) {
     return { available: true, error: 'semgrep output had no results array', findings: [] };

@@ -19,7 +19,7 @@ levers drive the choice:
 1. **Trust before delight.** Competitive players are statistics-literate and
    instinctively skeptical of any site claiming to know "the best" anything.
    A cool, low-saturation base + tabular numerals + a methodology page
-   visible in the nav reads as *peer-reviewed*, not *engagement-bait*.
+   visible in the nav reads as _peer-reviewed_, not _engagement-bait_.
 2. **Cognitive load = bounce.** Incumbent stats sites stack every
    variable at once. Broadcast Obsidian uses background elevation (5 layers)
    and a single accent hue to create unambiguous hierarchy — a tier-tile reads
@@ -44,16 +44,16 @@ computed for the tier-letter label placed on each fill.
 
 ### Neutrals (obsidian elevation ramp)
 
-| Token | Hex | Role | Contrast vs base |
-|---|---|---|---|
-| `--color-bg-base` | `#07090d` | page background | — |
-| `--color-bg-surface` | `#0d1118` | default card | — |
-| `--color-bg-elevated` | `#141923` | hover / popover | — |
-| `--color-bg-overlay` | `#1c2230` | modal | — |
-| `--color-text-primary` | `#e8ecf3` | body + headings | **14.8 : 1** AAA |
-| `--color-text-secondary` | `#a7b0c2` | secondary copy | **7.2 : 1** AAA |
-| `--color-text-muted` | `#6b7689` | labels, captions | **4.6 : 1** AA |
-| `--color-border-default` | `#232b3d` | card outlines | n/a (non-text 3:1 not required at this size) |
+| Token                    | Hex       | Role             | Contrast vs base                             |
+| ------------------------ | --------- | ---------------- | -------------------------------------------- |
+| `--color-bg-base`        | `#07090d` | page background  | —                                            |
+| `--color-bg-surface`     | `#0d1118` | default card     | —                                            |
+| `--color-bg-elevated`    | `#141923` | hover / popover  | —                                            |
+| `--color-bg-overlay`     | `#1c2230` | modal            | —                                            |
+| `--color-text-primary`   | `#e8ecf3` | body + headings  | **14.8 : 1** AAA                             |
+| `--color-text-secondary` | `#a7b0c2` | secondary copy   | **7.2 : 1** AAA                              |
+| `--color-text-muted`     | `#6b7689` | labels, captions | **4.6 : 1** AA                               |
+| `--color-border-default` | `#232b3d` | card outlines    | n/a (non-text 3:1 not required at this size) |
 
 Near-black indigo (not pure `#000`) avoids the OLED-burn feel and gives
 elevation layers somewhere to climb. Each layer steps ~+4% L\* so depth reads
@@ -61,12 +61,12 @@ even on glare-prone laptop screens.
 
 ### Accent — Hextech Cyan (single decisive hue)
 
-| Token | Hex | Contrast vs base |
-|---|---|---|
-| `--color-accent` | `#4ee0c8` | **7.9 : 1** AAA |
-| `--color-accent-hover` | `#6eebd5` | 9.0 : 1 |
-| `--color-accent-active` | `#2dc4ac` | 5.8 : 1 |
-| `--color-focus-ring` | `#7df0db` | 9.6 : 1 |
+| Token                   | Hex       | Contrast vs base |
+| ----------------------- | --------- | ---------------- |
+| `--color-accent`        | `#4ee0c8` | **7.9 : 1** AAA  |
+| `--color-accent-hover`  | `#6eebd5` | 9.0 : 1          |
+| `--color-accent-active` | `#2dc4ac` | 5.8 : 1          |
+| `--color-focus-ring`    | `#7df0db` | 9.6 : 1          |
 
 A cool cyan-teal at high chroma sits in a perceptual gap left by Riot's own
 palette (their UI cyan trends bluer; their gold owns warm). It pops
@@ -77,12 +77,12 @@ variety in an analytics product.
 
 ### Semantic — win/loss/warning/info (colorblind-safe pairs)
 
-| Token | Hex | Contrast vs base | Pairing rule |
-|---|---|---|---|
-| `--color-positive` | `#46d39a` | **6.9 : 1** AAA | always paired with ▲ arrow + position |
-| `--color-negative` | `#ff6b6b` | **5.5 : 1** AA | always paired with ▼ arrow + position |
-| `--color-warning` | `#f5b544` | **9.8 : 1** AAA | always paired with ⚠ icon + "low sample" label |
-| `--color-info` | `#6ab8ff` | **7.4 : 1** AAA | always paired with ⓘ icon |
+| Token              | Hex       | Contrast vs base | Pairing rule                                   |
+| ------------------ | --------- | ---------------- | ---------------------------------------------- |
+| `--color-positive` | `#46d39a` | **6.9 : 1** AAA  | always paired with ▲ arrow + position          |
+| `--color-negative` | `#ff6b6b` | **5.5 : 1** AA   | always paired with ▼ arrow + position          |
+| `--color-warning`  | `#f5b544` | **9.8 : 1** AAA  | always paired with ⚠ icon + "low sample" label |
+| `--color-info`     | `#6ab8ff` | **7.4 : 1** AAA  | always paired with ⓘ icon                      |
 
 **Colorblind safety contract:** ~8% of male players have red-green CVD. Win
 rate and trend MUST never communicate via hue alone. Every win/loss indicator
@@ -92,18 +92,18 @@ fully-sighted user gets the hue as the third redundant channel.
 
 ### Tier palette — S / A / B / C / D
 
-| Tier | Hex (fill) | FG token | Contrast (label on fill) |
-|---|---|---|---|
-| **S** | `#ffd166` gold | `#1a1405` | **13.5 : 1** AAA |
-| **A** | `#b388ff` lavender | `#160a2e` | **8.9 : 1** AAA |
-| **B** | `#4ee0c8` hextech cyan | `#04221d` | **7.9 : 1** AAA |
-| **C** | `#6ab8ff` sky blue | `#051320` | **7.4 : 1** AAA |
-| **D** | `#8693a8` slate | `#0a0d14` | **6.0 : 1** AAA |
+| Tier  | Hex (fill)             | FG token  | Contrast (label on fill) |
+| ----- | ---------------------- | --------- | ------------------------ |
+| **S** | `#ffd166` gold         | `#1a1405` | **13.5 : 1** AAA         |
+| **A** | `#b388ff` lavender     | `#160a2e` | **8.9 : 1** AAA          |
+| **B** | `#4ee0c8` hextech cyan | `#04221d` | **7.9 : 1** AAA          |
+| **C** | `#6ab8ff` sky blue     | `#051320` | **7.4 : 1** AAA          |
+| **D** | `#8693a8` slate        | `#0a0d14` | **6.0 : 1** AAA          |
 
 Hues span warm-gold → cool-violet → cyan → blue → desaturated slate. Two
 deliberate design moves:
 
-1. **Tier D is the only desaturated tone.** A weak champion *looks* weak
+1. **Tier D is the only desaturated tone.** A weak champion _looks_ weak
    even with hue stripped — its chroma is low. This is colorblind-safe
    redundancy via chroma rather than hue.
 2. **Every tier tile literally renders the letter `S`/`A`/`B`/`C`/`D`** as
@@ -115,11 +115,11 @@ list, and a `-fg` token for label text — both verified above 4.5:1.
 
 ### Delta / trend (▲▼)
 
-| Token | Hex | Glyph | Use |
-|---|---|---|---|
-| `--color-delta-up` | `#46d39a` | ▲ | rising win-rate / pick-rate |
-| `--color-delta-down` | `#ff6b6b` | ▼ | falling |
-| `--color-delta-flat` | `#6b7689` | — | < 0.05 pp change |
+| Token                | Hex       | Glyph | Use                         |
+| -------------------- | --------- | ----- | --------------------------- |
+| `--color-delta-up`   | `#46d39a` | ▲     | rising win-rate / pick-rate |
+| `--color-delta-down` | `#ff6b6b` | ▼     | falling                     |
+| `--color-delta-flat` | `#6b7689` | —     | < 0.05 pp change            |
 
 Same colorblind contract: the arrow is the primary channel, color is
 reinforcement, and the value text carries `font-variant-numeric: tabular-nums`
@@ -130,12 +130,12 @@ so columns of deltas read as a coherent block.
 A win-rate based on 12 games is not the same as one based on 50,000 games,
 and the design must make that lie impossible to tell by accident.
 
-| Level | Sample threshold | Visual treatment |
-|---|---|---|
-| **High** | ≥ 1,000 | 100% opacity, solid surface |
-| **Medium** | ≥ 200 | 78% opacity, dashed bottom rule |
-| **Low** | ≥ 30 | 55% opacity, diagonal warning hatch, ⚠ chip |
-| **Insufficient** | < 30 | rendered as Low; stat may be hidden entirely |
+| Level            | Sample threshold | Visual treatment                             |
+| ---------------- | ---------------- | -------------------------------------------- |
+| **High**         | ≥ 1,000          | 100% opacity, solid surface                  |
+| **Medium**       | ≥ 200            | 78% opacity, dashed bottom rule              |
+| **Low**          | ≥ 30             | 55% opacity, diagonal warning hatch, ⚠ chip  |
+| **Insufficient** | < 30             | rendered as Low; stat may be hidden entirely |
 
 Thresholds live in `packages/shared` (`SAMPLE_THRESHOLDS`) and are calibrated for a
 **sampled** high-elo dataset — per-matchup counts run in the tens-to-hundreds, so an
@@ -207,7 +207,7 @@ tier row. Composition:
   `--color-bg-elevated` + `box-shadow: var(--shadow-md)`, transition
   `transform var(--duration-fast) var(--ease-out)`.
 - **Champion portrait** fills the tile; a 2px inner ring uses the tier's
-  fill token (`--color-tier-{x}`) — so the tile is hue-coded *and* the row
+  fill token (`--color-tier-{x}`) — so the tile is hue-coded _and_ the row
   it sits in is already labeled with the tier letter.
 - **Stat strip** along the bottom edge: WR% (largest), then pick%, then ban%,
   all `.stat` utility for tabular alignment. WR uses `--color-positive`
@@ -260,8 +260,8 @@ A single horizontal row representing "Champion X vs Champion Y."
 - Row background alternates `--color-bg-base` / `--color-bg-surface`
   (zebra striping for scan-ability across long lists).
 - WR delta vs the average bot-lane matchup uses `--color-delta-up` / `--color-delta-down`
-  + arrow glyph + tabular value. **The matchup is "favored / even / unfavored"
-  not "good / bad"** — copy is neutral; color carries the verdict.
+  - arrow glyph + tabular value. **The matchup is "favored / even / unfavored"
+    not "good / bad"** — copy is neutral; color carries the verdict.
 - Each row is a `<a>` to `/matchup/[a]-vs-[b]`, `:focus-visible` ring
   inset 2px so it stays inside the row boundary.
 - Confidence chip (see below) renders inline after the WR — never optional.
@@ -294,7 +294,7 @@ The honesty badge. Always rendered next to any stat that has a sample size.
 - Low: `background: var(--color-warning-subtle)`,
   `border: 1px solid var(--color-warning)`,
   prepended with ⚠ glyph in `--color-warning`, label reads
-  "low sample · n = 312". The parent stat container *also* gets
+  "low sample · n = 312". The parent stat container _also_ gets
   `.confidence-low`, so the dimming + hatch propagate to the whole row.
 
 ---
@@ -320,8 +320,8 @@ The honesty badge. Always rendered next to any stat that has a sample size.
 
 ## File map
 
-| File | Role |
-|---|---|
-| `apps/web/src/styles/tokens.css` | All tokens via Tailwind v4 `@theme` + `:root`. |
+| File                             | Role                                                                  |
+| -------------------------------- | --------------------------------------------------------------------- |
+| `apps/web/src/styles/tokens.css` | All tokens via Tailwind v4 `@theme` + `:root`.                        |
 | `apps/web/src/styles/global.css` | `@import`s tailwind + tokens, base styles, utilities, reduced-motion. |
-| `docs/design-system.md` | This document. |
+| `docs/design-system.md`          | This document.                                                        |

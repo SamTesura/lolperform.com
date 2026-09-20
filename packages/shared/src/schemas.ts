@@ -181,7 +181,9 @@ export const buildPathSchema = z.object({
    * winning long enough to buy it.
    */
   slotOptions: z
-    .array(z.array(z.object({ item: z.number().int(), share: z.number(), games: z.number().int() })))
+    .array(
+      z.array(z.object({ item: z.number().int(), share: z.number(), games: z.number().int() })),
+    )
     .nullable()
     .default(null),
   /** Boots ranked by popularity — their own decision, kept out of the
