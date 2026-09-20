@@ -10,22 +10,22 @@
     "typecheck": "astro check"
   },
   "dependencies": {
-    "@astrojs/mdx": "8.0.0",
+    "@astrojs/mdx": "8.0.1",
     "@astrojs/react": "6.0.5",
     "@astrojs/sitemap": "3.7.4",
     "@lolperform/shared": "workspace:*",
     "@tailwindcss/vite": "4.3.3",
     "@tanstack/react-query": "5.102.8",
-    "astro": "7.3.1",
-    "lucide-react": "1.43.0",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
+    "astro": "7.3.2",
+    "lucide-react": "1.45.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "tailwindcss": "4.3.3"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.10",
-    "@types/react": "19.2.18",
-    "@types/react-dom": "19.2.7",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "typescript": "6.0.3"
   }
 }
