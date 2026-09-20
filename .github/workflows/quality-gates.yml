@@ -45,8 +45,12 @@ jobs:
             *) npm ci || npm install --legacy-peer-deps ;;
           esac
 
+      # The scanners live in the security workflow, which installs gitleaks and
+      # semgrep and checks out full history for them. This job installs neither
+      # and checks out one commit, so it says so rather than running a secret
+      # scan over a single commit and calling that "full history".
       - name: Run quality gates
-        run: node .quality-gates/run-gates.mjs
+        run: node .quality-gates/run-gates.mjs --no-security
 
       - name: Upload coverage
         if: always() && hashFiles('coverage/coverage-final.json') != ''
