@@ -1,0 +1,23 @@
+# Line endings are LF everywhere, in the repository AND in the working tree.
+#
+# Without this, a Windows checkout with core.autocrlf=true writes CRLF to disk
+# while prettier's endOfLine default is `lf`, so `pnpm format:check` fails on
+# every parseable file locally and passes in CI — and `pnpm format` cannot fix
+# it, because the next checkout restores CRLF.
+#
+# `text=auto` still lets git detect binary files and leave them untouched.
+* text=auto eol=lf
+
+# Windows batch files are only valid with CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Explicit, so content sniffing can never get these wrong.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary

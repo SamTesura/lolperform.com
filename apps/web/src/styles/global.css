@@ -14,80 +14,123 @@
     color-scheme: dark;
   }
 
-html {
-  -webkit-text-size-adjust: 100%;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-body {
-  margin: 0;
-  min-height: 100dvh;
-  background: var(--color-bg-base);
-  color: var(--color-text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--text-base);
-  line-height: var(--leading-normal);
-  font-feature-settings: 'cv11', 'ss01', 'ss03'; /* Inter alt forms; harmless if Inter absent */
-}
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--color-bg-base);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    font-feature-settings: 'cv11', 'ss01', 'ss03'; /* Inter alt forms; harmless if Inter absent */
+  }
 
-/* Headings — display font when wired; tight leading for broadcast feel. */
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-display);
-  font-weight: var(--font-weight-semibold);
-  line-height: var(--leading-tight);
-  letter-spacing: -0.01em;
-  color: var(--color-text-primary);
-  margin: 0;
-}
+  /* Headings — display font when wired; tight leading for broadcast feel. */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--leading-tight);
+    letter-spacing: -0.01em;
+    color: var(--color-text-primary);
+    margin: 0;
+  }
 
-h1 { font-size: var(--text-3xl); letter-spacing: -0.02em; }
-h2 { font-size: var(--text-2xl); letter-spacing: -0.015em; }
-h3 { font-size: var(--text-xl); }
-h4 { font-size: var(--text-lg); }
-h5 { font-size: var(--text-md); }
-h6 { font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-muted); }
+  h1 {
+    font-size: var(--text-3xl);
+    letter-spacing: -0.02em;
+  }
+  h2 {
+    font-size: var(--text-2xl);
+    letter-spacing: -0.015em;
+  }
+  h3 {
+    font-size: var(--text-xl);
+  }
+  h4 {
+    font-size: var(--text-lg);
+  }
+  h5 {
+    font-size: var(--text-md);
+  }
+  h6 {
+    font-size: var(--text-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-muted);
+  }
 
-p { margin: 0; }
+  p {
+    margin: 0;
+  }
 
-/* Links — accent hue; underline only on hover to keep tables clean. */
-a {
-  color: var(--color-accent);
-  text-decoration: none;
-  transition: color var(--duration-fast) var(--ease-out);
-}
-a:hover { color: var(--color-accent-hover); text-decoration: underline; text-underline-offset: 3px; }
-a:active { color: var(--color-accent-active); }
+  /* Links — accent hue; underline only on hover to keep tables clean. */
+  a {
+    color: var(--color-accent);
+    text-decoration: none;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  a:hover {
+    color: var(--color-accent-hover);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  a:active {
+    color: var(--color-accent-active);
+  }
 
-/* Selection — accent-tinted, never default browser blue. */
-::selection {
-  background: var(--color-accent);
-  color: var(--color-accent-fg);
-}
+  /* Selection — accent-tinted, never default browser blue. */
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-accent-fg);
+  }
 
-/* Focus ring — visible only on keyboard nav; consistent across all controls. */
-:focus { outline: none; }
-:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-  border-radius: var(--radius-sm);
-}
+  /* Focus ring — visible only on keyboard nav; consistent across all controls. */
+  :focus {
+    outline: none;
+  }
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+    border-radius: var(--radius-sm);
+  }
 
-/* Form controls — inherit type, dark-first defaults. */
-button, input, select, textarea {
-  font: inherit;
-  color: inherit;
-}
-button { background: none; border: 0; padding: 0; cursor: pointer; }
-button:disabled { cursor: not-allowed; color: var(--color-text-disabled); }
+  /* Form controls — inherit type, dark-first defaults. */
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+  button {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+    color: var(--color-text-disabled);
+  }
 
-hr {
-  border: 0;
-  height: 1px;
-  background: var(--gradient-broadcast-rule);
-  margin: var(--spacing-6) 0;
-}
+  hr {
+    border: 0;
+    height: 1px;
+    background: var(--gradient-broadcast-rule);
+    margin: var(--spacing-6) 0;
+  }
 } /* @layer base */
 
 /* =============================================================================
@@ -99,7 +142,9 @@ hr {
 .stat,
 .tabular {
   font-variant-numeric: tabular-nums lining-nums;
-  font-feature-settings: 'tnum' 1, 'lnum' 1;
+  font-feature-settings:
+    'tnum' 1,
+    'lnum' 1;
 }
 
 /* Monospace stat for delta blocks (▲ +0.4 / ▼ -0.2). */
@@ -127,9 +172,15 @@ hr {
 /* Confidence visual language — a gentle fade only. Low-sample tiles must still
    look like normal, selectable cards (not disabled), so we drop the heavy
    hatch/dashed treatments and lean on the inline sample-size + ⚠ chip instead. */
-.confidence-high { opacity: var(--confidence-high-opacity); }
-.confidence-medium { opacity: var(--confidence-medium-opacity); }
-.confidence-low { opacity: var(--confidence-low-opacity); }
+.confidence-high {
+  opacity: var(--confidence-high-opacity);
+}
+.confidence-medium {
+  opacity: var(--confidence-medium-opacity);
+}
+.confidence-low {
+  opacity: var(--confidence-low-opacity);
+}
 
 /* Visually-hide while staying screen-reader available. Reused for "▲ rising"
    labels alongside the arrow glyph so colorblind users hear the trend. */

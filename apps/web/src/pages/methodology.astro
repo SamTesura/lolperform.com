@@ -10,7 +10,9 @@ import Base from '../layouts/Base.astro';
     <header class="space-y-1">
       <p class="text-sm font-semibold tracking-widest text-accent uppercase">Methodology</p>
       <h1>How these numbers are made.</h1>
-      <p>Most stats sites hide this page. Here it's the point: you should be able to check our work.</p>
+      <p>
+        Most stats sites hide this page. Here it's the point: you should be able to check our work.
+      </p>
     </header>
 
     <section class="space-y-2">
@@ -18,14 +20,13 @@ import Base from '../layouts/Base.astro';
       <p>
         LolPerform is a <strong class="text-text-primary">readable, transparent</strong> stats tool
         covering <strong class="text-text-primary">all five roles</strong>, with extra depth in bot
-        lane.
-        It optimises for three things scale doesn't buy: a UI you can scan in seconds,
-        genuine depth on bottom lane (ADC matchups, ADC + Support synergy, counters), and honesty
-        about every number's confidence.
+        lane. It optimises for three things scale doesn't buy: a UI you can scan in seconds, genuine
+        depth on bottom lane (ADC matchups, ADC + Support synergy, counters), and honesty about
+        every number's confidence.
       </p>
       <p>
-        It is <strong class="text-text-primary">not</strong> a full-ladder aggregator like the largest
-        sites, which ingest millions of games per day. We sample. So treat the tiers as a
+        It is <strong class="text-text-primary">not</strong> a full-ladder aggregator like the
+        largest sites, which ingest millions of games per day. We sample. So treat the tiers as a
         well-calibrated, clearly-labelled estimate — strongest for popular champions, openly
         low-confidence for rare ones — not gospel.
       </p>
@@ -35,8 +36,8 @@ import Base from '../layouts/Base.astro';
       <h2>Where the data comes from</h2>
       <p>
         Riot's API has no "tier list" endpoint. Like every stats site, we build it ourselves: we
-        crawl ranked Solo/Duo ladders (the <code class="text-text-primary">league-v4</code> and <code class="text-text-primary">match-v5</code> APIs),
-        then aggregate the matches. Champion
+        crawl ranked Solo/Duo ladders (the <code class="text-text-primary">league-v4</code> and{' '}
+        <code class="text-text-primary">match-v5</code> APIs), then aggregate the matches. Champion
         art and item icons come from Riot's Data Dragon CDN.
       </p>
     </section>
@@ -44,20 +45,22 @@ import Base from '../layouts/Base.astro';
     <section class="space-y-2">
       <h2>It's a sample, and we say so</h2>
       <p>
-        We don't claim to read every game. We sample ranked matches across eight regions — <strong
-          class="text-text-primary">NA, EUW, EUNE, KR, JP, BR, OCE, and VN</strong> — and then weight
-        every statistic to the ladder's <strong class="text-text-primary">real rank distribution</strong> (post-stratification:
-        the crawl deliberately oversamples Master+ so high-elo views stay meaningful, and the published
-        numbers correct for it). A champion that's strong in Emerald but weak in Master is graded for
-        the rank mix that actually plays the bracket, not for whoever was easiest to crawl. The pooled
-        view is additionally weighted by <strong class="text-text-primary">server population</strong>, so
-        a small server never counts as much as KR or EUW, and extreme weights are trimmed to keep a
-        few lucky games from swinging a grade. The
-        default <strong class="text-text-primary">All Regions</strong> view pools every region into one
-        sample (the largest and steadiest); you can also filter to any single region. We're a sampled
-        dataset, not a full-ladder one like the largest sites — which is exactly why <strong
-          class="text-text-primary">every statistic shows its sample size</strong>. A win rate over 40
-        games is not the same as one over 40,000, and the UI never lets you forget it.
+        We don't claim to read every game. We sample ranked matches across eight regions —{' '}
+        <strong class="text-text-primary">NA, EUW, EUNE, KR, JP, BR, OCE, and VN</strong> — and then
+        weight every statistic to the ladder's{' '}
+        <strong class="text-text-primary">real rank distribution</strong> (post-stratification: the
+        crawl deliberately oversamples Master+ so high-elo views stay meaningful, and the published
+        numbers correct for it). A champion that's strong in Emerald but weak in Master is graded
+        for the rank mix that actually plays the bracket, not for whoever was easiest to crawl. The
+        pooled view is additionally weighted by{' '}
+        <strong class="text-text-primary">server population</strong>, so a small server never counts
+        as much as KR or EUW, and extreme weights are trimmed to keep a few lucky games from
+        swinging a grade. The default <strong class="text-text-primary">All Regions</strong> view
+        pools every region into one sample (the largest and steadiest); you can also filter to any
+        single region. We're a sampled dataset, not a full-ladder one like the largest sites — which
+        is exactly why{' '}
+        <strong class="text-text-primary">every statistic shows its sample size</strong>. A win rate
+        over 40 games is not the same as one over 40,000, and the UI never lets you forget it.
       </p>
     </section>
 
@@ -82,50 +85,61 @@ import Base from '../layouts/Base.astro';
         </li>
       </ul>
       <p>
-        Win rate is corrected before it is ranked, for <strong class="text-text-primary">who picks
-        the champion</strong>. Within a single rank, popular blind-pick-friendly champions are picked
-        by weaker players than niche specialist picks are, and that difference lands on the
-        champion's win rate rather than the player's. Every crawled match carries one observation of
-        how strong the picking player is, taken from their career ranked record, and a champion whose
-        players are stronger than average gives that advantage back. The correction is deliberately
-        an under-correction, and the size of it is published next to the win rate rather than hidden
-        in the score.
+        Win rate is corrected before it is ranked, for{' '}
+        <strong class="text-text-primary">who picks the champion</strong>. Within a single rank,
+        popular blind-pick-friendly champions are picked by weaker players than niche specialist
+        picks are, and that difference lands on the champion's win rate rather than the player's.
+        Every crawled match carries one observation of how strong the picking player is, taken from
+        their career ranked record, and a champion whose players are stronger than average gives
+        that advantage back. The correction is deliberately an under-correction, and the size of it
+        is published next to the win rate rather than hidden in the score.
       </p>
       <p>
-        Both signals then get a small <strong class="text-text-primary">skill-floor adjustment</strong> (at
-        most ±0.4% win-rate equivalent): a mechanically simple champion's win rate is repeatable
-        by nearly everyone who picks it, so it earns slightly more trust than the same number on a
-        champion whose ladder record is carried by specialists. The buckets are curated — Riot's own
-        difficulty ratings are too inconsistent to use — and deliberately small: they nudge boundary
-        cases, never rewrite a tier.
+        Both signals then get a small{' '}
+        <strong class="text-text-primary">skill-floor adjustment</strong> (at most ±0.4% win-rate
+        equivalent): a mechanically simple champion's win rate is repeatable by nearly everyone who
+        picks it, so it earns slightly more trust than the same number on a champion whose ladder
+        record is carried by specialists. The buckets are curated — Riot's own difficulty ratings
+        are too inconsistent to use — and deliberately small: they nudge boundary cases, never
+        rewrite a tier.
       </p>
       <p>
         Each champion gets a rank on both signals; a weighted sum of the two ranks orders the lane,
         and champions a signal cannot tell apart share a rank on it rather than being ordered
-        arbitrarily. Some
-        sites also factor in per-player signals such as best-player win rate or best-player Elo —
-        those require tracking individual players across months, and this site stores no player
-        identifiers by design, so our grading uses the signals a sampled, privacy-preserving
-        pipeline can support.
+        arbitrarily. Some sites also factor in per-player signals such as best-player win rate or
+        best-player Elo — those require tracking individual players across months, and this site
+        stores no player identifiers by design, so our grading uses the signals a sampled,
+        privacy-preserving pipeline can support.
       </p>
     </section>
 
     <section class="space-y-2">
       <h2>Tiers</h2>
       <p>
-        Grades are cut at fixed percentiles of the lane's ranking, so
-        an <strong class="text-text-primary">S+</strong> always means "top of this patch's meta" no
+        Grades are cut at fixed percentiles of the lane's ranking, so an{' '}
+        <strong class="text-text-primary">S+</strong> always means "top of this patch's meta" no
         matter how compressed the win rates are: roughly the top 4% of a lane's pool is S+, the top
         14% reaches S−, the middle lands in B, and the bottom tail is D. The base letter sets the
         colour and the row; the <strong class="text-text-primary">+ / −</strong> shows where the
         champion sits inside the band.
       </p>
       <p>
-        A grade needs <strong class="text-text-primary">1,000 games</strong> in that lane this patch to stand fully on its own.
-        Below that — right after a patch flips, before the new sample has filled in — a champion is graded <strong class="text-text-primary">provisional</strong> (dashed tier badge) if it has a prior-patch grade to lean on: its ranking blends the two, weighted by how much of the 1,000-game floor this patch has filled, so the blend is almost entirely last patch's data at game one and entirely this patch's data at game 1,000.
-        The prior has to be worth leaning on: it only counts if it cleared the same 1,000-game floor last patch. Without that rule a champion almost nobody plays in a lane could enter on a handful of games, borrow a prior built from equally few, and come out with a grade — which is how an off-role pick on 144 games briefly outranked bot laners with thousands.
-        A brand new champion or lane with no prior-patch history, and no games yet this patch, still shows <strong class="text-text-primary">NR</strong> (not rated) instead of a grade — so a lane can never read "S+" off pure guesswork.
-        Win, pick, and ban rates always display the current patch's real numbers next to their game count, whether or not the grade above them is provisional. All numbers come from the current patch only — balance changes make older games misleading — and the sample compounds every few hours as the crawler runs.
+        A grade needs <strong class="text-text-primary">1,000 games</strong> in that lane this patch
+        to stand fully on its own. Below that — right after a patch flips, before the new sample has
+        filled in — a champion is graded <strong class="text-text-primary">provisional</strong>{' '}
+        (dashed tier badge) if it has a prior-patch grade to lean on: its ranking blends the two,
+        weighted by how much of the 1,000-game floor this patch has filled, so the blend is almost
+        entirely last patch's data at game one and entirely this patch's data at game 1,000. The
+        prior has to be worth leaning on: it only counts if it cleared the same 1,000-game floor
+        last patch. Without that rule a champion almost nobody plays in a lane could enter on a
+        handful of games, borrow a prior built from equally few, and come out with a grade — which
+        is how an off-role pick on 144 games briefly outranked bot laners with thousands. A brand
+        new champion or lane with no prior-patch history, and no games yet this patch, still shows{' '}
+        <strong class="text-text-primary">NR</strong> (not rated) instead of a grade — so a lane can
+        never read "S+" off pure guesswork. Win, pick, and ban rates always display the current
+        patch's real numbers next to their game count, whether or not the grade above them is
+        provisional. All numbers come from the current patch only — balance changes make older games
+        misleading — and the sample compounds every few hours as the crawler runs.
       </p>
     </section>
 
@@ -145,9 +159,15 @@ import Base from '../layouts/Base.astro';
       <h2>Confidence</h2>
       <p>Sample size maps to a visible treatment on every stat:</p>
       <ul class="list-inside list-disc space-y-1 text-text-muted">
-        <li><strong class="text-text-primary">High</strong> (≥ 1,000 games): solid.</li>
-        <li><strong class="text-text-primary">Medium</strong> (≥ 200): dimmed, dashed underline.</li>
-        <li><strong class="text-text-primary">Low</strong> (≥ 30): heavily dimmed, ⚠ chip.</li>
+        <li>
+          <strong class="text-text-primary">High</strong> (≥ 1,000 games): solid.
+        </li>
+        <li>
+          <strong class="text-text-primary">Medium</strong> (≥ 200): dimmed, dashed underline.
+        </li>
+        <li>
+          <strong class="text-text-primary">Low</strong> (≥ 30): heavily dimmed, ⚠ chip.
+        </li>
         <li>Below 30: treated as low and often hidden — we won't show a number we don't trust.</li>
       </ul>
     </section>
@@ -155,27 +175,27 @@ import Base from '../layouts/Base.astro';
     <section class="space-y-2">
       <h2>Builds</h2>
       <p>
-        Every champion page shows its <strong class="text-text-primary">most common build</strong> for
-        the champion's primary role: the items players actually finish with, ranked by how often they
-        appear across all of that champion's sampled games this patch, laid
-        out as <strong class="text-text-primary">six item slots</strong> — <strong class="text-text-primary">seven
-        for bot-lane roles</strong>, where the support quest item occupies a slot. Slots without a
-        consistent pick yet render empty rather than guessing. The number beside the items is the
-        champion's own win rate and game count in that role — a frequency composite is not one exact
-        build, so it has no win rate of its own, and we won't invent one. This is a frequency
-        picture, not a curated guide: it shows what the sampled ladder buys, and it sharpens
-        automatically as games accumulate.
+        Every champion page shows its <strong class="text-text-primary">most common build</strong>{' '}
+        for the champion's primary role: the items players actually finish with, ranked by how often
+        they appear across all of that champion's sampled games this patch, laid out as{' '}
+        <strong class="text-text-primary">six item slots</strong> —{' '}
+        <strong class="text-text-primary">seven for bot-lane roles</strong>, where the support quest
+        item occupies a slot. Slots without a consistent pick yet render empty rather than guessing.
+        The number beside the items is the champion's own win rate and game count in that role — a
+        frequency composite is not one exact build, so it has no win rate of its own, and we won't
+        invent one. This is a frequency picture, not a curated guide: it shows what the sampled
+        ladder buys, and it sharpens automatically as games accumulate.
       </p>
     </section>
 
     <section class="space-y-2">
       <h2>How fresh it is</h2>
       <p>
-        A crawler runs <strong class="text-text-primary">every six hours</strong> and each
-        run <strong class="text-text-primary">adds to</strong> the sample instead of replacing it: new
+        A crawler runs <strong class="text-text-primary">every six hours</strong> and each run{' '}
+        <strong class="text-text-primary">adds to</strong> the sample instead of replacing it: new
         matches merge into an accumulated store (deduplicated by match id), so every number on the
-        site gets steadier through the patch. When a new patch ships, the
-        sample <strong class="text-text-primary">resets</strong> — older games reflect a different balance
+        site gets steadier through the patch. When a new patch ships, the sample{' '}
+        <strong class="text-text-primary">resets</strong> — older games reflect a different balance
         state, so they never bleed into the new patch's numbers. Expect thinner data for the first
         day of a patch and a fast climb after; no one presses a button.
       </p>
@@ -185,14 +205,14 @@ import Base from '../layouts/Base.astro';
       <h2>Recent changes</h2>
       <ul class="list-inside list-disc space-y-1 text-text-muted">
         <li>
-          <strong class="text-text-primary">Ranking rebuilt around what a champion is worth</strong> — the
-          ranking no longer multiplies a champion's distance from a 50% win rate by how often it is
-          picked. That term meant two champions on the same win rate could sit several grades apart
-          purely because one was popular, which pushed common picks down and pocket picks up. It is
-          replaced by meta presence, which counts for a third as much as strength. Win rates are now
-          also corrected for how strong a champion's players are, champions a signal cannot tell
-          apart share a rank on it instead of being ordered arbitrarily, and a prior-patch grade only
-          seeds a provisional grade if the prior itself was properly sampled.
+          <strong class="text-text-primary">Ranking rebuilt around what a champion is worth</strong>{' '}
+          — the ranking no longer multiplies a champion's distance from a 50% win rate by how often
+          it is picked. That term meant two champions on the same win rate could sit several grades
+          apart purely because one was popular, which pushed common picks down and pocket picks up.
+          It is replaced by meta presence, which counts for a third as much as strength. Win rates
+          are now also corrected for how strong a champion's players are, champions a signal cannot
+          tell apart share a rank on it instead of being ordered arbitrarily, and a prior-patch
+          grade only seeds a provisional grade if the prior itself was properly sampled.
         </li>
         <li>
           <strong class="text-text-primary">Rank-mix and region-mix correction</strong> — stats are
@@ -208,9 +228,9 @@ import Base from '../layouts/Base.astro';
           after NA maintenance on Wednesdays, so new patches appear hours sooner.
         </li>
         <li>
-          <strong class="text-text-primary">Rank-based grading</strong> — tiers
-          now come from each lane's combined strength + presence ranking, cut at fixed percentiles, instead
-          of fixed win-rate thresholds. S+ means "top of the meta", every patch, by construction.
+          <strong class="text-text-primary">Rank-based grading</strong> — tiers now come from each
+          lane's combined strength + presence ranking, cut at fixed percentiles, instead of fixed
+          win-rate thresholds. S+ means "top of the meta", every patch, by construction.
         </li>
         <li>
           <strong class="text-text-primary">1,000-game tier floor, everywhere</strong> — the tier
@@ -220,8 +240,8 @@ import Base from '../layouts/Base.astro';
         </li>
         <li>
           <strong class="text-text-primary">Most common build for every champion</strong> —
-          frequency-ranked items in fixed slots (six per role, seven for bot lane), each with its win
-          rate and sample size.
+          frequency-ranked items in fixed slots (six per role, seven for bot lane), each with its
+          win rate and sample size.
         </li>
         <li>
           <strong class="text-text-primary">Compounding sample</strong> — crawls every six hours

@@ -239,8 +239,7 @@ export function normalizeMatch(
         Number.isFinite(pair[0]) && Number.isFinite(pair[1]) && pair[0]! > 0
           ? (pair as [number, number])
           : undefined,
-      quest:
-        Number.isFinite(p.roleBoundItem) && p.roleBoundItem! > 0 ? p.roleBoundItem : undefined,
+      quest: Number.isFinite(p.roleBoundItem) && p.roleBoundItem! > 0 ? p.roleBoundItem : undefined,
       start: start && start.length > 0 ? start : undefined,
       items: coreItems(p),
       runes: parseRunes(p.perks),

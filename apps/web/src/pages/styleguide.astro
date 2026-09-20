@@ -62,9 +62,42 @@ const tierExamples: RoleStats[] = [
 ];
 
 const matchupExamples: Matchup[] = [
-  { patch: '15.13', region: 'na1', rank: 'emerald_plus', role: 'BOTTOM', championKey: '51', opponentKey: '202', games: 1820, wins: 1010, winRate: 0.555, wilsonLower: 0.53 },
-  { patch: '15.13', region: 'na1', rank: 'emerald_plus', role: 'BOTTOM', championKey: '51', opponentKey: '523', games: 340, wins: 168, winRate: 0.494, wilsonLower: 0.44 },
-  { patch: '15.13', region: 'na1', rank: 'emerald_plus', role: 'BOTTOM', championKey: '51', opponentKey: '21', games: 47, wins: 19, winRate: 0.404, wilsonLower: 0.28 },
+  {
+    patch: '15.13',
+    region: 'na1',
+    rank: 'emerald_plus',
+    role: 'BOTTOM',
+    championKey: '51',
+    opponentKey: '202',
+    games: 1820,
+    wins: 1010,
+    winRate: 0.555,
+    wilsonLower: 0.53,
+  },
+  {
+    patch: '15.13',
+    region: 'na1',
+    rank: 'emerald_plus',
+    role: 'BOTTOM',
+    championKey: '51',
+    opponentKey: '523',
+    games: 340,
+    wins: 168,
+    winRate: 0.494,
+    wilsonLower: 0.44,
+  },
+  {
+    patch: '15.13',
+    region: 'na1',
+    rank: 'emerald_plus',
+    role: 'BOTTOM',
+    championKey: '51',
+    opponentKey: '21',
+    games: 47,
+    wins: 19,
+    winRate: 0.404,
+    wilsonLower: 0.28,
+  },
 ];
 
 const champByKey: Record<string, ChampionMeta> = Object.fromEntries(
@@ -83,7 +116,9 @@ const champByKey: Record<string, ChampionMeta> = Object.fromEntries(
     <section class="space-y-3">
       <h2>Tier badges</h2>
       <div class="flex items-center gap-3">
-        {TIER_GRADES.map((t) => <TierBadge tier={t} size="lg" />)}
+        {TIER_GRADES.map((t) => (
+          <TierBadge tier={t} size="lg" />
+        ))}
       </div>
     </section>
 
@@ -113,27 +148,23 @@ const champByKey: Record<string, ChampionMeta> = Object.fromEntries(
     <section class="space-y-3">
       <h2>Tier tiles (S → D, descending confidence)</h2>
       <div class="flex flex-wrap gap-3">
-        {
-          tierExamples.map((s) => (
-            <TierTile stat={s} meta={champByKey[s.championKey]!} />
-          ))
-        }
+        {tierExamples.map((s) => (
+          <TierTile stat={s} meta={champByKey[s.championKey]!} />
+        ))}
       </div>
     </section>
 
     <section class="space-y-3">
       <h2>Matchup rows (favored / even / unfavored, falling confidence)</h2>
       <div class="max-w-xl overflow-hidden rounded-lg border border-border-default">
-        {
-          matchupExamples.map((m, i) => (
-            <MatchupRow
-              matchup={m}
-              self={champs.caitlyn}
-              opponent={champByKey[m.opponentKey]!}
-              striped={i % 2 === 1}
-            />
-          ))
-        }
+        {matchupExamples.map((m, i) => (
+          <MatchupRow
+            matchup={m}
+            self={champs.caitlyn}
+            opponent={champByKey[m.opponentKey]!}
+            striped={i % 2 === 1}
+          />
+        ))}
       </div>
     </section>
   </div>

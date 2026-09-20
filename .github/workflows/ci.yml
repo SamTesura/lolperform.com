@@ -27,6 +27,11 @@ jobs:
         run: pnpm -r typecheck
       - name: Lint
         run: pnpm lint
+      # Nothing used to run `format:check`, so a prettier or plugin bump could
+      # silently change `.astro` output and land as churn in an unrelated PR
+      # (prettier-plugin-astro 1.0.0 did exactly that). Gate it here instead.
+      - name: Format check
+        run: pnpm format:check
       - name: Test
         run: pnpm test
       - name: Build web

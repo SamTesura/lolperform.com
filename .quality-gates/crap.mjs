@@ -75,8 +75,7 @@ export function analyzeCoverage(coveragePath) {
 
       // A function with no statements of its own (an arrow returning an
       // expression, say) falls back to whether the function itself was hit.
-      const coverage =
-        stmtTotal > 0 ? stmtCovered / stmtTotal : (data.f?.[id] ?? 0) > 0 ? 1 : 0;
+      const coverage = stmtTotal > 0 ? stmtCovered / stmtTotal : (data.f?.[id] ?? 0) > 0 ? 1 : 0;
 
       const crap = complexity ** 2 * (1 - coverage) ** 3 + complexity;
 

@@ -30,7 +30,9 @@ export function StatBadge({ label, value, tone = 'neutral', glyph }: Props) {
     <span
       className={`inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 ${TONE_BORDER[tone]}`}
     >
-      <span className="text-2xs font-medium tracking-[0.08em] text-text-muted uppercase">{label}</span>
+      <span className="text-2xs font-medium tracking-[0.08em] text-text-muted uppercase">
+        {label}
+      </span>
       <span className={`stat text-sm font-semibold ${TONE_VALUE[tone]}`}>
         {glyph ? (
           <span aria-hidden className="mr-0.5">

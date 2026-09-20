@@ -45,13 +45,11 @@ const jsonLd = {
     <meta name="description" content={description} />
     <meta name="theme-color" content="#07090d" />
     <link rel="canonical" href={canonical} />
-    {
-      noindex ? (
-        <meta name="robots" content="noindex, nofollow" />
-      ) : (
-        <meta name="robots" content="index, follow, max-image-preview:large" />
-      )
-    }
+    {noindex ? (
+      <meta name="robots" content="noindex, nofollow" />
+    ) : (
+      <meta name="robots" content="index, follow, max-image-preview:large" />
+    )}
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="sitemap" href="/sitemap-index.xml" />
 
@@ -72,14 +70,14 @@ const jsonLd = {
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
 
-    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
-
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)}></script>
     <!-- Google AdSense (verifies ownership + serves ads) -->
     <script
       is:inline
       async
       src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7585621325528982"
-      crossorigin="anonymous"></script>
+      crossorigin="anonymous"
+    ></script>
   </head>
   <body class="flex min-h-dvh flex-col">
     <SiteHeader />
