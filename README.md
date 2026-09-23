@@ -480,13 +480,13 @@ The D1 `database_id` is committed deliberately; it is an identifier, not a crede
 
 ### Workflows
 
-| Workflow                     | Trigger                                | Purpose                                                                |
-| ---------------------------- | -------------------------------------- | ---------------------------------------------------------------------- |
-| `ci.yml`                     | Push to `main`, every PR               | Typecheck, lint, test, build, rendered-whitespace scan, secret scan    |
-| `quality-gates.yml`          | Push to `main`, every PR               | Lint, typecheck, tests, coverage ratchet, CRAP and complexity ceilings |
-| `quality-gates-security.yml` | Push, PR, daily at 07:20 UTC           | gitleaks over full history, dependency audit, optional SAST            |
-| `mutation.yml`               | Scheduled                              | Stryker mutation testing                                               |
-| `patch-watch.yml`            | Every 6h, Wednesdays 15:00 UTC, manual | The data pipeline                                                      |
+| Workflow                     | Trigger                                | Purpose                                                                           |
+| ---------------------------- | -------------------------------------- | --------------------------------------------------------------------------------- |
+| `ci.yml`                     | Push to `main`, every PR               | Typecheck, lint, format check, test, build, rendered-whitespace scan, secret scan |
+| `quality-gates.yml`          | Push to `main`, every PR               | Lint, typecheck, tests, coverage ratchet, CRAP and complexity ceilings            |
+| `quality-gates-security.yml` | Push, PR, daily at 07:20 UTC           | gitleaks over full history, dependency audit, optional SAST                       |
+| `mutation.yml`               | Scheduled                              | Stryker mutation testing                                                          |
+| `patch-watch.yml`            | Every 6h, Wednesdays 15:00 UTC, manual | The data pipeline                                                                 |
 
 The two gate workflows split deliberately. `quality-gates.yml` measures correctness and runs
 `run-gates.mjs --no-security`; `quality-gates-security.yml` installs gitleaks and Semgrep, checks out
@@ -515,6 +515,18 @@ A `pre-push` hook runs the same gates before a push leaves the machine. It can b
 `scripts/check-inline-whitespace.mjs` scans every built page for words silently joined together.
 Astro can drop line breaks adjacent to inline tags, which corrupts rendered prose without failing
 any build or test. The scan exists because that shipped once.
+
+A related pairing must hold: `astroCompressHTML` in `.prettierrc.json` has to mirror `compressHTML`
+in `apps/web/astro.config.mjs`. The first tells the formatter which whitespace the compiler
+collapses; if the two disagree, the formatter moves spaces the compiler treats differently, which
+joins words on the rendered page. Both are pinned to the Astro default today.
+
+### Formatting
+
+`pnpm format:check` runs in CI, so a Prettier or plugin upgrade that changes output fails the pull
+request that introduces it, rather than surfacing later as unexplained churn in an unrelated one.
+`.gitattributes` forces LF line endings in the working tree; without it, a Windows checkout writes
+CRLF and the format check fails on every file.
 
 ---
 
