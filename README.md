@@ -29,6 +29,9 @@ refuses to grade a champion that has not been played enough this patch.
 12. [Glossary](#12-glossary)
 13. [Licence and attribution](#13-licence-and-attribution)
 
+For the full component-by-component reference, including a symptom-first guide to diagnosing
+outages, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ---
 
 ## 1. Overview
@@ -298,7 +301,7 @@ version Data Dragon reports. Data Dragon's version label routinely drifts from t
 ## 6. HTTP API reference
 
 Read-only. All routes are `GET`, return JSON, and are served from the same origin as the site.
-Responses are cached in KV for **600 seconds** and carry an `X-Cache: HIT|MISS` header.
+Responses are cached in KV for **600 seconds** and carry an `X-Cache: HIT|MISS|BYPASS` header.
 
 | Route                  | Parameters                              | Returns                                                              |
 | ---------------------- | --------------------------------------- | -------------------------------------------------------------------- |
@@ -335,7 +338,7 @@ accepting one.
 
 Cache keys are built **only** from the route path and the _validated_ parameters, never from the raw
 query string. Zod strips unknown keys, so `?x=<random>` cannot be used to flood the cache with
-distinct entries. Responses carry `X-Cache: HIT` or `MISS`.
+distinct entries. Responses carry `X-Cache: HIT` or `MISS`, or `BYPASS` when the cache write failed (for example a KV quota or outage) and the answer was served uncached.
 
 ### Example
 
