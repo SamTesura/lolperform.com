@@ -34,9 +34,19 @@ concurrency:
   group: patch-watch
   cancel-in-progress: false
 
-env:
-  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+# The Cloudflare credentials are deliberately NOT set here. A workflow-level
+# env reaches every step, including `pnpm install`, which runs third-party
+# install scripts (workerd has one). Any compromised dependency could then read
+# the token and act on the account's D1 and R2. Each step that runs wrangler
+# declares them itself, and nothing else sees them — the same way RIOT_API_KEY
+# is scoped to the crawl step alone.
+#
+# Every such step opens with a `${CLOUDFLARE_API_TOKEN:?}` guard. Several of
+# them swallow wrangler's errors on purpose, and "Restore match store" treats
+# any failure as a fresh start: if a refactor dropped the token from that step
+# it would restore nothing and "Save match store" would then overwrite the
+# accumulated store with one run's matches. The guard turns that silent data
+# loss into a loud failure.
 
 jobs:
   refresh:
@@ -67,7 +77,11 @@ jobs:
 
       - name: Patch already loaded in D1
         id: loaded
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          : "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN is not set for this step}"
           json=$(pnpm exec wrangler d1 execute lolperform --remote --json \
             --command "SELECT patch, generated_at FROM patches ORDER BY generated_at DESC LIMIT 1" 2>/dev/null || echo '[]')
           loaded=$(echo "$json" | jq -r '.[0].results[0].patch // ""')
@@ -144,7 +158,11 @@ jobs:
       # ~10x smaller. The plain-object fallback covers the migration run.
       - name: Restore match store
         if: steps.decide.outputs.run == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          : "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN is not set for this step}"
           mkdir -p pipeline/data/store
           if pnpm exec wrangler r2 object get lolperform-matches/matches.ndjson.gz --file pipeline/data/store/matches.ndjson.gz --remote 2>/dev/null; then
             gunzip -f pipeline/data/store/matches.ndjson.gz
@@ -169,7 +187,11 @@ jobs:
       # runner kill at region 6 of 6 before this.
       - name: Save match store
         if: always() && steps.decide.outputs.run == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          : "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN is not set for this step}"
           if [ ! -s pipeline/data/store/matches.ndjson ]; then
             echo "No store file to save (crawl died before its first flush)."
             exit 0
@@ -195,7 +217,11 @@ jobs:
       # idempotent, so a lost load costs freshness, never consistency.
       - name: Load into D1
         if: steps.decide.outputs.load == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          : "${CLOUDFLARE_API_TOKEN:?CLOUDFLARE_API_TOKEN is not set for this step}"
           for attempt in 1 2 3; do
             if pnpm exec wrangler d1 execute lolperform --remote --file db/.generated/load.sql; then
               exit 0
