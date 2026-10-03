@@ -12,12 +12,12 @@
     "           An accepted risk that never returns is a hole with paperwork."
   ],
   "accepted": [
-  {
-    "id": "pnpm-audit:1240991:high",
-    "reason": "GHSA-ch52-4w7c-c8xp (http-cache-semantics <=4.2.0, max-stale on a shared cache). No patched release: 4.2.0 is latest; an unmerged upstream fix is open (kornelski/http-cache-semantics PR #58). The vulnerable code is CachePolicy.evaluateRequest()/satisfiesWithoutRevalidation(). The only importer, astro 7.3.5's build-time remote-image cache (dist/assets/build/remote.js), calls only storable()/timeToLive() on its own fetches and serves nothing to other users; the site uses no astro:assets remote images. The package is absent from apps/web/dist and from the Worker. On expiry: if 4.2.1 is out, refresh the lockfile and delete this entry.",
-    "addedBy": "SamTesura (drafted by Claude Code)",
-    "added": "2026-10-03",
-    "expires": "2026-11-03"
-  }
-]
+    {
+      "id": "pnpm-audit:1240991:high",
+      "reason": "GHSA-ch52-4w7c-c8xp (http-cache-semantics <=4.2.0, max-stale on a shared cache). No patched release: 4.2.0 is latest; an unmerged upstream fix is open (kornelski/http-cache-semantics PR #58). The vulnerable code is CachePolicy.evaluateRequest()/satisfiesWithoutRevalidation(). The only importer, astro 7.3.5's build-time remote-image cache (dist/assets/build/remote.js), calls only storable()/timeToLive() on its own fetches and serves nothing to other users; the site uses no astro:assets remote images. The package is absent from apps/web/dist and from the Worker. On expiry: if 4.2.1 is out, refresh the lockfile and delete this entry.",
+      "addedBy": "SamTesura (drafted by Claude Code)",
+      "added": "2026-10-03",
+      "expires": "2026-11-03"
+    }
+  ]
 }
