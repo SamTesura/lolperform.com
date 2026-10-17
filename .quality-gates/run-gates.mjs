@@ -318,17 +318,29 @@ if (SECURITY_ONLY) {
   }
   if (wantCoverage) {
     analysis = analyzeCoverage(join(ROOT, 'coverage', 'coverage-final.json'));
-    if (!analysis) {
+    if (!analysis && !testsPassed) {
+      /**
+       * Vitest writes no coverage report when any test fails
+       * (`coverage.reportOnFailure` defaults to false), so here the missing
+       * report is a consequence of the [tests] failure, not a second problem.
+       * Calling it a tooling problem sent triage after two causes for one. The
+       * run still fails: the [tests] failure above is already recorded.
+       */
+      notes.push(
+        'coverage: not measured — the test run failed, and Vitest writes no coverage report ' +
+          'when it does (coverage.reportOnFailure defaults to false). See [tests].',
+      );
+    } else if (!analysis) {
       /**
        * The runner asked for coverage, the tooling was present, and the suite
-       * ran — so an absent report means something went wrong, not that there
+       * passed — so an absent report means something went wrong, not that there
        * was nothing to measure. Reporting that as a passing note is how a gate
        * ends up silently measuring nothing, which is worse than no gate at all.
        */
       fail(
         'coverage',
         'coverage was requested but coverage/coverage-final.json was not produced.\n' +
-          'The suite ran, so this is a tooling problem — most often the coverage flags\n' +
+          'The suite passed, so this is a tooling problem — most often the coverage flags\n' +
           'not reaching vitest, or @vitest/coverage-v8 failing to load.\n' +
           `Reproduce with: ${command}`,
       );
