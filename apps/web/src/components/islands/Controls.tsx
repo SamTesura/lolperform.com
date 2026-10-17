@@ -74,7 +74,7 @@ function Select<T extends string>({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
-        className="select min-h-11 rounded-sm border border-border-default bg-bg-elevated px-2 py-1 text-sm text-text-primary"
+        className="select min-h-11 rounded-sm border border-border-default bg-bg-elevated px-2 py-1 text-md text-text-primary pointer-fine:text-sm"
       >
         {options.map((o) => (
           <option key={o} value={o}>
