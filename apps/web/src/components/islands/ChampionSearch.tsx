@@ -123,7 +123,7 @@ export default function ChampionSearch({ champions, version }: Props) {
           onKeyDown={onKeyDown}
           placeholder="Search champions…"
           aria-label="Search champions and pages"
-          className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
+          className="w-full bg-transparent text-md text-text-primary placeholder:text-text-muted focus:outline-none pointer-fine:text-sm"
         />
       </div>
 
