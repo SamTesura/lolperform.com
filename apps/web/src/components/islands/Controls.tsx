@@ -69,7 +69,7 @@ function Select<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 text-xs text-text-muted">
+    <label className="flex flex-col items-start gap-1 text-xs text-text-muted pointer-fine:flex-row pointer-fine:items-center pointer-fine:gap-2">
       <span className="uppercase tracking-[0.08em]">{label}</span>
       <select
         value={value}
