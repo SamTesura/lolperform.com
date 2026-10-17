@@ -1716,7 +1716,7 @@ Without `--coverage.all`, a new file with no tests would never appear in the rep
 
 When `scripts.test` matches `/^vitest(\s+run)?(\s+--[\w-]+(=\S+)?)*\s*$/`, the gate runs `node node_modules/vitest/vitest.mjs run …` directly. The repo's `"vitest run"` matches. This avoids pnpm dropping flags passed after `--`.
 
-If the tests ran but `coverage/coverage-final.json` is missing, the gate fails with `[coverage]`. It never treats a missing report as "nothing to measure".
+If the tests passed but `coverage/coverage-final.json` is missing, the gate fails with `[coverage]`. It never treats a missing report as "nothing to measure". If the tests failed, Vitest writes no report (`coverage.reportOnFailure` defaults to false), so the gate only notes `coverage: not measured` beside the `[tests]` failure.
 
 #### CRAP score
 
