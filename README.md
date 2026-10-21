@@ -74,7 +74,7 @@ schedules, so a data problem cannot break the site and a site deploy cannot dist
 ```
 ┌──────────────────────────── GitHub Actions (scheduled) ────────────────────────────┐
 │                                                                                    │
-│   R2 match store  ──restore──▶  crawl 8 regions  ──▶  accumulate  ──▶  aggregate │ 
+│   R2 match store  ──restore──▶  crawl 8 regions  ──▶  accumulate  ──▶  aggregate   │
 │         ▲                       (league-v4 → match-v5)   (dedupe)      (stats)     │
 │         └──────────save──────────────────────────────────────────────────┐         │
 │                                                                          ▼         │
