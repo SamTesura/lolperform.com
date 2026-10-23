@@ -55,8 +55,19 @@ jobs:
             | tar -xz -C /usr/local/bin gitleaks
           gitleaks version
 
+      # pip trusts only the certifi bundle it vendors, never the OS store, and
+      # the runner's pip can predate 26.2.2, the first whose bundle drops the
+      # compromised eMudhra CAs (2026-10). So semgrep gets its own venv, whose
+      # pip is replaced first from a hash-pinned wheel: the sha256 holds even if
+      # that download is intercepted, and semgrep itself then comes through the
+      # patched bundle. A venv also sidesteps PEP 668, which pipx was here for.
       - name: Install semgrep
-        run: pipx install semgrep || pip install --break-system-packages semgrep
+        run: |
+          python3 -m venv "$RUNNER_TEMP/semgrep"
+          "$RUNNER_TEMP/semgrep/bin/python" -m pip install --disable-pip-version-check \
+            "pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70"
+          "$RUNNER_TEMP/semgrep/bin/python" -m pip install --disable-pip-version-check semgrep
+          echo "$RUNNER_TEMP/semgrep/bin" >> "$GITHUB_PATH"
 
       - name: Install dependencies
         run: |
