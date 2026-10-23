@@ -20,6 +20,9 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
         with:
           node-version: 22
+          # check-latest: the runner image's cached 22.x can predate 22.23.4, the
+          # release that rejects the compromised eMudhra CA keys (2026-10).
+          check-latest: true
       - run: corepack enable
       - name: Install
         run: pnpm install --frozen-lockfile
