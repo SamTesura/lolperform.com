@@ -3,7 +3,7 @@ import { ChampionPortrait } from './ChampionPortrait';
 import { ConfidenceChip } from './ConfidenceChip';
 import { formatPercent } from '../../lib/format';
 
-/** Neutral verdict copy — color carries the good/bad signal, words stay factual. */
+/** Neutral verdict copy: color carries the good/bad signal, words stay factual. */
 function verdict(winRate: number): { label: string; tone: string; glyph: string } {
   if (winRate >= 0.52) return { label: 'Favored', tone: 'text-positive', glyph: '▲' };
   if (winRate <= 0.48) return { label: 'Unfavored', tone: 'text-negative', glyph: '▼' };

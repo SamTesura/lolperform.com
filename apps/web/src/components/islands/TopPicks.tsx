@@ -9,8 +9,8 @@ import { QueryProvider } from './QueryProvider';
 import { AWAITING_DATA, EmptyState, Loading } from './States';
 
 function Picks() {
-  // Bot lane leads because it is the specialty, but every lane is one tap away
-  // — the landing page promises all five roles and has to deliver them.
+  // Bot lane leads because it is the specialty, but every lane is one tap away;
+  // the landing page promises all five roles and has to deliver them.
   const [role, setRole] = useState<Role>('BOTTOM');
 
   const meta = useQuery({ queryKey: ['meta'], queryFn: fetchMeta });
@@ -26,7 +26,7 @@ function Picks() {
 
   return (
     <div className="space-y-3">
-      {/* The site's own role tabs, not a second bespoke style — a role switcher
+      {/* The site's own role tabs, not a second bespoke style; a role switcher
           should look the same here as it does on the tier list. */}
       <RoleTabsInteractive value={role} onChange={setRole} />
       {tiers.isLoading ? (

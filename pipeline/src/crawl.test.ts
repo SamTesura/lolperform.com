@@ -125,7 +125,7 @@ describe('crawl seed ordering', () => {
   it('keeps the seed list head proportional to pool sizes, not tier-equalized', async () => {
     // 90 emerald-range vs 10 apex-range seeds via a client whose ladder pools
     // dwarf the apex pools. The crawled matches' tier mix must track the pool
-    // ratio — the old round-robin would have pushed apex to ~60%.
+    // ratio; the old round-robin would have pushed apex to ~60%.
     const big = (region: Platform, tag: string, n: number) =>
       Array.from({ length: n }, (_, i) => ({
         puuid: `${region}-${tag}-${i}`,
@@ -185,7 +185,7 @@ describe('crawl seed baseline capture', () => {
     // The fake hands out 2 match ids per player. Tagging both with that
     // player's career win rate would count one player twice in the champion's
     // mean, making the sample look larger than the number of independent
-    // players behind it — which is how the first live estimates swung by over
+    // players behind it; this is how the first live estimates swung by over
     // a point between consecutive crawls.
     const matches = await crawl(fakeClient(), config(['na1']));
     const seeded = matches.filter((m) => m.seed).length;

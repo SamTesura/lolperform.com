@@ -1,7 +1,7 @@
 import type { Role } from '@lolperform/shared';
 
 /**
- * Curated lane counters — common, widely-agreed picks INTO a given enemy, keyed
+ * Curated lane counters: common, widely-agreed picks INTO a given enemy, keyed
  * by the enemy's Data Dragon id, per role. This is deliberately *editorial*
  * (general game knowledge), not derived from our sampled match data: counter
  * relationships are well known and stable, while per-matchup win rates need far
@@ -18,7 +18,7 @@ export interface Counter {
 }
 
 export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
-  // ---------------- TOP ----------------
+  // TOP
   Nasus: {
     TOP: [
       { id: 'Teemo', note: 'Blind + ranged poke denies stacks' },
@@ -318,7 +318,7 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
     ],
   },
 
-  // ---------------- JUNGLE ----------------
+  // JUNGLE
   MasterYi: {
     JUNGLE: [
       { id: 'Rammus', note: 'Thornmail + taunt melts his autos' },
@@ -432,7 +432,7 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
     ],
   },
 
-  // ---------------- MID ----------------
+  // MID
   Yone: {
     MIDDLE: [
       { id: 'Malzahar', note: 'Suppress stops his dash combo' },
@@ -666,7 +666,7 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
     ],
   },
 
-  // ---------------- BOTTOM (ADC) ----------------
+  // BOTTOM (ADC)
   Draven: {
     BOTTOM: [
       { id: 'Caitlyn', note: 'Out-ranges him, traps deny axes' },
@@ -841,7 +841,7 @@ export const COUNTERS: Record<string, Partial<Record<Role, Counter[]>>> = {
     ],
   },
 
-  // ---------------- UTILITY (support) ----------------
+  // UTILITY (support)
   Blitzcrank: {
     UTILITY: [
       { id: 'Morgana', note: 'Black Shield blocks the hook' },

@@ -23,8 +23,8 @@ describe('cachedJson', () => {
   });
 
   it('still answers when the KV write fails (quota, outage)', async () => {
-    // The account tripped Cloudflare's daily KV limits on 2026-09-02. A cache
-    // write failure must degrade to an uncached response, never a 500.
+    // A cache write failure (daily KV quota) degrades to an uncached
+    // response, never a 500.
     const env = envWith({
       get: async () => null,
       put: async () => {

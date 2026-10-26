@@ -68,7 +68,7 @@ describe('accumulate', () => {
     const prior = Array.from({ length: 100 }, (_, i) => m(`old${i}`, '16.13'));
     const fresh = [
       ...Array.from({ length: 9 }, (_, i) => m(`hist${i}`, '16.13')),
-      m('early', '16.14'), // 10% — below the flip threshold
+      m('early', '16.14'), // 10%, below the flip threshold
     ];
     const { store, dominantPatch } = accumulate(prior, fresh, '16.14');
     expect(dominantPatch).toBe('16.13'); // dataset stays on the live majority

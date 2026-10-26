@@ -19,12 +19,12 @@ export const ROLE_LABELS: Record<Role, string> = {
 /** The two bot-lane roles, the focus of the deep wiki. */
 export const BOT_LANE_ROLES = ['BOTTOM', 'UTILITY'] as const;
 
-/** Ranked Solo/Duo queue id. The only queue we aggregate. */
+/** Ranked Solo/Duo queue id. The only queue the pipeline aggregates. */
 export const QUEUE_RANKED_SOLO = 420;
 
 /**
- * Rank brackets exposed to users for filtering. We crawl high elo and bucket
- * upward-inclusive ("emerald_plus" = Emerald and above).
+ * Rank brackets exposed to users for filtering. The crawl covers high elo only,
+ * and brackets are upward-inclusive ("emerald_plus" = Emerald and above).
  */
 export const RANK_BRACKETS = ['emerald_plus', 'diamond_plus', 'master_plus'] as const;
 export type RankBracket = (typeof RANK_BRACKETS)[number];
@@ -37,7 +37,7 @@ export const RANK_BRACKET_LABELS: Record<RankBracket, string> = {
 
 export const DEFAULT_RANK_BRACKET: RankBracket = 'emerald_plus';
 
-/** League-v4 tiers we crawl, highest first. */
+/** League-v4 tiers the crawler reads, highest first. */
 export const LEAGUE_TIERS = ['CHALLENGER', 'GRANDMASTER', 'MASTER', 'DIAMOND', 'EMERALD'] as const;
 export type LeagueTier = (typeof LEAGUE_TIERS)[number];
 
@@ -52,13 +52,11 @@ export const BRACKET_TIERS: Record<RankBracket, readonly LeagueTier[]> = {
 };
 
 /**
- * Share of the ranked ladder in each crawled tier (percent of all ranked
- * players, June 2026 solo-queue distribution — esportstales.com). Only the
- * ratios matter: aggregation post-stratifies each bracket's sample to these,
- * so a crawl that oversamples apex (deliberately, to keep the master_plus
- * slice usable) still reports stats representative of the bracket's real
- * population instead of an apex-skewed one. Champions whose win rate moves
- * with elo (Caitlyn down, Vayne up) are exactly the ones a raw mix misgrades.
+ * Share of the ranked ladder in each crawled tier, in percent of all ranked
+ * players (June 2026 solo-queue distribution, esportstales.com). Only the
+ * ratios matter: aggregation post-stratifies each bracket to these, so the
+ * deliberate apex oversampling (it keeps master_plus usable) does not skew
+ * champions whose win rate moves with elo (Caitlyn down, Vayne up).
  */
 export const TIER_POPULATION_SHARE: Record<LeagueTier, number> = {
   EMERALD: 12,
@@ -70,12 +68,10 @@ export const TIER_POPULATION_SHARE: Record<LeagueTier, number> = {
 
 /**
  * Ranked players per crawled server, in millions (Split 2 2024 ranked-API
- * estimates — unrankedsmurfs.com; VN and JP are estimates, no published
- * figures). Only the ratios matter: the pooled "all" view post-stratifies to
- * these so it represents global ranked play by population, not by our
- * equal-per-region crawl budget — which otherwise triples the influence of
- * small servers (JP + OCE + VN were 31% of the crawl, ~2× their real share)
- * and skews champions whose win rate varies by region.
+ * estimates from unrankedsmurfs.com; VN and JP have no published figures and
+ * are estimated). Only the ratios matter: the pooled "all" view post-stratifies
+ * to these. The crawl budget is equal per region, so without it JP + OCE + VN
+ * carry about twice their real share and skew region-sensitive champions.
  */
 export const REGION_POPULATION_SHARE: Record<Platform, number> = {
   kr: 2.57,
@@ -89,18 +85,16 @@ export const REGION_POPULATION_SHARE: Record<Platform, number> = {
 };
 
 /**
- * Platform routing values we crawl — one ranked ladder each — mapped to the
- * regional routing host match-v5 uses. Add a platform here and it becomes
- * crawlable and selectable in the UI in one step.
+ * Crawled platform routing values, one ranked ladder each. A platform added
+ * here becomes crawlable and selectable in the UI.
  */
 export const PLATFORMS = ['na1', 'euw1', 'kr', 'eun1', 'br1', 'jp1', 'oc1', 'vn2'] as const;
 export type Platform = (typeof PLATFORMS)[number];
 
 /**
- * Region filter values exposed to users: every crawled platform plus the pooled
- * "all" view (all regions combined). Pooling is the largest, most stable sample,
- * so it is the default — adding more platforms enriches it instead of thinning
- * each per-region slice. "all" is an aggregation bucket, never a crawl target.
+ * Region filter values: every crawled platform plus the pooled "all" view.
+ * "all" is the default because it is the largest, most stable sample. It is an
+ * aggregation bucket, never a crawl target.
  */
 export const REGIONS = ['all', ...PLATFORMS] as const;
 export type Region = (typeof REGIONS)[number];
@@ -117,6 +111,7 @@ export const REGION_LABELS: Record<Region, string> = {
   vn2: 'VN',
 };
 
+/** Regional routing host match-v5 uses for each platform. */
 export type RegionalRoute = 'americas' | 'europe' | 'asia' | 'sea';
 
 export const REGION_ROUTE: Record<Platform, RegionalRoute> = {
@@ -141,8 +136,8 @@ export const TIER_GRADES = ['S', 'A', 'B', 'C', 'D'] as const;
 export type TierGrade = (typeof TIER_GRADES)[number];
 
 /**
- * Minimum games for a slice to be considered statistically meaningful.
- * Below LOW we hide or heavily flag the number — honesty over false precision.
+ * Sample-size bands for confidence labels, in games. Below `low` the UI hides
+ * or flags the number rather than imply false precision.
  */
 export const SAMPLE_THRESHOLDS = {
   low: 30,

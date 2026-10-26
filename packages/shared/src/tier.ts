@@ -2,31 +2,22 @@ import type { TierGrade } from './constants.js';
 import { skillFloorOffset, type SkillFloor } from './skillFloor.js';
 
 /**
- * Tiering policy — rank-based grading (published on /methodology). Tiers are
- * NOT fixed win-rate cutoffs: champions in a role are ranked by two signals —
- * strength (Wilson win rate, corrected for player pool) and meta presence —
- * and grades are cut
- * at fixed percentiles of that ranking, so "S+" always means "top of this
- * patch's meta", the same convention the major tier lists follow.
+ * Tiering policy, published on /methodology. Tiers are not win-rate cutoffs:
+ * champions in a role are ranked by strength (Wilson win rate, corrected for
+ * player pool) and meta presence, and grades are cut at fixed percentiles of
+ * that ranking, so "S+" means "top of this patch's meta".
  *
- * Per-player signals that need individual players tracked across months
- * (best-player win rate, best-player Elo) remain out of scope — this pipeline
- * stores no player identifiers by design. The one player signal it does use,
- * the picking player's career win rate, is captured per match and aggregated
- * immediately, carrying no identity with it. See playerSkill.ts.
- *
- * Lives in shared so the pipeline (which computes and stores grades at slice
- * level) and every UI surface stay in agreement.
+ * The pipeline stores no player identifiers by design. The one player signal,
+ * the picking player's career win rate, is aggregated per match with no
+ * identity attached. See playerSkill.ts.
  */
 
-/** Stats-display floor: below this we show a dash instead of a win rate. */
+/** Stats-display floor in games: below it the UI shows a dash instead of a win rate. */
 export const MIN_TIER_GAMES = 50;
 
 /**
- * Grading floor: a champion enters a role's ranking pool only past this many
- * games this patch. Below it there is no grade at all — the tier list omits
- * the champion and its page shows NR — because ranking a champion off a few
- * dozen games is noise, not signal.
+ * Grading floor in games this patch. Below it there is no grade (the tier list
+ * omits the champion and its page shows NR), because a few dozen games is noise.
  */
 export const TIER_LIST_MIN_GAMES = 1000;
 
@@ -53,9 +44,9 @@ export type FullTierGrade = (typeof FULL_TIER_GRADES)[number];
 
 /**
  * Cumulative rank-percentile ceiling per grade. A champion whose combined-rank
- * percentile falls under `upTo` earns that grade — e.g. the top 4% of a role's
- * pool is S+. Shaped like the distribution the major tier lists produce: a few
- * S/S+, a broad middle, a thin tail.
+ * percentile falls under `upTo` earns that grade: the top 4% of a role's pool
+ * is S+. Shaped like the major tier lists: a few S/S+, a broad middle, a thin
+ * tail.
  */
 export const TIER_PERCENTILES: readonly { grade: FullTierGrade; upTo: number }[] = [
   { grade: 'S+', upTo: 0.04 },
@@ -80,7 +71,7 @@ export function isRanked(games: number): boolean {
   return games >= MIN_TIER_GAMES;
 }
 
-/** Base letter of a full grade ("S+" → "S") — drives row grouping and colour. */
+/** Base letter of a full grade ("S+" → "S"), used for row grouping and colour. */
 export function baseTier(full: FullTierGrade): TierGrade {
   return full[0] as TierGrade;
 }
@@ -91,9 +82,8 @@ export interface PriorPatchStats {
   pickRate: number;
   banRate: number;
   wilsonLower: number;
-  /** Games behind the prior. A prior is only usable if it was itself ranked —
-   *  see gradeSlice. Optional for callers that predate the check; absent is
-   *  treated as unranked, i.e. no provisional grade. */
+  /** Games behind the prior. A prior is usable only if it was itself ranked
+   *  (see gradeSlice); absent counts as unranked, so no provisional grade. */
   games?: number;
 }
 
@@ -113,31 +103,19 @@ export interface GradeInput {
 }
 
 /**
- * Meta presence: how much of the draft a champion occupies, picked or removed.
- *
- * This replaced PBI — (winRate − 0.5) · pick / (1 − ban) — which was being
- * used as half the strength ranking and could not do that job. Multiplying a
- * champion's distance from 50% by its pick rate makes popularity amplify the
- * sign: two champions on an identical 48.2% win rate ranked eight places apart
- * purely because one was popular, while an equally popular champion above 50%
- * got the same magnitude as a bonus. That is a meta-impact measure, not a
- * strength measure, and it was the single largest distortion in the tier list.
- *
- * Presence keeps the defensible half of the idea — a champion contested in
- * every draft is more meta-relevant than a pocket pick, and is played into
- * prepared opponents, which suppresses its raw win rate — without letting
- * popularity change the sign of anything.
+ * Meta presence: how much of the draft a champion occupies, picked or banned.
+ * A contested champion is more meta-relevant and faces prepared opponents.
+ * PBI, (winRate - 0.5) * pick / (1 - ban), is not used: popularity amplifies
+ * its sign, so identical win rates rank far apart by pick rate alone.
  */
 export function presence(r: Pick<GradeInput, 'pickRate' | 'banRate'>): number {
   return r.pickRate + r.banRate;
 }
 
 /**
- * Rank-sum weights. Strength still leads, but presence carries real weight: a
- * champion contested in a third of drafts is shaping the patch, and it eats
- * bans and prepared opponents in a way a pocket pick never does. Measured on
- * live bot lane, moving from 3:1 to 2:1 lifted the heavily-contested picks a
- * band or so without disturbing the top of the table.
+ * Rank-sum weights. Strength leads, but a champion contested in a third of
+ * drafts shapes the patch. On live bot lane, 2:1 lifts heavily contested picks
+ * about a band over 3:1 without disturbing the top of the table.
  */
 export const STRENGTH_WEIGHT = 2;
 export const PRESENCE_WEIGHT = 1;
@@ -147,17 +125,15 @@ export interface GradeResult {
   /** Sort key, higher = better. Ranked rows land in (0, 1]; sub-floor rows are
    *  negative so they always sort after every ranked champion. */
   score: number;
-  /** True when this patch hasn't reached TIER_LIST_MIN_GAMES yet and the grade
-   *  leans on a shrinkage-blended prior-patch prior instead. */
+  /** True when this patch is still under TIER_LIST_MIN_GAMES and the grade
+   *  leans on blended prior-patch stats. */
   provisional: boolean;
 }
 
 /**
  * Blend a row's stats toward its prior-patch counterpart, weighted linearly by
- * how far this patch's sample has filled TIER_LIST_MIN_GAMES (0 games this
- * patch = pure prior, TIER_LIST_MIN_GAMES+ = pure current — the prior fades
- * out exactly as fast as real signal fades in). No prior, or already past the
- * floor: current stats pass through unchanged.
+ * how far this patch has filled TIER_LIST_MIN_GAMES (0 games = pure prior, the
+ * floor or more = pure current). Without a prior, stats pass through unchanged.
  */
 function blendWithPrior(r: GradeInput, prior: PriorPatchStats | undefined): PriorPatchStats {
   if (!prior || r.games >= TIER_LIST_MIN_GAMES) {
@@ -179,22 +155,13 @@ function blendWithPrior(r: GradeInput, prior: PriorPatchStats | undefined): Prio
 }
 
 /**
- * Grade one role's slice. Champions past TIER_LIST_MIN_GAMES are ranked twice —
- * by strength (Wilson win rate, corrected for player pool and skill floor) and
- * by meta presence — then ordered by a weighted sum of the two ranks
- * (rank-sum is scale-free, so neither signal drowns the other) and cut into
- * grades at TIER_PERCENTILES. Rows below the floor get a 'D-' placeholder that
- * no UI surfaces (the tier list omits them; pages show NR) — unless a prior-patch
- * counterpart exists, in which case the row enters the pool past MIN_TIER_GAMES
- * using its prior-blended stats, flagged `provisional`.
- *
- * Both signals see a skill-floor adjustment (±SKILL_FLOOR_OFFSET win-rate
- * equivalent): a low-floor champion's win rate is repeatable by anyone who
- * picks it, so it earns slightly more trust than the same number on a
- * mechanically demanding champion. Small by design — it nudges boundary
- * cases, never rewrites a tier.
- *
- * Result is aligned with the input order.
+ * Grade one role's slice. Champions past TIER_LIST_MIN_GAMES are ranked by
+ * strength (Wilson bound plus player-pool and skill-floor shifts) and by meta
+ * presence, ordered by a weighted rank sum (scale-free, so neither signal
+ * drowns the other) and cut at TIER_PERCENTILES. A row under the floor with a
+ * ranked prior enters past MIN_TIER_GAMES on blended stats, flagged
+ * `provisional`; other sub-floor rows get a 'D-' placeholder no UI shows.
+ * Results align with the input order.
  */
 export function gradeSlice(rows: readonly GradeInput[]): GradeResult[] {
   const out: GradeResult[] = rows.map((r) => ({
@@ -202,11 +169,9 @@ export function gradeSlice(rows: readonly GradeInput[]): GradeResult[] {
     score: r.wilsonLower - 1,
     provisional: false,
   }));
-  // A prior is only worth leaning on if the prior itself was ranked. Without
-  // that gate a champion nobody plays in the lane enters on 50 games and
-  // borrows a prior built from equally few — laundering noise into a grade.
-  // Measured on live 16.14 bot lane, the gate dropped the pool from 95 to 45
-  // and removed a 144-game Qiyana at S and a 158-game Riven at S-.
+  // Lean on a prior only if the prior itself was ranked. Otherwise a champion
+  // nobody plays in the lane enters on 50 games and borrows a prior built from
+  // equally few. On live 16.14 bot lane this gate cut the pool from 95 to 45.
   const usablePrior = (r: GradeInput): PriorPatchStats | undefined =>
     r.priorPatch && (r.priorPatch.games ?? 0) >= TIER_LIST_MIN_GAMES ? r.priorPatch : undefined;
   const pool = rows
@@ -219,9 +184,8 @@ export function gradeSlice(rows: readonly GradeInput[]): GradeResult[] {
   const blended = new Map(pool.map((x) => [x.i, blendWithPrior(x.r, usablePrior(x.r))]));
   // Midranks: tied values share the average of the positions they span, so a
   // signal that cannot tell two champions apart contributes nothing to
-  // separating them. Assigning tied rows arbitrary consecutive ranks instead
-  // would let sort order alone move a champion by whole grades — presence in
-  // particular ties constantly (identical ban rates, zero-ban champions).
+  // separating them. Arbitrary consecutive ranks would let sort order alone
+  // move a champion by whole grades, and presence ties constantly (zero bans).
   const rankOf = (key: (x: (typeof pool)[number]) => number): Map<number, number> => {
     const sorted = [...pool].sort((a, b) => key(b) - key(a));
     const ranks = new Map<number, number>();

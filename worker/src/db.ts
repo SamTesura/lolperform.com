@@ -18,15 +18,10 @@ import {
 } from '@lolperform/shared';
 import type { Env } from './env.js';
 
-/* ------------------------------------------------------------------ *
- * Row shapes (snake_case, as stored in D1)
- *
- * The per-champion tables (matchups, builds, keystone_stats, rune_pages) and
- * role_stats were folded into JSON payloads in migration 0011 — D1 bills per
- * row written, and the fan-out cost ~1M row writes per refresh against a free
- * ceiling of 100k/day. What is left is three slice tables whose payloads are
- * parsed here. See db/migrations/0011_slice_tables.sql.
- * ------------------------------------------------------------------ */
+// Row shapes, snake_case as stored in D1. Per-champion data lives in JSON
+// payloads on three slice tables because D1 on Workers Free allows 100k rows
+// written per day, and one row per record would cost about 1M per refresh.
+// See db/migrations/0011_slice_tables.sql.
 
 interface PatchRow {
   patch: string;
@@ -54,9 +49,7 @@ interface CounterRow {
   wilson_lower: number;
 }
 
-/* ------------------------------------------------------------------ *
- * Payload shapes — mirrors of the writer in pipeline/src/load.ts.
- * ------------------------------------------------------------------ */
+// Payload shapes. They mirror the writer in pipeline/src/load.ts.
 
 export interface StoredMatchup {
   opponentKey: string;
@@ -122,12 +115,8 @@ export interface StoredRoleStat {
   tier: string;
 }
 
-/* ------------------------------------------------------------------ *
- * Payload parsers — tolerant by design (unit tested)
- *
- * A payload is written by our own pipeline, but a truncated or half-migrated
- * row must degrade to "no data" rather than 500 the whole champion page.
- * ------------------------------------------------------------------ */
+// Payload parsers. Tolerant on purpose: a truncated or half-migrated row
+// degrades to "no data" instead of failing the whole champion page with a 500.
 
 const EMPTY_RUNES: RunePage = {
   keystone: 0,
@@ -179,9 +168,7 @@ export function parseDuoSlice(payload: string | null | undefined): StoredDuo[] {
   return asArray<StoredDuo>(raw?.duos);
 }
 
-/* ------------------------------------------------------------------ *
- * Pure hydrators: payload entry + its slice key -> shared type
- * ------------------------------------------------------------------ */
+// Pure hydrators: payload entry + its slice key -> shared type.
 
 export function mapChampion(r: ChampionRow): ChampionMeta {
   return { key: r.champion_key, id: r.id, name: r.name, title: r.title, roles: [] };
@@ -244,8 +231,8 @@ export function hydrateBuild(
     rank: slice.rank,
     role,
     championKey,
-    // '-' was the pre-0011 sentinel for "no opponent"; payloads write null, but
-    // a backfilled row can still carry the sentinel through.
+    // Payloads write null for "no opponent", but a backfilled row can still
+    // carry the older '-' sentinel.
     opponentKey: b.opponentKey && b.opponentKey !== '-' ? b.opponentKey : null,
     items: asArray<number>(b.items),
     runes: asRunes(b.runes),
@@ -325,9 +312,7 @@ export function mapCounter(r: CounterRow, tier: string | undefined): CounterPick
   };
 }
 
-/* ------------------------------------------------------------------ *
- * Queries — all prepared + bound (no string concatenation of inputs)
- * ------------------------------------------------------------------ */
+// Queries. All prepared and bound; no input is concatenated into SQL.
 
 export interface Slice {
   patch: string;
@@ -341,8 +326,8 @@ export async function getLatestPatch(env: Env): Promise<PatchRow | null> {
   ).first<PatchRow>();
 }
 
-/** The patch immediately before `patch`, if one is still on hand (the loader
- *  keeps a short retention window — see buildLoadSql). Null once none remains. */
+/** The patch before `patch`, or null once it has aged out of the loader's
+ *  short retention window (see buildLoadSql). */
 async function getPreviousPatch(env: Env, patch: string): Promise<string | null> {
   const row = await env.DB.prepare(
     'SELECT patch FROM patches WHERE patch != ? ORDER BY generated_at DESC LIMIT 1',
@@ -352,7 +337,7 @@ async function getPreviousPatch(env: Env, patch: string): Promise<string | null>
   return row?.patch ?? null;
 }
 
-/** One role's stored (ungraded) stats — a single row read on the primary key. */
+/** One role's stored (ungraded) stats: a single row read on the primary key. */
 async function fetchRoleSlice(
   env: Env,
   patch: string,
@@ -368,7 +353,7 @@ async function fetchRoleSlice(
   return parseRoleSlice(row?.payload);
 }
 
-/** Every role a champion appears in for this slice — a primary-key prefix scan. */
+/** Every role a champion appears in for this slice: a primary-key prefix scan. */
 async function fetchChampionRows(
   env: Env,
   slice: Slice,
@@ -385,7 +370,7 @@ async function fetchChampionRows(
 
 /**
  * Everything one champion has in one slice, hydrated once and reused by the
- * champion page's five lists. Each call is ~5 row reads (one per role played).
+ * champion page's five lists. One row read per role played, so at most 5.
  */
 async function fetchChampionPayloads(
   env: Env,
@@ -398,10 +383,9 @@ async function fetchChampionPayloads(
 
 /**
  * One role's slice, graded live: current-patch rows below TIER_LIST_MIN_GAMES
- * are blended with their prior-patch counterpart (see tier.ts) instead of
- * sitting out as NR while the new patch's sample fills up. Displayed games/
- * win rate/etc. stay the champion's real current-patch numbers — only the
- * ranking inputs and resulting tier/score/provisional are blended.
+ * blend with their prior-patch counterpart (see tier.ts) instead of showing NR
+ * while the new patch fills up. Only the ranking inputs and the resulting
+ * tier, score and provisional flag are blended; displayed stats stay real.
  */
 async function getGradedRoleStats(env: Env, slice: Slice, role: Role): Promise<RoleStats[]> {
   const current = await fetchRoleSlice(env, slice.patch, slice.region, slice.rank, role);
@@ -567,10 +551,8 @@ export async function getDuos(env: Env, slice: Slice): Promise<DuoSynergy[]> {
 
 /**
  * Counter picks: champions with the best record against `opponentKey` in `role`.
- *
- * The matchups live inside champion payloads, so this scans the slice's rows —
- * but json_each projects the matching matchup out in SQL, so only the 24 rows
- * that survive the sort cross the wire instead of every payload in the slice.
+ * Matchups live inside champion payloads; json_each projects the matching one
+ * in SQL so only the top 24 rows cross the wire, not every payload in the slice.
  */
 export async function getCounters(
   env: Env,
@@ -594,7 +576,7 @@ export async function getCounters(
     .all<CounterRow>();
   if (results.length === 0) return [];
 
-  // Tier comes from the stored (ungraded) role stats, as the pre-0011 join did.
+  // Tier comes from the stored, ungraded role stats.
   const stats = await fetchRoleSlice(env, slice.patch, slice.region, slice.rank, role);
   const tierByChamp = new Map(stats.map((stat) => [stat.championKey, stat.tier]));
   return results.map((r) => mapCounter(r, tierByChamp.get(r.champion_key)));

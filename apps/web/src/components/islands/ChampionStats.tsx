@@ -28,7 +28,7 @@ interface ItemInfo {
   description?: string;
   gold?: { base: number; total: number };
   /** Item ids this one is built from, straight out of Data Dragon. Unlike
-   *  everything else on this page it is not a sampled statistic — it is the
+   *  everything else on this page it is not a sampled statistic; it is the
    *  shop's own recipe, so it is exact and needs no confidence treatment. */
   from?: string[];
 }
@@ -51,8 +51,8 @@ function componentsOf(id: number, catalog?: Record<string, ItemInfo>): Piece[] {
 
 /**
  * How each finished item is actually bought: the pieces, their prices, and the
- * total. Aimed at players who know what to build but not what to buy on a back
- * — the shop recipe answers that exactly, with no sample size to caveat.
+ * total. Aimed at players who know what to build but not what to buy on a back;
+ * the shop recipe answers that exactly, with no sample size to caveat.
  */
 function BuildPath({
   items,
@@ -191,7 +191,7 @@ function RuneDot({
  * The most common rune page, drawn as the in-client tree: every rune of the
  * primary and secondary styles shown, with the chosen ones lit and the rest
  * dimmed. Layout data comes from Data Dragon, the chosen page from the
- * champion's most common rune signature this patch. Presentation only — the
+ * champion's most common rune signature this patch. Presentation only; the
  * honest per-keystone win rates live in the Keystones list next to it.
  */
 function RunePagePanel({ runes, catalog }: { runes: RunePage; catalog?: RuneCatalog }) {
@@ -256,7 +256,7 @@ function RunePagePanel({ runes, catalog }: { runes: RunePage; catalog?: RuneCata
 
 /**
  * The champion's rune pages: up to two, switchable, each headed by its own
- * win rate and sample — a per-page pre-lock statistic, so unlike item numbers
+ * win rate and sample, a per-page pre-lock statistic, so unlike item numbers
  * it means what it says. Falls back to the build row's page when per-page
  * rows haven't been aggregated yet. Options, not one prescription.
  */
@@ -323,7 +323,7 @@ function RunePages({
  * own strength inside it, so comparing keystones to the champion's baseline is
  * what isolates the choice. And unlike an item statistic this is a fair thing
  * to publish at all: a rune page is locked in champion select, before the game
- * exists, so it cannot be an effect of already winning — whereas a completed
+ * exists, so it cannot be an effect of already winning; whereas a completed
  * item's win rate largely measures having survived long enough to finish it.
  */
 function Keystones({
@@ -332,7 +332,7 @@ function Keystones({
   catalog,
 }: {
   rows: KeystoneStats[];
-  /** The champion's win rate in this role — the thing each keystone is judged against. */
+  /** The champion's win rate in this role; the baseline each keystone is judged against. */
   baseline: number | undefined;
   catalog?: Record<string, KeystoneInfo>;
 }) {
@@ -394,8 +394,8 @@ type SlotOption = { item: number; share: number; games: number };
 /**
  * The build laid out the way players read it on the big sites: core items in
  * order, then alternatives per later slot, plus boots as their own decision.
- * Every option shows how often the ladder takes it and on how many games —
- * options, not one prescription. Deliberately no per-slot win rates: an item's
+ * Every option shows how often the ladder takes it and on how many games,
+ * not one prescription. Deliberately no per-slot win rates: an item's
  * "win rate" mostly measures having been winning long enough to buy it, so we
  * publish popularity, which is at least exactly what it claims to be.
  */
@@ -505,7 +505,7 @@ function SlotBreakdown({
     </li>
   );
 
-  // The core trio never repeats itself, and later columns exclude the trio —
+  // The core trio never repeats itself, and later columns exclude the trio;
   // an item both in core and as a "4th item" reads as a broken duplicate. The
   // later columns MAY repeat each other: the same item genuinely is the 4th
   // buy in some games and the 5th in others, and each column should offer a
@@ -660,7 +660,7 @@ interface SpellInfo {
 
 /**
  * Summoner spell pairs, each with win rate, pick share and games. The win
- * rate is shown here — and not on items — because spells are locked in
+ * rate is shown here (and not on items) because spells are locked in
  * champion select: a pre-lock choice cannot be an effect of already winning.
  */
 function SpellPairs({
@@ -718,7 +718,7 @@ function SpellPairs({
 /**
  * Data Dragon item descriptions use light markup (<stats>, <attention>,
  * <passive>, <br>, damage-type tags…). Parse it into plain-text structure and
- * render with React — never as raw HTML.
+ * render with React, never as raw HTML.
  */
 function stripTags(s: string): string {
   return s
@@ -761,7 +761,7 @@ function parseItemDescription(desc: string): {
 
 /**
  * "Best" holds only matchups the champion actually wins (>50%), "toughest" only
- * ones it loses (<50%), so the two lists are disjoint by construction — with a
+ * ones it loses (<50%), so the two lists are disjoint by construction; with a
  * thin matchup set, a plain sort-and-take-6 from both ends put the same
  * opponents (even favored ones) on both sides. Exactly-even matchups appear in
  * neither.
@@ -863,7 +863,7 @@ function Detail({ championId }: { championId: string }) {
   const roleMatchups = matchups.filter((m) => m.role === activeRole);
   const bestMatchups = topMatchups(roleMatchups, true);
   const toughMatchups = topMatchups(roleMatchups, false);
-  // Strictly the chosen role's own build — a wrong-role fallback would show
+  // Strictly the chosen role's own build; a wrong-role fallback would show
   // mid items under a bot tab.
   const champBuild = builds.find((b) => b.opponentKey === null && b.role === activeRole);
 
@@ -883,8 +883,8 @@ function Detail({ championId }: { championId: string }) {
                 key={s.role}
                 className="flex w-full flex-wrap items-center gap-2 rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 sm:w-auto sm:gap-3"
               >
-                {/* Tiers only for graded rows (score > 0) — the same test the
-                    tier list uses — otherwise a lane could read "S+" here
+                {/* Tiers only for graded rows (score > 0), the same test the
+                    tier list uses; otherwise a lane could read "S+" here
                     while the champion is absent from that lane's tier list.
                     Win rate always shows. */}
                 {s.score > 0 ? (
@@ -1020,7 +1020,7 @@ function Detail({ championId }: { championId: string }) {
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex flex-wrap gap-2">
                 {Array.from({
-                  // Six item slots, seven for bot lane — the support quest item
+                  // Six item slots, seven for bot lane; the support quest item
                   // occupies one down there.
                   length: champBuild.role === 'BOTTOM' || champBuild.role === 'UTILITY' ? 7 : 6,
                 }).map((_, i) => {
@@ -1051,7 +1051,7 @@ function Detail({ championId }: { championId: string }) {
                             return (
                               <>
                                 {/* Items with no passive/active prose (e.g. Infinity
-                                  Edge) carry their one-liner in plaintext — show
+                                  Edge) carry their one-liner in plaintext; show
                                   it under the name like the big sites do. */}
                                 {parsed.sections.length === 0 && info.plaintext ? (
                                   <span className="mt-0.5 block text-2xs leading-snug text-text-muted">

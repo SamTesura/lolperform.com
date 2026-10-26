@@ -6,7 +6,7 @@ import { botLaneMatches } from './__fixtures__/matches.js';
 describe('aggregate post-stratification', () => {
   it('weights slice stats to the real rank distribution, not the crawl mix', () => {
     // Crawl mix: 200 EMERALD matches (Caitlyn 60% WR) + 600 MASTER matches
-    // (Caitlyn 45% WR) — raw mix would say 48.75%. The real Emerald+ ladder is
+    // (Caitlyn 45% WR); raw mix would say 48.75%. The real Emerald+ ladder is
     // ~93% Emerald+Diamond, so the weighted rate must land near the Emerald
     // stratum, far above the raw apex-dragged figure.
     const emerald = botLaneMatches(200, 120).map((m, i) => ({
@@ -52,7 +52,7 @@ describe('aggregate post-stratification', () => {
         r.region === 'all',
     )!;
     // untrimmed share-weighting says ≈0.590; the oc1 cell clamps at the 0.25
-    // weight floor, landing ≈0.567 — still far from the raw-mix 0.45
+    // weight floor, landing ≈0.567, still far from the raw-mix 0.45
     expect(pooled.winRate).toBeGreaterThan(0.55);
     expect(pooled.winRate).toBeLessThan(0.61);
     const oceOnly = result.roleStats.find(
@@ -111,7 +111,7 @@ describe('aggregate keystone-page coverage', () => {
     // 270 games on the fixture keystone split across two secondary styles
     // (150 + 120) plus 105 First Strike games: the two biggest signatures both
     // run the same keystone, so First Strike would appear in the keystone
-    // list (>=100 games) with no page — the Lucian contradiction. Coverage
+    // list (>=100 games) with no page, the Lucian contradiction. Coverage
     // must emit its page as slot 3.
     const matches = botLaneMatches(375, 200).map((m, i) => {
       const runes =
@@ -146,7 +146,7 @@ describe('aggregate keystone-list page parity', () => {
   it('lists a keystone whose page is displayed even under the keystone floor', () => {
     // 160 games on the fixture keystone + 45 on an Electrocute page: the
     // Electrocute page clears the 30-game page floor, so it will be on
-    // display — the keystone list must then include Electrocute too (45 <
+    // display; the keystone list must then include Electrocute too (45 <
     // 100), or the page names a keystone the list does not have (the Ashe
     // contradiction, mirror of Lucian's).
     const matches = botLaneMatches(205, 120).map((m, i) =>

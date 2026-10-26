@@ -1,21 +1,14 @@
 /**
- * Skill floor — how much mechanical mastery a champion demands before its win
- * rate is achievable — folded into grading as a small, bounded adjustment:
+ * Skill floor: how much mechanical mastery a champion demands before its win
+ * rate is achievable. A low floor means the listed rate is repeatable by almost
+ * anyone (a 48% Caitlyn is a safer pick than a 48% Aphelios); a high floor
+ * means dedicated players earn it. Grading applies it as a small, bounded nudge.
  *
- * - LOW floor: the listed win rate is repeatable by almost anyone who picks
- *   the champion, so it deserves slightly more trust (e.g. Caitlyn: long
- *   range, simple pattern — a 48% Caitlyn is a safer pick than a 48% Aphelios).
- * - HIGH floor: the listed win rate is earned disproportionately by dedicated
- *   players; the average visitor should expect less.
- *
- * Curated (like the counter list) because Riot's Data Dragon `info.difficulty`
- * is not usable — it rates Caitlyn 6 vs Garen 5 and Varus 2. Full-roster review
- * (July 2026, all 173 champions): each entry needs at least two agreeing
- * signals among community difficulty tables, hardest/easiest-champion consensus
- * lists, and Riot's own design framing for recent releases (Milio, Naafiri and
- * Vex simple by design; Zaahen a "simple but deadly stat checker"; Locke and
- * Yunara stated medium). Contested champions stay neutral. Keyed by Data
- * Dragon id.
+ * Curated because Data Dragon `info.difficulty` is unusable (Caitlyn 6, Garen 5,
+ * Varus 2). Reviewed across all 173 champions in July 2026: each entry needs two
+ * agreeing signals from community difficulty tables, hardest/easiest consensus
+ * lists and Riot's design framing. Contested champions stay neutral. Keyed by
+ * Data Dragon id.
  */
 export type SkillFloor = 'low' | 'medium' | 'high';
 
@@ -29,7 +22,7 @@ export function skillFloorOffset(floor: SkillFloor | undefined): number {
 }
 
 const LOW: string[] = [
-  // Simple, forgiving kits — the win rate travels to everyone who picks them.
+  // Simple, forgiving kits: the win rate travels to everyone who picks them.
   'Amumu',
   'Annie',
   'Ashe',
@@ -103,7 +96,7 @@ const LOW: string[] = [
 ];
 
 const HIGH: string[] = [
-  // Mechanically demanding — the ladder win rate is carried by specialists.
+  // Mechanically demanding: specialists carry the ladder win rate.
   'Akali',
   'Akshan',
   'Ambessa',

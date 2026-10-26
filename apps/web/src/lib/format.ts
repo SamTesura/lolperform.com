@@ -1,16 +1,16 @@
 import { toPercent } from '@lolperform/shared';
 
-/** "54.2%" — fixed one-decimal percentage from a 0..1 proportion. */
+/** "54.2%": fixed one-decimal percentage from a 0..1 proportion. */
 export function formatPercent(value: number, decimals = 1): string {
   return `${toPercent(value, decimals).toFixed(decimals)}%`;
 }
 
-/** "12,840" — grouped integer. */
+/** "12,840": grouped integer. */
 export function formatCount(value: number): string {
   return value.toLocaleString('en-US');
 }
 
-/** "n = 12,840" — sample-size label used by the confidence chip. */
+/** "n = 12,840": sample-size label used by the confidence chip. */
 export function formatSample(games: number): string {
   return `n = ${formatCount(games)}`;
 }

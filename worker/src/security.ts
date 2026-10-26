@@ -1,19 +1,16 @@
 /**
- * Security headers applied to every response the Worker emits — both API JSON and
- * the static site served through the ASSETS binding.
+ * Security headers applied to every response the Worker emits: API JSON and the
+ * static site served through the ASSETS binding.
  *
- * CSP notes:
- * - `script-src 'self'`: Astro ships island hydration as external module scripts;
- *   no inline scripts are allowed.
- * - `style-src 'self' 'unsafe-inline'`: Astro inlines small critical CSS. Inline
- *   styles are low risk; inline scripts are not, hence the asymmetry.
- * - `img-src` allows the Data Dragon CDN (champion/item art) and data: URIs.
+ * CSP:
+ * - `style-src 'unsafe-inline'`: Astro inlines small critical CSS.
+ * - `img-src` allows the Data Dragon CDN (champion and item art) and data: URIs.
  */
-// Google AdSense requires its script/frame/img/connect domains to be allowlisted,
-// and in practice needs 'unsafe-inline' for the scripts it injects. This is a
-// deliberate tradeoff for monetization; the site renders no user-supplied HTML
-// (all data is numeric/enum from our own D1, escaped by React), so the residual
-// XSS surface is low. Everything non-ad stays tightly scoped.
+// Google AdSense needs its script, frame, img and connect domains allowlisted,
+// and 'unsafe-inline' in script-src for the scripts it injects. That is a
+// deliberate tradeoff for monetization: the site renders no user-supplied HTML
+// (all data is numeric or enum values from the site's own D1, escaped by
+// React), so the residual XSS surface is low. Everything non-ad stays scoped.
 const GOOGLE_ADS =
   'https://*.googlesyndication.com https://*.googleadservices.com https://*.google.com https://*.doubleclick.net https://*.adtrafficquality.google';
 
@@ -30,9 +27,8 @@ const CSP = [
   `script-src 'self' 'unsafe-inline' ${CF_INSIGHTS_SCRIPT} https://adservice.google.com https://*.googletagservices.com ${GOOGLE_ADS}`,
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
-  // Data Dragon in connect-src: the item tooltips fetch item.json (names +
-  // short descriptions) client-side from the same read-only static CDN that
-  // already serves all champion/item art.
+  // Item tooltips fetch item.json (names and short descriptions) from the
+  // Data Dragon CDN in the browser.
   `connect-src 'self' https://ddragon.leagueoflegends.com ${CF_INSIGHTS_CONNECT} ${GOOGLE_ADS}`,
   `frame-src ${GOOGLE_ADS}`,
   "form-action 'self'",

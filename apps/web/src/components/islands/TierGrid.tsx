@@ -23,7 +23,7 @@ function Grid({ initialRole }: { initialRole?: Role }) {
   const [role, setRole] = useState<Role>(initialRole ?? 'BOTTOM');
 
   // Keep the address bar pointing at the role being viewed, so the current
-  // list is always shareable — /tier-list/support and friends are real
+  // list is always shareable; /tier-list/support and friends are real
   // prerendered pages, and switching tabs swaps to that page's URL without a
   // reload.
   const selectRole = (next: Role) => {
@@ -47,7 +47,7 @@ function Grid({ initialRole }: { initialRole?: Role }) {
   const champions = tiers.data?.champions ?? [];
 
   // Only show champions the shared grader actually ranked. gradeSlice scores
-  // ranked rows in (0, 1] and everything else negative — that already accounts
+  // ranked rows in (0, 1] and everything else negative; that already accounts
   // for provisional (prior-patch-blended) rows entering the pool early, so
   // score > 0 is the single source of truth here, not a games threshold.
   const ranked = champions.filter((c) => c.score > 0).sort((a, b) => b.score - a.score);

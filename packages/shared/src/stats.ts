@@ -1,11 +1,8 @@
 import { SAMPLE_THRESHOLDS } from './constants.js';
 
 /**
- * Wilson score interval lower bound for a binomial proportion.
- *
- * We rank champions by this instead of raw win rate so that a 60% win rate over
- * 10 games does not outrank a 53% win rate over 5000 games. It is the same idea
- * behind "how to sort by upvotes" — penalise small samples, reward certainty.
+ * Wilson score interval lower bound for a binomial proportion. Ranking by it
+ * keeps a 60% win rate over 10 games from outranking 53% over 5000.
  *
  * @param wins  number of wins
  * @param games total games (>= wins, > 0)

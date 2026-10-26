@@ -26,10 +26,9 @@ export async function cachedJson(
   }
   const data = await produce();
   const body = JSON.stringify(data);
-  // The cache is an optimization, never a dependency: a KV write failure
-  // (daily quota on a free plan, a transient KV outage) must degrade to an
-  // uncached response, not turn every cache miss into a 500. This surfaced
-  // when the account tripped Cloudflare's daily KV limits on 2026-09-02.
+  // The cache is an optimization, not a dependency: a KV write failure (the
+  // Free plan's daily write quota, a transient outage) degrades to an uncached
+  // response instead of turning every cache miss into a 500.
   let cacheHeader = 'MISS';
   try {
     await env.CACHE.put(key, body, { expirationTtl: ttl });

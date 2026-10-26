@@ -29,7 +29,7 @@ describe('playerPoolDelta', () => {
     const few = playerPoolDelta({ baselines: many(0.55, 10), poolMean: 0.5 });
     const lots = playerPoolDelta({ baselines: many(0.55, 2000), poolMean: 0.5 });
     expect(Math.abs(few.delta)).toBeLessThan(Math.abs(lots.delta));
-    // at exactly the shrinkage constant, half the measured gap survives
+    // At exactly the shrinkage constant, half the measured gap survives.
     const half = playerPoolDelta({
       baselines: many(0.53, PLAYER_POOL_SHRINKAGE),
       poolMean: 0.5,
@@ -46,8 +46,8 @@ describe('playerPoolDelta', () => {
 
   it('under-corrects rather than over-corrects (the (1-f) attenuation)', () => {
     // A champion whose players are 2pp above average, measured cleanly. The
-    // true correction is (w - s)/(1 - f) >= (w - s); we apply only (w - s), so
-    // the delta must never exceed the measured gap.
+    // true correction is (w - s)/(1 - f) >= (w - s); only (w - s) is applied,
+    // so the delta must never exceed the measured gap.
     const measuredGap = 0.02;
     const r = playerPoolDelta({ baselines: many(0.5 + measuredGap, 10_000), poolMean: 0.5 });
     expect(r.delta).toBeLessThanOrEqual(measuredGap + 1e-12);

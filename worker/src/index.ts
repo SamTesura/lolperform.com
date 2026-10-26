@@ -2,7 +2,7 @@
  * lolperform.com edge Worker.
  *
  * Serves the prebuilt Astro site through the ASSETS binding and the read-only
- * `/api/v1/*` surface backed by D1 (+ KV cache). Every response carries the full
+ * `/api/v1/*` surface backed by D1 and a KV cache. Every response carries the full
  * security-header set; every API query parameter is validated as an enum before
  * it can reach a prepared D1 statement.
  */
@@ -36,7 +36,7 @@ export default {
       return withSecurityHeaders(response);
     }
 
-    // Everything else: static site asset.
+    // Everything else is a static site asset.
     const asset = await env.ASSETS.fetch(request);
     return withSecurityHeaders(asset);
   },

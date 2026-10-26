@@ -17,7 +17,7 @@ interface Props {
 
 /**
  * Broadcast-style role tab strip: an underline marks the active lane (no pill).
- * Presentational — the interactive filtering version lives in a React island.
+ * Presentational; the interactive filtering version lives in a React island.
  */
 export function RoleTabs({ active, hrefFor }: Props) {
   return (

@@ -11,7 +11,7 @@ export function Loading({ label = 'Loading…' }: { label?: string }) {
 
 /**
  * Used for both true errors and the pre-data state. Until the first patch crawl
- * runs, the API returns 503 — we frame that as an informative wait, not a failure.
+ * runs, the API returns 503; we frame that as an informative wait, not a failure.
  */
 export function EmptyState({ title, detail }: { title: string; detail?: string }) {
   return (

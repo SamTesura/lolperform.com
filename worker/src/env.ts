@@ -2,8 +2,8 @@
 export interface Env {
   /** Static site assets (the built Astro `dist`). */
   ASSETS: Fetcher;
-  /** D1 — source of truth for aggregated stats. */
+  /** D1: source of truth for aggregated stats. */
   DB: D1Database;
-  /** KV — hot cache for computed API responses. */
+  /** KV: hot cache for computed API responses. */
   CACHE: KVNamespace;
 }
