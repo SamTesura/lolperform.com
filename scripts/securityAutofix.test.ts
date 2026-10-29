@@ -10,8 +10,10 @@ import { describe, expect, it } from 'vitest';
 import {
   EXPECTED_CHECKS,
   checkVerdict,
-  fixedBetween,
+  compareAudits,
+  improved,
   isFixable,
+  newestRuns,
   packagesToRefresh,
   parseAudit,
   renderBody,
@@ -26,7 +28,12 @@ interface Advisory {
   patched: string;
   ghsa: string;
   title: string;
+  paths: string[];
+  left?: number;
 }
+
+const SITEMAP = '4.5.4|apps/web > @astrojs/sitemap@3.7.4 > zod@4.5.4';
+const ASTRO = '4.6.6|apps/web > astro@7.4.0 > zod@4.6.6';
 
 const advisory = (over: Partial<Advisory> = {}): Advisory => ({
   id: '1243066',
@@ -35,11 +42,12 @@ const advisory = (over: Partial<Advisory> = {}): Advisory => ({
   patched: '>=4.6.6',
   ghsa: 'GHSA-mrhx-c7xc-m3w5',
   title: 'Zod can exhaust memory while validating oversized constrained collections',
+  paths: [SITEMAP],
   ...over,
 });
 
 describe('parseAudit', () => {
-  it('maps the advisories in a pnpm audit report', () => {
+  it('maps each advisory and every vulnerable copy pnpm found', () => {
     const report = {
       actions: [],
       advisories: {
@@ -50,11 +58,20 @@ describe('parseAudit', () => {
           patched_versions: '>=4.6.6',
           github_advisory_id: 'GHSA-mrhx-c7xc-m3w5',
           title: 'Zod can exhaust memory while validating oversized constrained collections',
+          findings: [
+            { version: '4.5.4', paths: ['apps/web > @astrojs/sitemap@3.7.4 > zod@4.5.4'] },
+            { version: '4.6.6', paths: ['apps/web > astro@7.4.0 > zod@4.6.6'] },
+          ],
         },
       },
       metadata: {},
     };
-    expect(parseAudit(JSON.stringify(report))).toEqual([advisory()]);
+    expect(parseAudit(JSON.stringify(report))).toEqual([advisory({ paths: [SITEMAP, ASTRO] })]);
+  });
+
+  it('counts an advisory reported without findings as one copy', () => {
+    const report = { advisories: { 7: { id: 7, module_name: 'x', patched_versions: '>=2' } } };
+    expect(parseAudit(JSON.stringify(report))?.[0].paths).toEqual(['*']);
   });
 
   it('reads a clean report as no advisories', () => {
@@ -113,20 +130,34 @@ describe('packagesToRefresh', () => {
   });
 });
 
-describe('fixedBetween', () => {
-  it('reports the fixable advisories the refresh removed', () => {
-    const before = [
-      advisory({ id: '1' }),
-      advisory({ id: '2', name: 'http-cache-semantics', patched: '<0.0.0' }),
-      advisory({ id: '3', name: 'source-map-js' }),
-    ];
-    const after = [before[1], before[2]];
-    expect(fixedBetween(before, after).map((a) => a.id)).toEqual(['1']);
+describe('compareAudits and improved', () => {
+  it('counts a fully fixed advisory', () => {
+    const before = [advisory()];
+    expect(compareAudits(before, [])).toEqual({ removed: [`1243066|${SITEMAP}`], added: [] });
+    expect(improved(before, [])).toEqual([advisory({ left: 0 })]);
   });
 
-  it('does not count an advisory with no patched release as fixed', () => {
+  it('counts a copy fixed on one path while another remains as progress', () => {
+    const before = [advisory({ paths: [SITEMAP, ASTRO] })];
+    const after = [advisory({ paths: [ASTRO] })];
+    expect(compareAudits(before, after).removed).toEqual([`1243066|${SITEMAP}`]);
+    expect(improved(before, after)).toEqual([advisory({ paths: [SITEMAP, ASTRO], left: 1 })]);
+  });
+
+  it('reports copies a refresh would bring in, of any advisory', () => {
+    const newcomer = advisory({ id: '9', name: 'other', patched: '<0.0.0', paths: ['1.0.0|x'] });
+    expect(compareAudits([advisory()], [newcomer]).added).toEqual(['9|1.0.0|x']);
+  });
+
+  it('never credits an advisory with no patched release', () => {
     const gone = advisory({ name: 'http-cache-semantics', patched: '<0.0.0' });
-    expect(fixedBetween([gone], [])).toEqual([]);
+    expect(compareAudits([gone], []).removed).toEqual([]);
+    expect(improved([gone], [])).toEqual([]);
+  });
+
+  it('reports nothing when the refresh changed nothing', () => {
+    expect(improved([advisory()], [advisory()])).toEqual([]);
+    expect(compareAudits([advisory()], [advisory()])).toEqual({ removed: [], added: [] });
   });
 });
 
@@ -157,11 +188,16 @@ describe('titleFor', () => {
 });
 
 describe('renderBody', () => {
-  it('tables what was fixed and says when the PR merges', () => {
-    const body = renderBody([advisory()], []);
-    expect(body).toContain('| `zod` | high | GHSA-mrhx-c7xc-m3w5 | `>=4.6.6` |');
+  it('tables what was fixed and says how the PR merges', () => {
+    const body = renderBody([advisory({ left: 0 })], []);
+    expect(body).toContain('| `zod` | high | GHSA-mrhx-c7xc-m3w5 | `>=4.6.6` | fixed |');
     expect(body).toContain(EXPECTED_CHECKS.join(', '));
+    expect(body).toContain('commit status');
     expect(body).not.toContain('Still reported');
+  });
+
+  it('says when copies are left', () => {
+    expect(renderBody([advisory({ left: 2 })], [])).toContain('| partly: 2 left |');
   });
 
   it('lists what is left for a person', () => {
@@ -171,16 +207,24 @@ describe('renderBody', () => {
       patched: '<0.0.0',
       ghsa: 'GHSA-ch52-4w7c-c8xp',
     });
-    const body = renderBody([advisory()], [left]);
+    const body = renderBody([advisory({ left: 0 })], [left]);
     expect(body).toContain('Still reported');
     expect(body).toContain('| `http-cache-semantics` |');
   });
 
   it('keeps advisory text from mentioning people or injecting markup', () => {
-    const body = renderBody([advisory({ title: 'ping @someone <img src=x> | col' })], []);
+    const title =
+      'ping @someone <img src=x> | col [click](https://evil.example) ![i](https://evil.example/i.png)';
+    const body = renderBody([advisory({ title, left: 0 })], []);
     expect(body).toContain('ping @​someone');
     expect(body).not.toContain('<img');
     expect(body).not.toContain('| col');
+    expect(body).not.toContain('](https://evil.example');
+  });
+
+  it('caps a runaway version range', () => {
+    const body = renderBody([advisory({ patched: `>=${'9'.repeat(400)}`, left: 0 })], []);
+    expect(body.split('\n').every((line) => line.length < 400)).toBe(true);
   });
 });
 
@@ -233,6 +277,7 @@ describe('checkVerdict', () => {
   it('judges each check by its newest run', () => {
     const retried = [run(0, EXPECTED_CHECKS[0], 'completed', 'failure'), ...allPassed];
     expect(checkVerdict(retried).verdict).toBe('pass');
+    expect(newestRuns(retried).get(EXPECTED_CHECKS[0])?.id).toBe(1);
     const regressed = [...allPassed, run(70, EXPECTED_CHECKS[0], 'completed', 'failure')];
     expect(checkVerdict(regressed).verdict).toBe('fail');
   });
@@ -254,7 +299,7 @@ describe('command line', () => {
     }
   });
 
-  it('ships nothing when the plan found nothing to fix', () => {
+  it('ships nothing when the plan found nothing to change', () => {
     for (const state of ['stuck', 'error', '']) {
       const r = cli(['ship'], { PLAN_STATE: state });
       expect(r.status).toBe(0);

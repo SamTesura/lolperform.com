@@ -24,6 +24,7 @@ permissions:
   pull-requests: write # open, update, merge or close the PR
   actions: write # start the checks on the branch: GITHUB_TOKEN pushes start no workflows
   checks: read # read their results
+  statuses: write # record passed checks where the ruleset counts them (see the script)
 
 concurrency:
   group: security-autofix
@@ -31,7 +32,12 @@ concurrency:
 
 jobs:
   autofix:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'failure'
+    # After a failed scan, only one of ours: a fork's PR can come from a branch
+    # it named main too.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

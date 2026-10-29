@@ -579,7 +579,8 @@ Migrations live in `db/migrations/`, numbered `0001` through `0011`.
   every six hours, and whenever the scan fails on `main`, it re-resolves the flagged packages
   inside the ranges their parents declare, opens a PR, runs every check on it and merges it once
   they pass. It never edits `package.json`, adds overrides or touches the security allowlist, so
-  an advisory with no patched release still needs a person.
+  an advisory with no patched release still needs a person. It needs **Allow GitHub Actions to
+  create and approve pull requests** turned on under Settings → Actions → General.
 
 Three major-version updates are deliberately pinned in `.github/dependabot.yml`. Each records why,
 because each was a real failure:
