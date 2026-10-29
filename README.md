@@ -488,6 +488,7 @@ The D1 `database_id` is committed deliberately; it is an identifier, not a crede
 | `ci.yml`                     | Push to `main`, every PR               | Typecheck, lint, format check, test, build, rendered-whitespace scan, secret scan |
 | `quality-gates.yml`          | Push to `main`, every PR               | Lint, typecheck, tests, coverage ratchet, CRAP and complexity ceilings            |
 | `quality-gates-security.yml` | Push, PR, daily at 07:20 UTC           | gitleaks over full history, dependency audit, optional SAST                       |
+| `security-autofix.yml`       | Every 6h, a failed scan on `main`      | Fixes new dependency advisories by refreshing the lockfile; merges once green     |
 | `mutation.yml`               | Scheduled                              | Stryker mutation testing                                                          |
 | `patch-watch.yml`            | Every 6h, Wednesdays 15:00 UTC, manual | The data pipeline                                                                 |
 
@@ -573,7 +574,12 @@ Migrations live in `db/migrations/`, numbered `0001` through `0011`.
   stored anywhere in the system. The one player-derived signal used, the picking player's career win
   rate, is aggregated immediately and carries no identity.
 - **Supply chain.** Dependabot runs weekly, grouping production and development updates separately,
-  and every update runs the full gate suite before it can merge.
+  and every update runs the full gate suite before it can merge. Dependabot opens no security PR
+  for a package we only reach through another package, so `security-autofix.yml` covers those:
+  every six hours, and whenever the scan fails on `main`, it re-resolves the flagged packages
+  inside the ranges their parents declare, opens a PR, runs every check on it and merges it once
+  they pass. It never edits `package.json`, adds overrides or touches the security allowlist, so
+  an advisory with no patched release still needs a person.
 
 Three major-version updates are deliberately pinned in `.github/dependabot.yml`. Each records why,
 because each was a real failure:

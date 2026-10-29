@@ -1,9 +1,13 @@
 # GitHub Actions
 
-| Workflow          | Trigger              | Purpose                                                                  |
-| ----------------- | -------------------- | ------------------------------------------------------------------------ |
-| `ci.yml`          | PRs + push to `main` | Typecheck, lint, test, and gitleaks secret scan.                         |
-| `patch-watch.yml` | every 6h + manual    | Detect a new patch, crawl Riot, aggregate, and load the dataset into D1. |
+| Workflow                     | Trigger                  | Purpose                                                                                 |
+| ---------------------------- | ------------------------ | --------------------------------------------------------------------------------------- |
+| `ci.yml`                     | PRs + push to `main`     | Typecheck, lint, format check, test, build, and gitleaks secret scan.                   |
+| `quality-gates.yml`          | PRs + push to `main`     | Tests with the coverage ratchet and the CRAP and complexity ceilings.                   |
+| `quality-gates-security.yml` | PRs + push + daily       | gitleaks over full history and `pnpm audit`.                                            |
+| `security-autofix.yml`       | every 6h + a failed scan | Refreshes the lockfile for new advisories, then opens, checks and merges the PR itself. |
+| `mutation.yml`               | nightly + manual         | Stryker mutation testing.                                                               |
+| `patch-watch.yml`            | every 6h + manual        | Detect a new patch, crawl Riot, aggregate, and load the dataset into D1.                |
 
 Deployment itself is handled by **Cloudflare Workers Builds** (connected to this
 repo): every push to `main` builds the site and deploys the Worker. No deploy
@@ -19,7 +23,15 @@ Add these under **Settings → Secrets and variables → Actions**:
 | `CLOUDFLARE_API_TOKEN`  | patch-watch | Token with **Account → D1 → Edit** permission, used by `wrangler d1 execute --remote`. |
 | `CLOUDFLARE_ACCOUNT_ID` | patch-watch | Your Cloudflare account ID.                                                            |
 
-`GITHUB_TOKEN` is provided automatically (used by gitleaks).
+`GITHUB_TOKEN` is provided automatically (used by gitleaks and by
+`security-autofix`).
+
+## Required repository setting
+
+`security-autofix` opens its PR with `GITHUB_TOKEN`, which GitHub allows only
+when **Settings → Actions → General → Workflow permissions → Allow GitHub
+Actions to create and approve pull requests** is ticked. Without it the
+workflow stops at its Ship step and says so.
 
 ## How the refresh works
 
