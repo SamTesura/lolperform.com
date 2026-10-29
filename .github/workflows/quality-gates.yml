@@ -8,6 +8,11 @@ on:
   # token, which starts no workflows.
   workflow_dispatch:
 
+# Read-only: on a dispatched run the token would otherwise take the repository
+# default, and nothing here writes.
+permissions:
+  contents: read
+
 concurrency:
   group: gates-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
