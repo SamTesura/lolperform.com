@@ -13,8 +13,8 @@ interface ActiveWindow extends RateWindow {
 
 /**
  * Multi-window token-bucket limiter. Riot enforces several app-rate windows at
- * once (e.g. 20/s and 100/2min on a dev key); we respect every window before
- * issuing a request so we rarely trip a 429 in the first place.
+ * once (e.g. 20/s and 100/2min on a dev key); waiting on every window before a
+ * request keeps 429s rare.
  */
 export class RateLimiter {
   private readonly windows: ActiveWindow[];
@@ -52,9 +52,8 @@ export const DEV_KEY_WINDOWS: RateWindow[] = [
 
 /**
  * Parse Riot's `X-App-Rate-Limit` header ("20:1,100:120" = 20 per 1s and 100
- * per 120s) into limiter windows, so the crawler paces at exactly what the key
- * actually allows — dev key today, production key tomorrow, no retuning.
- * Returns [] for anything malformed (caller keeps its current windows).
+ * per 120s) into limiter windows, so the crawler paces at what the key allows.
+ * Returns [] for anything malformed, and the caller keeps its current windows.
  */
 export function parseRateLimitHeader(value: string): RateWindow[] {
   const windows: RateWindow[] = [];

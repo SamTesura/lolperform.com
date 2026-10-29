@@ -18,7 +18,7 @@ export function error(status: number, message: string, extra?: unknown): Respons
 
 /**
  * Validate URL search params against a Zod schema. Returns the parsed object or a
- * 400 Response. Only enum/typed fields pass — there is no free-form input path to
+ * 400 Response. Only enum and typed fields pass, so no free-form input reaches
  * the database.
  */
 export function parseQuery<T extends z.ZodType>(

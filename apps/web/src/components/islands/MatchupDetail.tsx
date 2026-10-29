@@ -102,7 +102,7 @@ function Matchup() {
   const m =
     rows.find((r) => r.opponentKey === oppMeta.key && (!role || r.role === role)) ??
     rows.find((r) => r.opponentKey === oppMeta.key);
-  // If the URL didn't pin a valid role, we fell back to the biggest-sample row —
+  // If the URL didn't pin a valid role, we fell back to the biggest-sample row;
   // say so instead of letting it read like the user's chosen lane.
   const roleInferred = Boolean(m && m.role !== role);
 
@@ -118,7 +118,7 @@ function Matchup() {
     );
   }
 
-  // Same game pool, opposite perspective — computed from the stored counts so
+  // Same game pool, opposite perspective; computed from the stored counts so
   // it's exact, rather than 1 - winRate off a possibly-rounded REAL.
   const selfWr = m.winRate;
   const oppWr = m.games > 0 ? (m.games - m.wins) / m.games : 0;

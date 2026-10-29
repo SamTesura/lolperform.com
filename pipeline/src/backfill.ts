@@ -1,19 +1,16 @@
 /**
- * One-time cutover: build the migration-0011 slice rows out of the legacy
+ * Build the slice rows (db/migrations/0011_slice_tables.sql) out of the legacy
  * fan-out tables (role_stats, matchups, duos, builds, keystone_stats,
- * rune_pages) already loaded in D1, so the new Worker can be deployed without
- * waiting ~6 hours for the next crawl to finish.
+ * rune_pages) in D1, so the Worker can serve them without waiting ~6 hours for
+ * the next crawl.
  *
- * Why per-slice statements and not one big query: the whole-database form reads
- * ~800k rows and runs past D1's per-query time limit. Scoping every statement to
- * one (patch, region, rank) keeps each one small — a few hundred rows written,
- * a few thousand read — and lets a failed slice be retried on its own.
+ * One statement set per (patch, region, rank): the whole-database query reads
+ * ~800k rows and runs past D1's per-query time limit, and a failed slice can be
+ * retried on its own.
  *
- * Cost: one row written per champion-role, role slice and duo slice — about 19k
- * rows for a full patch, against the Workers Free ceiling of 100,000 per day.
- * Use --patches=1 to do only the current patch when the day's budget is tight;
- * the default of 2 also covers the prior patch the tier list blends for
- * provisional grades.
+ * Cost: about 19k rows written per patch, against the Workers Free ceiling of
+ * 100,000 per day. --patches=1 does only the current patch; the default of 2
+ * also covers the prior patch the tier list blends for provisional grades.
  *
  *   pnpm --filter @lolperform/pipeline backfill -- [--patches=2] [--dry-run] [--local]
  */
@@ -23,7 +20,7 @@ import { RANK_BRACKETS, REGIONS } from '@lolperform/shared';
 
 const DB = 'lolperform';
 
-/** Quote a SQL string literal. Every value here is one of our own constants. */
+/** Quote a SQL string literal. Every value here is one of the repo's own constants. */
 function q(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
@@ -37,9 +34,9 @@ export interface BackfillStatements {
 /**
  * The three statements that rebuild one (patch, region, rank) slice.
  *
- * `loaded_at` is stamped 'backfill' so the next pipeline load — which stamps its
- * own generated_at and then prunes rows that do not carry it — replaces
- * everything this pass wrote.
+ * `loaded_at` is stamped 'backfill', so the next pipeline load (which stamps its
+ * own generated_at and prunes rows that do not carry it) replaces everything
+ * this pass wrote.
  */
 export function buildBackfillSql(patch: string, region: string, rank: string): BackfillStatements {
   const scope = `patch = ${q(patch)} AND region = ${q(region)} AND rank = ${q(rank)}`;
@@ -127,9 +124,7 @@ FROM (SELECT * FROM duos WHERE ${scope} ORDER BY games DESC LIMIT 500)`.trim();
   return { championSlice, roleSlice, duoSlice };
 }
 
-/* ------------------------------------------------------------------ *
- * CLI
- * ------------------------------------------------------------------ */
+// CLI
 
 interface Options {
   patches: number;

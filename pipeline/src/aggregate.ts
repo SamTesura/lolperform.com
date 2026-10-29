@@ -32,23 +32,21 @@ export interface AggregateResult {
   builds: BuildPath[];
 }
 
-/** Minimum samples before a derived row is emitted (honesty floors). */
+/** Minimum games before a derived row is emitted. */
 export const MIN_MATCHUP_GAMES = 10;
 export const MIN_DUO_GAMES = 10;
 export const MIN_BUILD_GAMES = 20;
 /** A keystone needs this many games on a champion before it is worth showing.
- *  Keystone choice is coarse — most champions realistically run three to six —
- *  so the arms stay fat and this floor is about noise, not scarcity. */
+ *  Most champions run three to six keystones, so this floor guards against
+ *  noise, not scarcity. */
 export const MIN_KEYSTONE_GAMES = 100;
-/** A full rune page splits the sample much finer than a keystone: demanding
- *  100 games of the SECOND page hid it for all but a handful of champions
- *  early in a patch (27 of 236 champions had one on the first 16.16 load).
- *  30 games is enough to show the option — the page chip displays its own
- *  games count and win rate, so the reader can judge the sample. */
+/** A full rune page splits the sample much finer than a keystone, and a 100-game
+ *  floor hides the second page for most champions early in a patch. The page
+ *  chip shows its own games and win rate, so the reader can judge the sample. */
 export const MIN_RUNE_PAGE_GAMES = 30;
-/** Starting-item signatures arrive at one-fifth the match rate (the crawl
- *  samples timelines 1-in-5) and the choice space is tiny, so a low floor
- *  still filters noise without starving the section. */
+/** Starting-item signatures arrive at one fifth of the match rate (the crawl
+ *  samples timelines 1 in 5) and the choice space is tiny, so a low floor
+ *  filters noise without starving the section. */
 export const MIN_START_GAMES = 10;
 
 interface Tally {
@@ -74,14 +72,11 @@ const add = (t: Tally, win: boolean, weight = 1) => {
 };
 
 /**
- * Post-stratification weight per (seed tier × region) cell: reweights the
- * slice to the bracket's real rank distribution (TIER_POPULATION_SHARE) and —
- * for the pooled "all" view — to real server populations
- * (REGION_POPULATION_SHARE), so neither the crawl's deliberately apex-heavy
- * mix (kept for master_plus volume) nor its equal-per-region budget skews the
- * stats of elo- or region-sensitive champions. Normalized so weights sum to
- * the raw match count over the cells actually present — rates keep their
- * scale.
+ * Post-stratification weight per (seed tier × region) cell. Reweights the slice
+ * to the bracket's real rank distribution (TIER_POPULATION_SHARE) and, for the
+ * pooled "all" view, to real server populations (REGION_POPULATION_SHARE), so
+ * the apex-heavy, equal-per-region crawl does not skew elo- or region-sensitive
+ * champions. Weights sum to the raw match count, so rates keep their scale.
  */
 function matchWeights(slice: NormMatch[], pooled: boolean): Map<string, number> {
   const counts = new Map<string, number>();
@@ -103,10 +98,8 @@ function matchWeights(slice: NormMatch[], pooled: boolean): Map<string, number> 
   for (const [key, n] of counts) {
     // Trimmed to [1/4, 4]: an under-crawled cell with a big population target
     // (say KR Emerald) would otherwise get a 40x weight and let a handful of
-    // lucky games swing a champion by several points — variance the correction
-    // isn't worth. Trimming keeps most of the bias correction, and as the
-    // crawl's own mix converges on the targets the weights approach 1 and the
-    // clamp stops binding.
+    // lucky games swing a champion by several points. Trimming keeps most of
+    // the bias correction.
     const raw = (targets.get(key)! / presentShare) * (slice.length / n);
     weights.set(key, Math.min(4, Math.max(0.25, raw)));
   }
@@ -142,9 +135,8 @@ export function aggregate(
     builds: [],
   };
   const regions = [...new Set(matches.map((m) => m.region))];
-  // "all" pools every region into the largest, steadiest sample. Only emit it
-  // when the crawl spans more than one region, so a single-region run doesn't
-  // duplicate its rows under both its own key and "all".
+  // "all" pools every region. Emit it only when the crawl spans more than one
+  // region, so a single-region run does not duplicate its rows under "all".
   const pool = regions.length > 1;
 
   for (const bracket of RANK_BRACKETS) {
@@ -168,10 +160,9 @@ export function aggregate(
  * their own rank tier and grouped by the champion they were playing.
  *
  * Centring per tier matters: a Challenger player's career win rate is higher
- * than an Emerald player's because they climbed, so a champion that skews
- * apex would otherwise look like it had a strong player pool purely from the
- * rank mix. Within-tier deviations carry only the part we want — how strong
- * this champion's players are *for their rank*.
+ * because they climbed, so an apex-skewed champion would look like it had a
+ * strong player pool purely from the rank mix. Within-tier deviations measure
+ * how strong the champion's players are for their rank.
  */
 function centredBaselines(slice: NormMatch[]): Map<string, number[]> {
   const byTier = new Map<LeagueTier, { sum: number; n: number }>();
@@ -204,7 +195,7 @@ function aggregateSlice(
   bootItems?: ReadonlySet<number>,
 ): void {
   const patch = slice[0]!.patch;
-  // Without a catalog every item counts (old behaviour, and what tests use).
+  // Without a catalog every item counts, which is what tests rely on.
   const isCompleted = (id: number): boolean => completedItems?.has(id) ?? true;
   const isBoots = (id: number): boolean => bootItems?.has(id) ?? false;
   const totalMatches = slice.length;
@@ -223,12 +214,11 @@ function aggregateSlice(
   // `${champ}|${role}` -> 'id+id+id' opening-buy signature -> tally.
   const startAgg = new Map<string, Map<string, Tally>>();
   // `${champ}|${role}` -> first completed item -> group tally + continuation counts.
-  // Keyed by FIRST item, not the exact trio: players think in "Kraken first" /
-  // "Yun Tal build", and exact ordered trios fragment so hard that a 1,400-game
-  // champion's top sequence sat under the floor while its first-item groups
-  // were hundreds of games fat.
-  const coreSeqAgg = new Map<string, Map<number, { tally: Tally; trios: Map<string, number> }>>(); // `${champ}|${role}` -> `${a}-${b}` -> tally
-  // `${role}|${champ}` -> runeSignature -> tally + mode count of full pages
+  // Keyed by first item, not the exact trio: players think in "Kraken first",
+  // and exact ordered trios fragment so hard that even a 1,400-game champion's
+  // top sequence falls under the floor.
+  const coreSeqAgg = new Map<string, Map<number, { tally: Tally; trios: Map<string, number> }>>();
+  // `${role}|${champ}` -> runeSignature -> tally + mode count of full pages.
   const runePageAgg = new Map<
     string,
     Map<string, { tally: Tally; pages: Map<string, { page: RunePage; n: number }> }>
@@ -300,8 +290,8 @@ function aggregateSlice(
         }
         const finished = p.items.filter(isCompleted);
         for (const id of new Set(finished)) f.set(id, (f.get(id) ?? 0) + 1);
-        // Boots are their own decision, tallied separately so the positional
-        // slots describe the actual damage/utility build order.
+        // Boots are a separate decision, tallied apart so the positional
+        // slots describe the damage and utility build order.
         let sk = slotAgg.get(fKey);
         if (!sk) {
           sk = [];
@@ -312,7 +302,7 @@ function aggregateSlice(
           bt2 = new Map();
           bootAgg.set(fKey, bt2);
         }
-        // Inventory position as an (approximate) build-order proxy: slot k of
+        // Inventory position as an approximate build-order proxy: slot k of
         // the non-boot finished list is roughly the k-th completed item.
         finished
           .filter((id) => !isBoots(id))
@@ -321,13 +311,13 @@ function aggregateSlice(
             bucket.set(id, (bucket.get(id) ?? 0) + 1);
           });
         for (const id of finished.filter(isBoots)) bt2.set(id, (bt2.get(id) ?? 0) + 1);
-        // 2026 role quests park boots in a slotless quest slot (ADC): the id
+        // 2026 role quests park ADC boots in a slotless quest slot: the id
         // arrives via roleBoundItem, never in item0-5.
         if (p.quest && isBoots(p.quest)) bt2.set(p.quest, (bt2.get(p.quest) ?? 0) + 1);
         // Build archetypes, grouped by the first completed non-boot item. The
-        // group's win rate covers every game that started on that item — the
-        // first completed item is close to a pre-outcome choice — while the
-        // displayed trio is the group's most common continuation.
+        // group's win rate covers every game that started on that item (close
+        // to a pre-outcome choice); the displayed trio is the group's most
+        // common continuation.
         const seq = finished.filter((id) => !isBoots(id));
         if (seq.length >= 1) {
           let cs = coreSeqAgg.get(fKey);
@@ -382,10 +372,9 @@ function aggregateSlice(
     }
   }
 
-  // --- emit role stats (graded per role pool by combined ranking) ---
-  // Rates come from the population-weighted tallies; `games`/`wins` stay raw
-  // so displayed sample sizes and honesty floors reflect matches actually
-  // analyzed. `winRate` is therefore the estimator, not wins/games.
+  // Role stats. Rates come from the population-weighted tallies; `games` and
+  // `wins` stay raw so displayed sample sizes and floors reflect matches
+  // actually analyzed. `winRate` is therefore the estimator, not wins/games.
   const sliceRows: RoleStats[] = [];
   for (const [key, t] of roleAgg) {
     const [role, championKey] = key.split('|') as [Role, string];
@@ -406,17 +395,18 @@ function aggregateSlice(
       wilsonLower: wilsonLowerBound(t.wWins, t.wGames),
       adjustedWinRate: pool.observations > 0 ? adjustWinRate(winRate, pool.delta) : null,
       playerPoolDelta: pool.observations > 0 ? pool.delta : null,
-      score: 0, // set by gradeSlice below
-      tier: 'D-', // placeholder; set by gradeSlice below
-      provisional: false, // set by gradeSlice below
+      // score, tier and provisional are placeholders until gradeSlice below.
+      score: 0,
+      tier: 'D-',
+      provisional: false,
       deltaWinRate: null,
       deltaTier: null,
     });
   }
-  // Grades are relative to the role's pool in this slice, so grading must see
-  // the whole role at once — a per-champion function can't rank. The pipeline
-  // grades one patch in isolation (no priorPatch input), so provisional is
-  // always false here; the worker recomputes live with prior-patch blending.
+  // Grades are relative to the role's pool in this slice, so grading sees the
+  // whole role at once. The pipeline grades one patch in isolation (no
+  // priorPatch), so provisional is always false here; the Worker recomputes
+  // live with prior-patch blending.
   for (const role of ROLES) {
     const rows = sliceRows.filter((r) => r.role === role);
     const graded = gradeSlice(
@@ -430,7 +420,7 @@ function aggregateSlice(
   }
   out.roleStats.push(...sliceRows);
 
-  // --- emit matchups ---
+  // Matchups.
   for (const [key, t] of matchupAgg) {
     if (t.games < MIN_MATCHUP_GAMES) continue;
     const [championKey, opponentKey, role] = key.split('|') as [string, string, Role];
@@ -448,7 +438,7 @@ function aggregateSlice(
     });
   }
 
-  // --- emit duos ---
+  // Duos.
   for (const [key, t] of duoAgg) {
     if (t.games < MIN_DUO_GAMES) continue;
     const [adcKey, supportKey] = key.split('|') as [string, string];
@@ -465,10 +455,11 @@ function aggregateSlice(
     });
   }
 
-  // --- emit vs-opponent builds (most frequent exact signature, floor-gated) ---
+  // Vs-opponent builds: the most frequent exact signature, floor-gated. The
+  // champion's own build ('-') is frequency-based, below.
   for (const [key, sigs] of buildAgg) {
     const [championKey, role, opp] = key.split('|') as [string, Role, string];
-    if (opp === '-') continue; // champion's own build is frequency-based below
+    if (opp === '-') continue;
     let top: BuildTally | null = null;
     for (const bt of sigs.values()) {
       if (!top || bt.games > top.games) top = bt;
@@ -495,16 +486,13 @@ function aggregateSlice(
   }
 
   const pageKeystones = new Set<string>();
-  // --- emit the champion's rune pages: two most common + keystone coverage ---
-  // Signature = keystone + both styles (fat arms); the stored page is the most
-  // common full page inside the signature, and games/wins are the signature's
-  // own — a pre-lock sample, so the win rate is honest to show.
+  // Rune pages: the two most common, plus keystone coverage. Signature =
+  // keystone + both styles; the stored page is the most common full page in
+  // the signature, and games/wins are the signature's own.
   //
-  // Coverage rule: every keystone strong enough for the keystone list
-  // (MIN_KEYSTONE_GAMES) must have a page here. Without it the two sections
-  // contradict each other — Lucian listed First Strike while both displayed
-  // pages ran Press the Attack, which reads as mentioning a rune the pages
-  // don't have.
+  // Every keystone that makes the keystone list (MIN_KEYSTONE_GAMES) gets a
+  // page here, or the two sections contradict each other (a keystone listed
+  // that no displayed page runs).
   for (const [key, sigs2] of runePageAgg) {
     const [role, championKey] = key.split('|') as [Role, string];
     const ranked2 = [...sigs2.values()]
@@ -542,15 +530,10 @@ function aggregateSlice(
     });
   }
 
-  // --- emit keystone win rates ---
-  // Weighted like role stats, so the rank/region correction carries over. The
-  // floor is a noise guard, not a scarcity one: a champion realistically runs
-  // three to six keystones, so the arms are fat wherever the champion itself
-  // has a usable sample.
-  // Parity with the pages: a keystone whose page is on display must appear
-  // here too (Ashe showed a Press the Attack page while this list had only
-  // Lethal Tempo — the mirror image of the Lucian contradiction). The page
-  // floor already vouches for the sample; the games count is shown either way.
+  // Keystone win rates, weighted like role stats so the rank and region
+  // correction carries over. A keystone whose page is on display appears here
+  // too, even under MIN_KEYSTONE_GAMES: the page floor already vouches for the
+  // sample, and the games count is shown either way.
   for (const [key, t] of keystoneAgg) {
     if (t.games < MIN_KEYSTONE_GAMES && !(pageKeystones.has(key) && t.games >= MIN_RUNE_PAGE_GAMES))
       continue;
@@ -569,13 +552,11 @@ function aggregateSlice(
     });
   }
 
-  // --- emit the champion's own "most common build": per-item frequency ---
-  // Requiring 20+ games of an *identical* full item set almost never triggers on
-  // sampled volume, which left most champions buildless. Instead, rank the items
-  // a champion actually buys by how often they appear across all its games and
-  // take the top slots (7 for bot-lane roles — the support quest occupies one —
-  // 6 everywhere else). Runes come from the most common rune page. The sample
-  // behind it is the champion's full game count for the role.
+  // The champion's own "most common build", by per-item frequency. 20+ games of
+  // an identical full item set almost never occurs on sampled volume, so rank
+  // items by how often they appear across all the champion's games and take the
+  // top slots (7 for bot-lane roles, where the quest slot adds one; 6
+  // elsewhere). Runes come from the most common rune page.
   for (const [key, t] of roleAgg) {
     const [role, championKey] = key.split('|') as [Role, string];
     const freq = itemFreq.get(`${championKey}|${role}`);
@@ -596,7 +577,7 @@ function aggregateSlice(
 
     // Per-slot alternatives: top finished items at each inventory position,
     // with each option's share of the games that filled that slot. Boots are
-    // their own row. Popularity, deliberately not per-slot win rates.
+    // their own row. Popularity, not per-slot win rates.
     const topOptions = (bucket: Map<number, number> | undefined, take: number) => {
       if (!bucket || bucket.size === 0) return [];
       const filled = [...bucket.values()].reduce((a, b) => a + b, 0);
@@ -610,7 +591,7 @@ function aggregateSlice(
     // so it needs spares below the raw top of each slot.
     const slotOptions = slots.slice(0, slotCount).map((bucket) => topOptions(bucket, 6));
     const bootOptions = topOptions(bootAgg.get(`${championKey}|${role}`), 3);
-    // Spell pairs carry their own win rate — locked in champion select, so
+    // Spell pairs carry their own win rate: they lock in champion select, so
     // unlike items the number cannot be an effect of already winning.
     const spellTallies = spellAgg.get(`${championKey}|${role}`);
     let spellOptions: NonNullable<BuildPath['spellOptions']> = [];
@@ -628,8 +609,8 @@ function aggregateSlice(
         }));
     }
 
-    // Opening buys: a purchase at 0:00 is locked before the game develops —
-    // the purest pre-outcome choice on the page, so its win rate is fair.
+    // Opening buys happen before the game develops, the purest pre-outcome
+    // choice on the page, so their win rate is fair.
     const startTallies = startAgg.get(`${championKey}|${role}`);
     let startOptions: NonNullable<BuildPath['startOptions']> = [];
     if (startTallies) {
@@ -654,8 +635,8 @@ function aggregateSlice(
       coreOptions = [...seqGroups.entries()]
         .filter(([, g]) => g.tally.games >= MIN_BUILD_GAMES && g.trios.size > 0)
         .sort((a2, b2) => b2[1].tally.games - a2[1].tally.games)
-        // 5, not 3: the site gives options, and real forks run deep — Ashe's
-        // Yun Tal-first group is her fourth-largest and was the one asked for.
+        // 5, not 3: real forks run deep (Ashe's Yun Tal-first group is her
+        // fourth-largest).
         .slice(0, 5)
         .map(([, g]) => {
           let bestK = '';

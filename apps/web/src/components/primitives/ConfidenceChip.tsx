@@ -13,7 +13,7 @@ interface Props {
 }
 
 /**
- * The honesty badge — rendered next to any stat that has a sample size.
+ * The honesty badge, rendered next to any stat that has a sample size.
  * Sample size is shown verbatim; low samples get a ⚠ and a warning style so a
  * 12-game win rate can never be mistaken for a 12,000-game one.
  */

@@ -4,7 +4,7 @@ import { QueryProvider } from './QueryProvider';
 
 /**
  * Live "matches analyzed" line for the hero. Reads /api/v1/meta, which the data
- * pipeline updates on every load — the number grows with each 6-hour crawl, no
+ * pipeline updates on every load; the number grows with each 6-hour crawl, no
  * rebuild involved. Falls back to the plain honesty line until data arrives.
  */
 function Counter() {

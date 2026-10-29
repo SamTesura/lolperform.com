@@ -2,15 +2,13 @@ import { z } from 'zod';
 import { ROLES, RANK_BRACKETS, REGIONS, TIER_GRADES } from './constants.js';
 import { FULL_TIER_GRADES } from './tier.js';
 
-/* ------------------------------------------------------------------ *
- * Primitive enums (derived from the canonical constant tuples)
- * ------------------------------------------------------------------ */
+// Primitive enums, derived from the constant tuples.
 
 export const roleSchema = z.enum(ROLES);
 export const rankBracketSchema = z.enum(RANK_BRACKETS);
 export const regionSchema = z.enum(REGIONS);
 export const tierGradeSchema = z.enum(TIER_GRADES);
-/** Fine sub-graded tier ("S+" … "D-") — what the pipeline stores per slice. */
+/** Fine sub-graded tier ("S+" to "D-"), as the pipeline stores it per slice. */
 export const fullTierGradeSchema = z.enum(FULL_TIER_GRADES);
 
 /** Patch label as `major.minor`, e.g. "14.12". */
@@ -19,22 +17,19 @@ export const patchSchema = z.string().regex(/^\d{1,2}\.\d{1,2}$/, 'patch must lo
 /** Numeric Riot champion key as a string, e.g. "21" (Miss Fortune). */
 export const championKeySchema = z.string().regex(/^\d+$/, 'champion key must be numeric');
 
-/* ------------------------------------------------------------------ *
- * Static champion metadata (from Data Dragon)
- * ------------------------------------------------------------------ */
+// Static champion metadata from Data Dragon.
 
 export const championMetaSchema = z.object({
   key: championKeySchema,
-  id: z.string().min(1), // alphanumeric id, e.g. "MissFortune" — used for slugs/images
+  // Alphanumeric id used for slugs and images, e.g. "MissFortune".
+  id: z.string().min(1),
   name: z.string().min(1),
   title: z.string(),
   roles: z.array(roleSchema),
 });
 export type ChampionMeta = z.infer<typeof championMetaSchema>;
 
-/* ------------------------------------------------------------------ *
- * Aggregated records (output of the pipeline, source rows in D1)
- * ------------------------------------------------------------------ */
+// Aggregated records: pipeline output, stored as rows in D1.
 
 /** A slice key shared by every aggregated record. */
 const sliceShape = {
@@ -56,11 +51,9 @@ export const roleStatsSchema = z.object({
   /** Wilson lower bound used for ranking/tiering. */
   wilsonLower: z.number().min(0).max(1),
   /**
-   * Win rate with the champion's player pool held at average strength — the
-   * ranking signal. `winRate` says what happened; this estimates how much of
-   * it the champion is responsible for. Null when no player-baseline
-   * observations back this row yet, in which case ranking falls back to the
-   * raw rate. See playerSkill.ts.
+   * Win rate with the champion's player pool held at average strength; the
+   * ranking signal. Null without player-baseline observations, in which case
+   * ranking falls back to the raw rate. See playerSkill.ts.
    */
   adjustedWinRate: z.number().min(0).max(1).nullable().default(null),
   /**
@@ -72,8 +65,8 @@ export const roleStatsSchema = z.object({
   /** Rank-derived sort score (higher = better; sub-floor rows are negative). */
   score: z.number(),
   tier: fullTierGradeSchema,
-  /** True when the grade leans on a shrinkage-blended prior-patch prior because
-   *  this champion hasn't reached TIER_LIST_MIN_GAMES yet this patch. */
+  /** True when the grade leans on prior-patch stats because this patch is
+   *  still under TIER_LIST_MIN_GAMES. */
   provisional: z.boolean().default(false),
   /** Win-rate change vs the previous patch, in absolute proportion (e.g. +0.012). */
   deltaWinRate: z.number().nullable().default(null),
@@ -83,13 +76,10 @@ export const roleStatsSchema = z.object({
 export type RoleStats = z.infer<typeof roleStatsSchema>;
 
 /**
- * Win rate of one keystone rune on one champion in one role.
- *
- * Unlike item statistics this is defensible: a rune page is locked in champion
- * select, before the game exists, so it cannot be an effect of already winning
- * the way a completed item can. It is still a *choice*, so it carries the usual
- * selection caveat, which is why the UI shows it against the champion's own
- * baseline rather than as a standalone number.
+ * Win rate of one keystone rune on one champion in one role. Runes lock in
+ * champion select, so unlike items the rate is not an effect of already
+ * winning. It is still a choice, so the UI shows it against the champion's own
+ * baseline.
  */
 export const keystoneStatsSchema = z.object({
   ...sliceShape,
@@ -105,11 +95,8 @@ export type KeystoneStats = z.infer<typeof keystoneStatsSchema>;
 
 /**
  * One of a champion's most common rune pages, with the page's own sample.
- *
- * The signature is keystone + primary style + secondary style, so the arms
- * stay fat; the stored page is the most common full page inside that
- * signature. Like keystones (and unlike items), a rune page is locked before
- * the game exists, so its win rate is a fair thing to publish.
+ * Pages group by keystone + primary style + secondary style so each group keeps
+ * a usable sample; the stored page is the most common full page in the group.
  */
 export const runePageStatsSchema = z.object({
   ...sliceShape,
@@ -174,11 +161,10 @@ export const buildPathSchema = z.object({
   wins: z.number().int().nonnegative(),
   winRate: z.number().min(0).max(1),
   /**
-   * Per display-slot alternatives: for each item slot, the finished items most
-   * often held at that inventory position, with each option's share of the
-   * games that filled the slot and its raw count. Popularity, deliberately not
-   * per-slot win rates — an item's "win rate" mostly measures having been
-   * winning long enough to buy it.
+   * Per display slot, the finished items most often held there, with each
+   * option's share of the games that filled the slot and its raw count.
+   * Popularity, not win rate: an item's win rate mostly measures having been
+   * ahead long enough to buy it.
    */
   slotOptions: z
     .array(
@@ -186,16 +172,15 @@ export const buildPathSchema = z.object({
     )
     .nullable()
     .default(null),
-  /** Boots ranked by popularity — their own decision, kept out of the
-   *  positional slots. Same popularity-not-win-rate treatment as slots. */
+  /** Boots ranked by popularity, kept out of the positional slots because they
+   *  are a separate decision. */
   bootOptions: z
     .array(z.object({ item: z.number().int(), share: z.number(), games: z.number().int() }))
     .nullable()
     .default(null),
   /**
-   * Summoner spell pairs with pick share AND win rate. Spells are locked in
-   * champion select — pre-lock like runes, unlike items — so a per-pair win
-   * rate is a fair number to publish.
+   * Summoner spell pairs with pick share and win rate. Spells lock in champion
+   * select, so a per-pair win rate is fair to publish.
    */
   spellOptions: z
     .array(
@@ -209,11 +194,10 @@ export const buildPathSchema = z.object({
     )
     .nullable()
     .default(null),
-  /** Build archetypes grouped by FIRST completed item (Kraken-first vs
-   *  Yun Tal-first): items = the group's most common three-item continuation,
-   *  stats = the whole group's. The first completed item is close to a
-   *  pre-outcome choice, which is what makes this win rate publishable while
-   *  raw per-item win rates are not. */
+  /** Build archetypes grouped by first completed item (Kraken-first vs
+   *  Yun Tal-first). `items` is the group's most common three-item path; stats
+   *  cover the whole group. The first item is close to a pre-outcome choice, so
+   *  its win rate is publishable where per-item rates are not. */
   coreOptions: z
     .array(
       z.object({
@@ -226,9 +210,9 @@ export const buildPathSchema = z.object({
     )
     .nullable()
     .default(null),
-  /** Opening buys (first 30s, timeline-sampled 1-in-5): the full purchase set
-   *  including potions, e.g. Doran's Blade + 2 potions. A 0:00 purchase is
-   *  locked before the game develops, so the win rate is fair to publish. */
+  /** Opening buys (first 30 s, timelines sampled 1 in 5), potions included,
+   *  e.g. Doran's Blade + 2 potions. Bought before the game develops, so the
+   *  win rate is fair to publish. */
   startOptions: z
     .array(
       z.object({
@@ -244,9 +228,7 @@ export const buildPathSchema = z.object({
 });
 export type BuildPath = z.infer<typeof buildPathSchema>;
 
-/* ------------------------------------------------------------------ *
- * API response envelopes
- * ------------------------------------------------------------------ */
+// API response envelopes.
 
 export const datasetMetaSchema = z.object({
   patch: patchSchema,
@@ -286,9 +268,7 @@ export const counterPickSchema = z.object({
 });
 export type CounterPick = z.infer<typeof counterPickSchema>;
 
-/* ------------------------------------------------------------------ *
- * API query params (validated at the Worker edge)
- * ------------------------------------------------------------------ */
+// API query params, validated at the Worker edge.
 
 export const tierListQuerySchema = z.object({
   region: regionSchema,

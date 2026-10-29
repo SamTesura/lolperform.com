@@ -12,7 +12,7 @@ export interface PatchStatus {
   isNew: boolean;
 }
 
-/** Compare the live Data Dragon patch against our last-built patch. */
+/** Compare the live Data Dragon patch against the last-built patch. */
 export async function detectPatch(): Promise<PatchStatus> {
   const latestVersion = await getLatestVersion();
   const latestPatch = patchLabel(latestVersion);

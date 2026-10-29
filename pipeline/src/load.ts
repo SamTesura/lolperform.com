@@ -35,7 +35,7 @@ function s(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-/** Emit a finite number, or 0 — never an injection vector or NaN. */
+/** Emit a finite number, or 0, so the value is never an injection vector or NaN. */
 function n(value: number): string {
   return Number.isFinite(value) ? String(value) : '0';
 }
@@ -55,8 +55,8 @@ const MAX_PAYLOAD_BYTES = 60_000;
  *  so storage does not grow without bound. */
 const RETAIN_PATCHES = 3;
 
-/** Duos served by /api/v1/duos — the endpoint's own LIMIT, applied at load time
- *  so the slice-wide board is a single row read. */
+/** Duos served by /api/v1/duos. The cap is applied at load time so the
+ *  slice-wide board is a single row read. */
 const DUO_BOARD_LIMIT = 500;
 
 /** Build a multi-row INSERT for one table, chunked by row count and bytes. */
@@ -73,7 +73,8 @@ function insertRows(table: string, columns: string[], rows: string[][], chunk = 
   };
   for (const r of rows) {
     const value = `(${r.join(', ')})`;
-    const added = Buffer.byteLength(value, 'utf8') + 4; // separator slack
+    // Plus 4 bytes of separator slack.
+    const added = Buffer.byteLength(value, 'utf8') + 4;
     if (batch.length > 0 && (batch.length >= chunk || bytes + added > MAX_STATEMENT_BYTES)) flush();
     batch.push(value);
     bytes += added;
@@ -82,10 +83,8 @@ function insertRows(table: string, columns: string[], rows: string[][], chunk = 
   return out.join('\n');
 }
 
-/* ------------------------------------------------------------------ *
- * Payload shapes — what a slice row carries, minus the key columns it
- * is already stored under. Mirrored by the parsers in worker/src/db.ts.
- * ------------------------------------------------------------------ */
+// Payload shapes: what a slice row carries, minus its key columns. Mirrored by
+// the parsers in worker/src/db.ts.
 
 export interface StoredMatchup {
   opponentKey: string;
@@ -161,9 +160,9 @@ function emptyPayload(): ChampionPayload {
 
 /**
  * Shrink an oversized payload instead of emitting a statement D1 will reject.
- * Order of sacrifice is least-defensible-first: the lowest-sample matchups go
- * before anything a champion page shows above the fold, and build option arrays
- * (the heaviest fields by far) go before the builds themselves.
+ * Least defensible data goes first: the lowest-sample matchups before anything
+ * a champion page shows above the fold, and build option arrays (by far the
+ * heaviest fields) before the builds themselves.
  */
 export function trimPayload(
   payload: ChampionPayload,
@@ -335,13 +334,12 @@ export function groupDuoSlices(duos: DuoSynergy[]): Map<string, StoredDuo[]> {
  * Build the SQL that loads one patch's dataset into D1.
  *
  * Idempotent without a delete-everything pass: rows are upserted by primary key
- * and stamped with this run's `generated_at`, then any row of this patch left
- * over from an earlier run is pruned. On the Workers Free plan a DELETE costs a
- * row write exactly like an INSERT, so clearing the patch first doubled the bill
- * for data that was about to be rewritten anyway.
+ * and stamped with this run's `generated_at`, then rows of this patch left over
+ * from an earlier run are pruned. On Workers Free a DELETE costs a row write
+ * like an INSERT, so clearing the patch first would double the bill.
  *
- * All values are escaped here — the pipeline is the only writer, but we never
- * trust string data (champion names) into raw SQL regardless.
+ * All values are escaped here. The pipeline is the only writer, but string data
+ * (champion names) is never trusted into raw SQL.
  */
 export function buildLoadSql(input: LoadInput): string {
   const { meta } = input;
@@ -402,9 +400,9 @@ export function buildLoadSql(input: LoadInput): string {
   }
   parts.push(insertRows('duo_slice', ['patch', 'region', 'rank', 'payload', 'loaded_at'], duoRows));
 
-  // Rows this run did not rewrite are keys that no longer exist (a champion that
-  // fell out of a role, an opponent that stopped appearing). Only they are
-  // deleted, so the prune costs a write per genuinely dead row.
+  // Rows this run did not rewrite are dead keys (a champion that fell out of a
+  // role, an opponent that stopped appearing). Only they are deleted, so the
+  // prune costs one write per dead row.
   for (const table of ['champion_slice', 'role_slice', 'duo_slice']) {
     parts.push(`DELETE FROM ${table} WHERE patch = ${patch} AND loaded_at <> ${run};`);
   }
@@ -438,9 +436,8 @@ async function readJson<T>(name: string): Promise<T> {
   return JSON.parse(await readFile(new URL(name, DATA_DIR), 'utf8')) as T;
 }
 
-/** Same, but a missing file yields a fallback instead of aborting the load.
- *  A dataset written before this table existed should still load everything
- *  else rather than costing the whole D1 update. */
+/** Same, but a missing file yields a fallback instead of aborting the load, so
+ *  a dataset that lacks this table still loads everything else. */
 async function readJsonOr<T>(name: string, fallback: T): Promise<T> {
   try {
     return await readJson<T>(name);

@@ -14,9 +14,8 @@ describe('presence', () => {
   });
 
   it('does not depend on win rate, so popularity cannot flip its sign', () => {
-    // The defect in the old PBI term: (winRate - 0.5) * pickRate meant an
-    // identical win rate scored wildly differently by popularity, and a
-    // popular sub-50% champion was punished for being popular.
+    // A PBI-style term, (winRate - 0.5) * pickRate, scores an identical win
+    // rate differently by popularity and punishes a popular sub-50% champion.
     const winner = presence({ pickRate: 0.15, banRate: 0.1 });
     const loser = presence({ pickRate: 0.15, banRate: 0.1 });
     expect(winner).toBe(loser);
@@ -28,15 +27,15 @@ describe('presence', () => {
 
 describe('gradeSlice popularity neutrality', () => {
   it('does not punish a champion for being popular at the same win rate', () => {
-    // The regression this guards: under PBI these two ranked eight places
-    // apart on the live data purely because of pick rate.
+    // Under PBI these two ranked eight places apart on live data purely
+    // because of pick rate.
     const rows: GradeInput[] = [
       { winRate: 0.482, pickRate: 0.11, banRate: 0.12, games: 12000, wilsonLower: 0.473 },
       { winRate: 0.482, pickRate: 0.015, banRate: 0.0, games: 12000, wilsonLower: 0.473 },
       ...Array.from({ length: 12 }, (_, i) => row(0.53 - i * 0.004, 0.05)),
     ];
     const graded = gradeSlice(rows);
-    // identical strength; the popular one may only be helped, never punished
+    // Identical strength: the popular one may only be helped, never punished.
     expect(graded[0]!.score).toBeGreaterThanOrEqual(graded[1]!.score);
   });
 });
@@ -49,7 +48,7 @@ describe('gradeSlice', () => {
     const graded = gradeSlice(rows);
     expect(graded[0]!.grade).toBe('S+');
     expect(graded[39]!.grade).toBe('D-');
-    // scores strictly follow the ranking
+    // Scores strictly follow the ranking.
     expect(graded[0]!.score).toBeGreaterThan(graded[20]!.score);
     expect(graded[20]!.score).toBeGreaterThan(graded[39]!.score);
   });
@@ -68,9 +67,11 @@ describe('gradeSlice', () => {
   it('excludes champions under the games floor and marks them D- with negative score', () => {
     const rows = [row(0.52), { ...row(0.99), games: TIER_LIST_MIN_GAMES - 1 }];
     const graded = gradeSlice(rows);
-    expect(graded[0]!.grade).toBe('S+'); // pool of one → top percentile
+    // A pool of one lands in the top percentile.
+    expect(graded[0]!.grade).toBe('S+');
     expect(graded[1]!.grade).toBe('D-');
-    expect(graded[1]!.score).toBeLessThan(0); // always sorts below ranked rows
+    // Sub-floor rows sort below ranked rows.
+    expect(graded[1]!.score).toBeLessThan(0);
   });
 
   it('returns placeholders when nothing reaches the floor', () => {
@@ -137,9 +138,9 @@ describe('gradeSlice provisional (prior-patch blending)', () => {
   });
 
   it('a thin prior cannot promote a champion: noise is not laundered into a grade', () => {
-    // The live pathology this guards: a champion barely played in the lane
-    // entered on 50 games and borrowed a prior built from equally few, landing
-    // an off-role 144-game Qiyana at S and a 158-game Riven at S-.
+    // Without the gate, a champion barely played in the lane enters on 50 games
+    // and borrows a prior built from equally few: on live data that put an
+    // off-role 144-game Qiyana at S and a 158-game Riven at S-.
     const rows: GradeInput[] = [
       ...Array.from({ length: 10 }, (_, i) => row(0.52 - i * 0.005, 0.12)),
       {
@@ -203,7 +204,8 @@ describe('gradeSlice provisional (prior-patch blending)', () => {
     ];
     const graded = gradeSlice(rows);
     expect(graded[10]!.provisional).toBe(false);
-    expect(graded[10]!.grade).toBe('S+'); // ranks purely on its own current-patch stats
+    // Ranks purely on its own current-patch stats.
+    expect(graded[10]!.grade).toBe('S+');
   });
 
   it('blend weight scales with current-patch games: more current games trusts the prior less', () => {

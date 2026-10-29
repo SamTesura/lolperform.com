@@ -23,7 +23,7 @@ import { countersFor, enemiesWithCounters } from '../../data/counters';
 /** Head-to-head rows below this many shared games are too noisy to recommend. */
 const MIN_H2H_GAMES = 25;
 
-/** Build-time champion roster (from Data Dragon) — the dropdown never depends
+/** Build-time champion roster (from Data Dragon); the dropdown never depends
  *  on the live API being reachable. */
 export interface RosterChampion {
   key: string;
@@ -47,7 +47,7 @@ function Recommender({ champions, version }: Props) {
     queryFn: () => fetchTierList(region, rank, role),
     retry: false,
   });
-  // Live head-to-head records vs the selected enemy — fills every matchup the
+  // Live head-to-head records vs the selected enemy; fills every matchup the
   // hand-curated list doesn't cover, from this patch's own games.
   const counters = useQuery({
     queryKey: ['counters', region, rank, role, enemyKey],
@@ -63,9 +63,9 @@ function Recommender({ champions, version }: Props) {
   );
 
   // The lane's real roster: champions the tier list itself ranks here (score
-  // > 0 — past the games floor, or provisional off a blended prior patch),
+  // > 0, past the games floor, or provisional off a blended prior patch),
   // plus any enemy the curated list covers. Deliberately NOT everyone who
-  // ever flexed into the lane — a 60-game Singed bot is not an enemy worth a
+  // ever flexed into the lane; a 60-game Singed bot is not an enemy worth a
   // dropdown slot.
   const enemyKeys = new Set<string>(
     (roleList.data?.champions ?? []).filter((s) => s.score > 0).map((s) => s.championKey),
@@ -134,7 +134,7 @@ function Recommender({ champions, version }: Props) {
                   if (!m) return null;
                   const stat = statByKey.get(m.key);
                   // Same contract as everywhere else: a tier badge only for
-                  // graded rows (score > 0 — past the floor, or provisional);
+                  // graded rows (score > 0, past the floor, or provisional);
                   // a bare win rate above 50 games; a dash below that.
                   const hasStats = stat && isRanked(stat.games);
                   const tiered = stat && stat.score > 0;

@@ -29,7 +29,7 @@ interface ChampionJson {
 
 /**
  * Champion metadata for a version, keyed by numeric champion key.
- * `roles` is left empty here — lane roles come from match data, not Data Dragon.
+ * `roles` is left empty: lane roles come from match data, not Data Dragon.
  */
 export async function getChampionMeta(version: string): Promise<Map<string, ChampionMeta>> {
   const res = await fetch(`${DDRAGON}/cdn/${version}/data/en_US/champion.json`);
@@ -68,8 +68,8 @@ interface ItemJson {
  * when nothing builds out of it and it is either assembled from components or
  * expensive enough to be an endpoint on its own. That excludes raw components
  * (they have `into`), starting items like Doran's Blade (cheap, no recipe),
- * and Ornn masterworks (not purchasable). Used so build displays show full
- * items rather than whatever happened to sit in an inventory at game end.
+ * and Ornn masterworks (not purchasable). Build displays use it to show full
+ * items rather than whatever sat in an inventory at game end.
  */
 export async function getCompletedItems(version: string): Promise<Set<number>> {
   const res = await fetch(`${DDRAGON}/cdn/${version}/data/en_US/item.json`);
@@ -78,10 +78,12 @@ export async function getCompletedItems(version: string): Promise<Set<number>> {
 
   const completed = new Set<number>();
   for (const [id, item] of Object.entries(json.data)) {
-    if (item.requiredAlly) continue; // Ornn masterworks etc.
+    // Ornn masterworks.
+    if (item.requiredAlly) continue;
     if (item.gold && !item.gold.purchasable) continue;
-    if (item.maps && item.maps['11'] === false) continue; // not on Summoner's Rift
-    // Having `into` normally marks a component — except when every upgrade is a
+    // Map 11 is Summoner's Rift.
+    if (item.maps && item.maps['11'] === false) continue;
+    // Having `into` normally marks a component, except when every upgrade is a
     // pure upgrade of this item alone (tier-3 boots, masterworks): then this is
     // still the endpoint of a normal build. Zeal-tier components fail this,
     // because their upgrades combine them with other pieces.

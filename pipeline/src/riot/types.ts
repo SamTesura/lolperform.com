@@ -1,8 +1,6 @@
 import type { LeagueTier, Region, Role, RunePage } from '@lolperform/shared';
 
-/* ------------------------------------------------------------------ *
- * Riot DTO subsets (only the fields we consume)
- * ------------------------------------------------------------------ */
+// Riot DTO subsets: only the fields the pipeline reads.
 
 export interface LeagueEntryDTO {
   puuid?: string;
@@ -33,9 +31,9 @@ interface PerksDTO {
 }
 
 export interface ParticipantDTO {
-  /** Used transiently to locate the seed player in a fetched match. NEVER
-   *  stored: normalizeMatch reads it and keeps only the seed's champion,
-   *  role and (rounded) baseline win rate. */
+  /** Locates the seed player in a fetched match and is never stored:
+   *  normalizeMatch keeps only the seed's champion, role and rounded
+   *  baseline win rate. */
   puuid?: string;
   championId: number;
   championName: string;
@@ -44,9 +42,9 @@ export interface ParticipantDTO {
   win: boolean;
   summoner1Id: number;
   summoner2Id: number;
-  /** Season 2026 role-quest bound item. ADC boots live HERE, not in item0-5:
+  /** Season 2026 role-quest bound item. ADC boots live here, not in item0-5:
    *  the bot-lane quest moves boots to a dedicated slot outside the six item
-   *  slots (0% of stored 16.16 BOTTOM games carry a boot id in items). */
+   *  slots (no stored 16.16 BOTTOM game carries a boot id in items). */
   roleBoundItem?: number;
   item0: number;
   item1: number;
@@ -87,10 +85,8 @@ export interface MatchTimelineDTO {
   };
 }
 
-/* ------------------------------------------------------------------ *
- * Normalized shapes (what the aggregator consumes) — decoupled from
- * Riot's DTO so aggregation is trivially testable with small fixtures.
- * ------------------------------------------------------------------ */
+// Normalized shapes the aggregator reads, decoupled from Riot's DTO so
+// aggregation tests can use small fixtures.
 
 export interface NormParticipant {
   championKey: string;
@@ -98,14 +94,14 @@ export interface NormParticipant {
   teamId: 100 | 200;
   win: boolean;
   /** Summoner spell pair, sorted ascending so Flash+Heal and Heal+Flash are
-   *  one thing. Absent on matches stored before this was captured. */
+   *  one thing. Absent on older stored matches that lack it. */
   spells?: [number, number];
-  /** Role-quest bound item id (2026: ADC boots sit here, slotless). Absent on
-   *  matches stored before this was captured, or when no quest item exists. */
+  /** Role-quest bound item id (in 2026, ADC boots sit here, slotless). Absent
+   *  on older stored matches, or when no quest item exists. */
   quest?: number;
-  /** Opening purchases (first 30s of the timeline, trinkets excluded), sorted.
-   *  Only present when the crawl sampled this match's timeline — the timeline
-   *  is a second API call, so only a fraction of matches carry it. */
+  /** Opening purchases (first 30 s of the timeline, trinkets excluded), sorted.
+   *  Present only when the crawl sampled this match's timeline, a second API
+   *  call made for a fraction of matches. */
   start?: number[];
   /** Non-zero item ids, trinket/consumables excluded. */
   items: number[];
@@ -121,15 +117,13 @@ export interface NormMatch {
   bans: number[];
   participants: NormParticipant[];
   /**
-   * The one player in this match whose ladder record we happen to know: the
-   * seed the match was discovered from. Their career win rate is the only
-   * available handle on player strength, and champion win rates are badly
-   * confounded without it — popular champions are picked by weaker players
-   * than niche ones, within the same rank. See aggregate.ts.
+   * The seed the match was discovered from, the one player whose ladder record
+   * is known. Their career win rate is the only handle on player strength. See
+   * aggregate.ts.
    *
-   * Deliberately identity-free: the seed's PUUID is used in memory to find
-   * them in the match and then discarded. What persists is a champion, a role
-   * and a win rate rounded to 0.1% — not linkable to a person or across runs.
+   * Identity-free by design: the PUUID finds the seed in memory and is
+   * discarded. What persists is a champion, a role and a win rate rounded to
+   * 0.1%, not linkable to a person or across runs.
    */
   seed?: SeedObservation;
 }
@@ -209,7 +203,7 @@ function coreItems(p: ParticipantDTO): number[] {
 /**
  * Convert a raw match DTO into the normalized shape, tagging it with the region
  * and the seed tier it was sampled from. Returns null if the match isn't usable
- * (wrong patch, missing positions, not a full 10-player game).
+ * (unparseable version, missing positions, not a full 10-player game).
  */
 export function normalizeMatch(
   dto: MatchDTO,
@@ -226,7 +220,8 @@ export function normalizeMatch(
   const starts = timeline ? startingPurchases(timeline) : undefined;
   const participants: NormParticipant[] = [];
   for (const [i, p] of dto.info.participants.entries()) {
-    if (!VALID_ROLES.has(p.teamPosition as Role)) return null; // remakes / missing positions
+    // Remakes and missing positions.
+    if (!VALID_ROLES.has(p.teamPosition as Role)) return null;
     if (p.teamId !== 100 && p.teamId !== 200) return null;
     const start = starts?.get(i + 1);
     const pair = [p.summoner1Id, p.summoner2Id].sort((a, b) => a - b);

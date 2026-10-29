@@ -10,11 +10,9 @@ import type { LeagueEntryDTO } from './riot/types.js';
 import { normalizeMatch, type NormMatch } from './riot/types.js';
 
 /**
- * Seed-tier weights (× playersPerDivision). A deliberate compromise: apex is
- * oversampled relative to its real ladder share (~5% of Emerald+) so the
- * master_plus bracket keeps a usable sample, while aggregation post-stratifies
- * every bracket back to TIER_POPULATION_SHARE so the published stats reflect
- * the real rank mix, not the crawl's.
+ * Seed-tier weights (× playersPerDivision). Apex is oversampled against its real
+ * ladder share (~5% of Emerald+) so master_plus keeps a usable sample;
+ * aggregation post-stratifies every bracket back to TIER_POPULATION_SHARE.
  */
 const APEX: { tier: LeagueTier; kind: 'challenger' | 'grandmaster' | 'master'; weight: number }[] =
   [
@@ -29,12 +27,10 @@ const LADDER: { tier: LeagueTier; weight: number }[] = [
 ];
 
 /**
- * A seed player: the PUUID we crawl from, plus their career ranked win rate
- * this split (league-v4 hands us wins/losses for free with every entry). The
- * win rate is the only player-strength signal available anywhere in the
- * pipeline, and champion win rates are badly confounded without it. The PUUID
- * is used to fetch match ids and to find the player inside a fetched match,
- * then dropped — see normalizeMatch.
+ * A seed player: the PUUID the crawl starts from, plus their career ranked win
+ * rate this split (league-v4 returns wins and losses with every entry). That
+ * win rate is the pipeline's only player-strength signal. The PUUID finds match
+ * ids and the player inside a fetched match, then is dropped (see normalizeMatch).
  */
 export interface SeedPlayer {
   puuid: string;
@@ -65,9 +61,8 @@ function shuffle<T>(arr: T[]): T[] {
 
 /**
  * Run `fn` over `items` with bounded concurrency. The Riot client's rate limiter
- * still caps the actual request rate; concurrency just keeps that many requests
- * in flight so throughput is limiter-bound, not latency-bound (the bug that made
- * the sequential crawl time out).
+ * caps the request rate; concurrency keeps enough requests in flight that
+ * throughput is limiter-bound, not latency-bound.
  */
 async function mapPool<T, R>(
   items: readonly T[],
@@ -126,9 +121,8 @@ async function seedPuuids(
 ): Promise<Map<LeagueTier, SeedPlayer[]>> {
   const p = config.playersPerDivision;
   const seeds = new Map<LeagueTier, SeedPlayer[]>();
-  // One dead league-v4 endpoint must not cost the region (or hours of crawled
-  // matches from the regions before it): a failed tier seeds empty and the
-  // remaining tiers still produce a usable, slightly less balanced sample.
+  // A dead league-v4 endpoint costs only its tier: it seeds empty and the
+  // remaining tiers still give a usable, slightly less balanced sample.
   for (const { tier, kind, weight } of APEX) {
     try {
       seeds.set(tier, await apexPuuids(client, region, kind, Math.round(p * weight)));
@@ -149,12 +143,10 @@ async function seedPuuids(
 }
 
 /**
- * Flatten the per-tier seed lists into one uniformly shuffled list. A uniform
- * shuffle keeps every prefix proportional to the pool sizes (in expectation),
- * so the `slice(0, needPuuids)` cap preserves the intended tier mix. The old
- * per-tier round-robin equalized tiers instead — one seed per tier per cycle
- * made the three apex tiers ~60% of every crawl (measured 67% of the live
- * store) and skewed every elo-sensitive champion's stats.
+ * Flatten the per-tier seed lists into one uniformly shuffled list. Every prefix
+ * stays proportional to the pool sizes (in expectation), so the
+ * `slice(0, needPuuids)` cap keeps the intended tier mix. A per-tier round-robin
+ * would equalize tiers and make the three apex tiers ~60% of every crawl.
  */
 function sampleOrder(
   seeds: Map<LeagueTier, SeedPlayer[]>,
@@ -166,22 +158,18 @@ function sampleOrder(
 }
 
 /**
- * Crawl a representative, sampled set of recent ranked matches across regions.
- * Both discovery (match ids per player) and fetch (match detail) run with
- * bounded concurrency so a region finishes well inside the Actions timeout.
+ * Crawl a sampled set of recent ranked matches across regions. Discovery and
+ * fetch both run with bounded concurrency so a region finishes inside the
+ * Actions timeout.
  *
- * We keep every valid recent match regardless of its in-client patch label —
- * Data Dragon's CDN version routinely lags/leads the live game patch, and an
- * exact-equality filter against it silently discarded ~84% of fetched matches.
- * `run.ts` picks the dominant patch actually present and tags the dataset with it.
+ * Every valid match is kept whatever its patch: Data Dragon's CDN version lags
+ * or leads the live game patch, so filtering on it drops most matches.
+ * accumulate() picks the dataset patch from the data.
  *
- * Failures degrade instead of aborting: a dead seed endpoint skips its tier, a
- * failed region skips that region. Only a run that keeps zero matches overall
- * throws — hours of crawled matches must never die with someone else's outage.
- *
- * `onRegionDone` (best-effort, awaited between regions) lets the caller flush
- * progress to disk, so an external kill — runner eviction, cancellation, the
- * job timeout — costs at most the region in flight, not the whole crawl.
+ * A dead seed endpoint skips its tier and a failed region skips that region;
+ * only a run with zero matches overall throws. `onRegionDone` (best-effort,
+ * awaited between regions) lets the caller flush progress, so an eviction or
+ * timeout costs at most the region in flight.
  */
 /** Fetch the timeline for every Nth discovered match (see crawlRegion). */
 const TIMELINE_SAMPLE_EVERY = 5;
@@ -192,16 +180,16 @@ export async function crawl(
   onRegionDone?: (matchesSoFar: readonly NormMatch[]) => Promise<void>,
 ): Promise<NormMatch[]> {
   const all: NormMatch[] = [];
-  // Split the wall-clock budget evenly across regions; reserve most of each
-  // region's slice for match-fetch (the bulk) over id-discovery.
+  // Split the wall-clock budget evenly across regions. Each region gives most
+  // of its share to match fetch, the bulk of the work (see crawlRegion).
   const regionBudgetMs = (config.maxRuntimeMinutes * 60_000) / Math.max(1, config.regions.length);
 
   for (const region of config.regions) {
     try {
       await crawlRegion(client, region, config, regionBudgetMs, all);
     } catch (err) {
-      // Never let one region abort the run: the matches already crawled from
-      // the other regions are hours of rate-limited work.
+      // One region never aborts the run: matches already crawled from the
+      // other regions are hours of rate-limited work.
       console.error(`[crawl] ${region}: region failed, continuing — ${String(err)}`);
     }
     try {
@@ -212,16 +200,16 @@ export async function crawl(
   }
 
   if (all.length === 0) {
-    // Nothing salvageable — fail loudly so the workflow run shows red. The
-    // store is untouched (run.ts only persists after crawl returns).
+    // Nothing salvageable: fail loudly so the workflow run shows red. Progress
+    // flushes wrote back only the prior store, so no data is lost.
     throw new Error('crawl kept zero matches across all regions — Riot API likely unavailable');
   }
 
   return all;
 }
 
-/** Crawl one region into `all`. Throws only on unexpected failures — the
- *  per-request and per-tier paths inside already degrade gracefully. */
+/** Crawl one region into `all`. Throws only on unexpected failures; the
+ *  per-request and per-tier paths inside degrade on their own. */
 async function crawlRegion(
   client: RiotClient,
   region: Platform,
@@ -235,8 +223,8 @@ async function crawlRegion(
   const matchDeadline = regionStart + regionBudgetMs * 0.97;
   const seeds = await seedPuuids(client, region, config);
 
-  // Only sample as many players as we need to reach the match cap (+buffer for
-  // de-duplication and off-patch / non-soloq matches).
+  // Sample only enough players to reach the match cap, plus 50% for duplicates
+  // and unusable or non-solo-queue matches.
   const needPuuids = Math.ceil((config.maxMatchesPerRegion / config.matchesPerPlayer) * 1.5);
   const seedList = sampleOrder(seeds).slice(0, needPuuids);
 
@@ -246,7 +234,7 @@ async function crawlRegion(
       const ids = (await client.getMatchIds(region, s.seed.puuid, config.matchesPerPlayer)) ?? [];
       return { ...s, ids };
     } catch {
-      // A single rate-limited/failed request must not abort the whole crawl.
+      // A single rate-limited or failed request does not abort the crawl.
       return { ...s, ids: [] as string[] };
     }
   });
@@ -255,12 +243,10 @@ async function crawlRegion(
   // record that player's champion and career win rate.
   const discovered = new Map<string, { tier: LeagueTier; seed?: SeedPlayer }>();
   for (const { tier, seed, ids } of idLists) {
-    // Only the first match kept from a seed carries their baseline. We pull up
-    // to matchesPerPlayer games per player, and tagging every one of them with
-    // the same career win rate would repeat a single player's number several
-    // times over — the per-champion mean would then be an average of far fewer
-    // independent players than its count suggests, and jump around between
-    // crawls. One observation per player per crawl keeps them independent.
+    // Only the first match kept from a seed carries their baseline. Tagging all
+    // of a player's matchesPerPlayer games would repeat one player's number, so
+    // the per-champion mean would rest on far fewer independent players than
+    // its count suggests. One observation per player per crawl.
     let carried = false;
     for (const id of ids) {
       if (discovered.size >= config.maxMatchesPerRegion) break;
@@ -271,9 +257,9 @@ async function crawlRegion(
   }
 
   const entries = [...discovered.entries()];
-  // Starting items need the timeline — a second request per match. One match
-  // in five keeps the request overhead at 20% while the tiny choice space
-  // (a handful of viable opening buys per champion) still fills fast.
+  // Starting items need the timeline, a second request per match. One match in
+  // five keeps the overhead at 20%, and the handful of viable opening buys per
+  // champion still fills fast.
   const timelineIds = new Set(
     entries.filter((_, i) => i % TIMELINE_SAMPLE_EVERY === 0).map(([id]) => id),
   );
@@ -287,7 +273,7 @@ async function crawlRegion(
         try {
           timeline = await client.getMatchTimeline(region, id);
         } catch {
-          // start data is a bonus; the match itself is still worth keeping
+          // Start data is optional; the match is still worth keeping.
         }
       }
       return normalizeMatch(dto, region, tier, seed, timeline);

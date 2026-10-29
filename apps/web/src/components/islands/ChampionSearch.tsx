@@ -50,7 +50,7 @@ export default function ChampionSearch({ champions, version }: Props) {
     const q = norm(raw);
     if (!q) return [];
 
-    // Pages match only on label/keyword *prefixes* — a bare "k" must not drag
+    // Pages match only on label/keyword *prefixes*: a bare "k" must not drag
     // in "Tier List" just because "ranking" contains a k.
     const features: Result[] = FEATURES.filter(
       (f) =>

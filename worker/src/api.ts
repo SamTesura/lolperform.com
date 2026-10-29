@@ -29,10 +29,10 @@ const sliceQuerySchema = z.object({ region: regionSchema, rank: rankBracketSchem
 type Handler = (request: Request, env: Env) => Promise<Response>;
 
 /**
- * Cache keys are built only from the route path and *validated* params — never
- * from the raw query string. Zod strips unknown keys, so `?x=<random>` would
- * otherwise mint a fresh KV entry per request: a cheap way for an attacker to
- * burn the KV write quota and hammer D1 behind every cache miss.
+ * Cache keys come only from the route path and validated params, never the raw
+ * query string. Zod strips unknown keys, so keying on the raw string would let
+ * `?x=<random>` mint a KV entry per request, burning the KV write quota and
+ * sending every request to D1.
  */
 function cacheKey(pathname: string, params: Record<string, string> = {}): string {
   const qs = Object.keys(params)

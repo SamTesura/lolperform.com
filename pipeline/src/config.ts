@@ -1,7 +1,7 @@
 import { ACTIVE_REGIONS, type Platform } from '@lolperform/shared';
 
 /**
- * Pipeline configuration. Tunables here control how much of the ladder we sample.
+ * Pipeline configuration. Tunables here control how much of the ladder is sampled.
  * The Riot key is read from the environment and never logged or persisted.
  */
 export interface PipelineConfig {
@@ -17,8 +17,8 @@ export interface PipelineConfig {
   maxMatchesPerRegion: number;
   /** Requests/second budget for the rate limiter (raise on a production key). */
   riotRps: number;
-  /** Wall-clock budget for the whole crawl; split evenly across regions so a
-   *  slow/throttled key still finishes and loads partial data before timeout. */
+  /** Wall-clock budget for the whole crawl, in minutes. Split evenly across
+   *  regions so a throttled key still loads partial data before the timeout. */
   maxRuntimeMinutes: number;
 }
 
@@ -27,17 +27,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): PipelineConfig
   return {
     riotApiKey,
     regions: ACTIVE_REGIONS,
-    // Defaults are sized for a PRODUCTION key. Broad sampling (many players, few
-    // matches each) keeps the sample representative; ~25k matches/region across
-    // NA/EUW/KR gives popular champions credible volume within the Actions timeout.
-    // Every value is env-overridable so the cron can be tuned without a deploy.
+    // Defaults are sized for a production key. Many players with few matches
+    // each keeps the sample representative; 25k matches per region gives popular
+    // champions credible volume. Every value is env-overridable so the cron can
+    // be tuned without a deploy.
     playersPerDivision: Number(env.PLAYERS_PER_DIVISION ?? 400),
     matchesPerPlayer: Number(env.MATCHES_PER_PLAYER ?? 8),
     maxMatchesPerRegion: Number(env.MAX_MATCHES_PER_REGION ?? 25000),
     riotRps: Number(env.RIOT_RPS ?? 20),
-    // Fill (almost) the whole 6h cron window: Riot's app limit is a rolling
-    // 2-minute budget, so unused wall-clock time is unrecoverable request
-    // budget. ~5.5h crawling + install/aggregate/load fits GitHub's 6h job cap.
+    // Riot's app limit is a rolling 2-minute budget, so idle wall-clock time is
+    // lost request budget. 5.5 h of crawling plus install, aggregate and load
+    // fits GitHub's 6 h job cap.
     maxRuntimeMinutes: Number(env.MAX_RUNTIME_MINUTES ?? 330),
   };
 }

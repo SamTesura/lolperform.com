@@ -15,7 +15,7 @@ const SIZES = {
 } as const;
 
 interface Props {
-  /** Base tier letter — drives the colour. */
+  /** Base tier letter; drives the colour. */
   tier: TierGrade;
   /** Full grade to display, e.g. "S+". Defaults to the base letter. */
   grade?: string;

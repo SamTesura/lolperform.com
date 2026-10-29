@@ -1,5 +1,5 @@
 /**
- * Data Dragon asset URL helpers. Images come from Riot's free static CDN — no
+ * Data Dragon asset URL helpers. Images come from Riot's free static CDN; no
  * API key required. The full ddragon version (e.g. "14.12.1") differs from our
  * patch label ("14.12"); callers pass the version surfaced by the dataset meta.
  */

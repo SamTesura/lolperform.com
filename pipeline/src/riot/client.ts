@@ -22,19 +22,18 @@ const APEX_PATH: Record<ApexKind, string> = {
  *
  * Pacing has two layers:
  * - The app-wide limit governs every request. It starts at the dev-key default
- *   and re-tunes itself from Riot's own `X-App-Rate-Limit` response header, so
- *   the crawler always runs at 100% of whatever the key actually allows — dev
- *   key today, production key tomorrow, no config change.
+ *   and re-tunes from Riot's `X-App-Rate-Limit` response header, so the crawler
+ *   runs at whatever the key allows with no config change.
  * - The league-v4 methods have much tighter per-method ceilings (apex 30/10s +
- *   500/10min, entries 50/10s) and get their own limiters on top.
+ *   500/10min, entries 50/10s) and get their own limiters, paced at 90%.
  */
 export class RiotClient {
-  /** App-wide pacing — replaced by the advertised windows on first response. */
+  /** App-wide pacing, replaced by the advertised windows on first response. */
   private appLimiter: RateLimiter;
   private appLimitTuned = false;
-  /** league-v4 challenger/grandmaster/master: 30 req/10s + 500 req/10min. */
+  /** league-v4 challenger/grandmaster/master. Riot allows 30 req/10s + 500 req/10min. */
   private readonly apexLimiter: RateLimiter;
-  /** league-v4 entries/{queue}/{tier}/{division}: 50 req/10s. */
+  /** league-v4 entries/{queue}/{tier}/{division}. Riot allows 50 req/10s. */
   private readonly entriesLimiter: RateLimiter;
 
   constructor(
@@ -84,7 +83,7 @@ export class RiotClient {
       if (res.ok) return (await res.json()) as T;
       if (res.status === 404) return null;
 
-      // Auth problems are almost always a bad/expired key — fail loudly and early.
+      // Auth errors almost always mean a bad or expired key: fail loudly and early.
       if (res.status === 401 || res.status === 403) {
         throw new Error(
           `Riot API ${res.status} for ${path}. The RIOT_API_KEY is invalid, expired, or lacks access.`,
@@ -100,7 +99,7 @@ export class RiotClient {
         await sleep(2 ** attempt * 500);
         continue;
       }
-      // Other unexpected 4xx (e.g. a deprecated endpoint): skip rather than abort the crawl.
+      // Other 4xx (e.g. a deprecated endpoint): skip rather than abort the crawl.
       return null;
     }
     throw new Error(`Riot API exhausted retries for ${path}`);
@@ -129,8 +128,8 @@ export class RiotClient {
 
   /** Recent ranked-solo match ids for a player. */
   getMatchIds(region: Platform, puuid: string, count = 20): Promise<string[] | null> {
-    // Riot-returned ids are interpolated into request paths — keep them shaped
-    // like ids so a malformed value can't redirect the request to another path.
+    // Riot-returned ids are interpolated into request paths. Requiring id shape
+    // stops a malformed value from redirecting the request to another path.
     if (!/^[A-Za-z0-9_-]+$/.test(puuid)) return Promise.resolve(null);
     const route = REGION_ROUTE[region];
     return this.request<string[]>(
@@ -146,7 +145,7 @@ export class RiotClient {
     return this.request<MatchDTO>(route, `/lol/match/v5/matches/${matchId}`);
   }
 
-  /** Match timeline — the source for opening item purchases. */
+  /** Match timeline: the source for opening item purchases. */
   getMatchTimeline(region: Platform, matchId: string): Promise<MatchTimelineDTO | null> {
     if (!/^[A-Za-z0-9_-]+$/.test(matchId)) return Promise.resolve(null);
     const route = REGION_ROUTE[region];
