@@ -34,13 +34,13 @@
     "eslint-plugin-astro": "3.2.1",
     "globals": "17.13.0",
     "prettier": "3.9.10",
-    "prettier-plugin-astro": "1.1.1",
+    "prettier-plugin-astro": "1.1.2",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.71.2",
+    "typescript-eslint": "8.72.0",
     "vitest": "4.1.12",
-    "wrangler": "4.151.1",
-    "@stryker-mutator/core": "^10.0.0",
-    "@stryker-mutator/vitest-runner": "^10.0.0"
+    "wrangler": "4.152.0",
+    "@stryker-mutator/core": "^10.1.1",
+    "@stryker-mutator/vitest-runner": "^10.1.1"
   },
   "pnpm": {
     "overrides": {
