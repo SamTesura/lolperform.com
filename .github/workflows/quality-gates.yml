@@ -4,6 +4,9 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  # security-autofix.yml starts this on its branch: its pushes use the workflow
+  # token, which starts no workflows.
+  workflow_dispatch:
 
 concurrency:
   group: gates-${{ github.workflow }}-${{ github.ref }}

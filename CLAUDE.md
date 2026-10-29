@@ -46,6 +46,9 @@ Worst offenders are uncovered pipeline helpers (`ddragon.getCompletedItems`, `ri
   the fast path on purpose.
 - GitHub scheduled workflows start **hours late**. Gate jobs on "time since last successful run", never on a
   start-hour window (Patch Watch was fixed this way).
+- A `security` check red on a PR that changed no dependencies is a new advisory on `main`, not the PR.
+  `security-autofix.yml` fixes it by lockfile refresh within ~6 h (see `scripts/security-autofix.mjs`);
+  Dependabot opens no PR for indirect packages. It never touches the allowlist: no-fix advisories need a person.
 - Every stat needs its sample size and confidence treatment. Champions below the threshold belong in the explicit
   _Unranked_ section, never graded.
 - `astroCompressHTML` in `.prettierrc.json` must mirror `compressHTML` in `apps/web/astro.config.mjs`. Both sit on

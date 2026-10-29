@@ -1,0 +1,67 @@
+name: security autofix
+
+# New advisories keep landing against packages we only reach through another
+# package, and Dependabot opens no PR for those. This re-resolves the flagged
+# packages inside the ranges their parents already declare, opens a PR with the
+# lockfile change, runs the checks on it and merges it once they all pass.
+# Anything it can't fix stays red in the `security` workflow for a person.
+# The why and the how are in scripts/security-autofix.mjs.
+
+on:
+  # Every six hours, so a new advisory is usually fixed before the daily scan
+  # or a PR trips over it. Scheduled runs start late; nothing here needs the hour.
+  schedule:
+    - cron: '41 */6 * * *'
+  # And as soon as the security scan fails on main.
+  workflow_run:
+    workflows: [security]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write # push the fix branch, merge the PR
+  pull-requests: write # open, update, merge or close the PR
+  actions: write # start the checks on the branch: GITHUB_TOKEN pushes start no workflows
+  checks: read # read their results
+
+concurrency:
+  group: security-autofix
+  cancel-in-progress: false
+
+jobs:
+  autofix:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Always main: a manual run started from another branch still fixes main.
+          ref: main
+          # No token left in .git/config. Only the Ship step can push.
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          # check-latest: the runner image's cached 22.x can predate 22.23.4, the
+          # release that rejects the compromised eMudhra CA keys (2026-10).
+          check-latest: true
+
+      # No token here, and pnpm runs with --ignore-scripts: no dependency code runs.
+      - name: Plan
+        id: plan
+        run: node scripts/security-autofix.mjs plan
+
+      - name: Ship
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLAN_STATE: ${{ steps.plan.outputs.state }}
+          PLAN_TITLE: ${{ steps.plan.outputs.title }}
+          PLAN_BODY: ${{ steps.plan.outputs.body }}
+        run: node scripts/security-autofix.mjs ship

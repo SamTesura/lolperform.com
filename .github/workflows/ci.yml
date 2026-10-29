@@ -4,6 +4,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  # security-autofix.yml starts this on its branch: its pushes use the workflow
+  # token, which starts no workflows, and verify and secret-scan are required.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -43,11 +46,10 @@ jobs:
       # on the rendered page — scan every built page so it can't ship again.
       - name: Check rendered whitespace
         run: node scripts/check-inline-whitespace.mjs
-      # `pnpm audit` is retired-upstream for now: npm shut off the classic audit
-      # endpoints (HTTP 410, July 2026) and no pnpm release speaks the bulk
-      # advisory API yet. Vulnerability coverage continues via GitHub Dependabot
-      # security updates (enabled on the repo; same GHSA advisory source).
-      # TODO: restore a lockfile audit step once pnpm ships bulk-endpoint support.
+      # No audit step here: quality-gates-security.yml runs `pnpm audit` on every
+      # PR, every push to main and daily, and security-autofix.yml fixes what a
+      # lockfile refresh can. Dependabot security updates open no PR for a
+      # package we only reach through another package.
 
   secret-scan:
     runs-on: ubuntu-latest
