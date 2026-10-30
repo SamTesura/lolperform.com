@@ -29,7 +29,13 @@ export function MatchupRow({ matchup, self, opponent, version, striped }: Props)
         striped ? 'bg-bg-surface' : 'bg-bg-base'
       }`}
     >
-      <ChampionPortrait championId={opponent.id} name={opponent.name} version={version} size={40} />
+      <ChampionPortrait
+        championId={opponent.id}
+        name={opponent.name}
+        alt=""
+        version={version}
+        size={40}
+      />
 
       <div className="min-w-0">
         <div className="truncate text-sm font-medium text-text-primary">{opponent.name}</div>

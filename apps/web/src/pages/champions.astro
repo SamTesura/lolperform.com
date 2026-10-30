@@ -18,16 +18,18 @@ const { version, champions } = await getBuildChampions();
       </p>
     </header>
 
-    <ul class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+    {/* role="list": Safari/VoiceOver drops list semantics once list-style is none. */}
+    <ul role="list" class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
       {champions.map((c) => (
         <li>
           <a
             href={`/champion/${c.id}`}
             class="flex flex-col items-center gap-1 rounded-md border border-border-subtle bg-bg-surface p-2 transition-colors duration-150 hover:bg-bg-elevated"
           >
+            {/* alt="" because the name is printed right below; it would be read twice. */}
             <img
               src={championSquare(c.id, version)}
-              alt={c.name}
+              alt=""
               width={56}
               height={56}
               loading="lazy"

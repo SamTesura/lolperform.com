@@ -80,8 +80,19 @@ const jsonLd = {
     ></script>
   </head>
   <body class="flex min-h-dvh flex-col">
+    <a href="#main" class="skip-link">
+      Skip to content
+    </a>
     <SiteHeader />
-    <main class={fullWidth ? 'flex-1' : 'mx-auto w-full max-w-[88rem] flex-1 px-4 py-6 sm:px-6'}>
+    {/* tabindex=-1 so the skip link moves focus here, not just the scroll position. */}
+    <main
+      id="main"
+      tabindex="-1"
+      class:list={[
+        'focus:shadow-none',
+        fullWidth ? 'flex-1' : 'mx-auto w-full max-w-[88rem] flex-1 px-4 py-6 sm:px-6',
+      ]}
+    >
       <slot />
     </main>
     <SiteFooter />

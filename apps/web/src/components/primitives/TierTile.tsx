@@ -50,6 +50,7 @@ export function TierTile({ stat, meta, version, href, unranked }: Props) {
       <ChampionPortrait
         championId={meta.id}
         name={meta.name}
+        alt=""
         version={version}
         tier={unranked ? undefined : baseTier(stat.tier)}
         size={76}
@@ -69,11 +70,16 @@ export function TierTile({ stat, meta, version, href, unranked }: Props) {
       </div>
 
       <div className="flex items-center justify-between px-0.5 text-2xs text-text-muted">
+        {/* "P"/"B" are visual shorthand; screen readers get the words. */}
         <span className="stat" title="Pick rate">
-          P {formatPercent(stat.pickRate)}
+          <span aria-hidden="true">P </span>
+          <span className="sr-only">Pick rate </span>
+          {formatPercent(stat.pickRate)}
         </span>
         <span className="stat" title="Ban rate">
-          B {formatPercent(stat.banRate)}
+          <span aria-hidden="true">B </span>
+          <span className="sr-only">Ban rate </span>
+          {formatPercent(stat.banRate)}
         </span>
       </div>
 

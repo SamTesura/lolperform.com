@@ -899,7 +899,8 @@ function Detail({ championId }: { championId: string }) {
                     className="inline-flex items-center rounded-md border border-border-default px-2 py-1 text-xs font-semibold text-text-muted"
                     title="Not enough games this patch, and no prior-patch data to blend — not tiered yet"
                   >
-                    NR
+                    <span aria-hidden="true">NR</span>
+                    <span className="sr-only">Not ranked</span>
                   </span>
                 )}
                 <span className="text-sm font-medium text-text-secondary">
@@ -1114,8 +1115,10 @@ function Detail({ championId }: { championId: string }) {
                       ) : null}
                     </span>
                   ) : (
+                    // role=img: aria-label on a bare div is not read.
                     <div
                       key={`empty-${i}`}
+                      role="img"
                       title="No consistent pick for this slot yet"
                       className="h-10 w-10 rounded-sm border border-dashed border-border-subtle bg-bg-inset/50"
                       aria-label={`Item slot ${i + 1}: no consistent pick yet`}

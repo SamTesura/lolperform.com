@@ -45,7 +45,13 @@ function Side({
       href={`/champion/${champ.id}`}
       className="flex flex-1 flex-col items-center gap-2 rounded-lg border border-border-subtle bg-bg-surface p-4 transition-colors hover:bg-bg-elevated"
     >
-      <ChampionPortrait championId={champ.id} name={champ.name} version={version} size={72} />
+      <ChampionPortrait
+        championId={champ.id}
+        name={champ.name}
+        alt=""
+        version={version}
+        size={72}
+      />
       <span className="text-sm font-semibold text-text-primary">{champ.name}</span>
       <span
         className={`stat text-2xl font-bold ${winRate >= 0.5 ? 'text-positive' : 'text-negative'}`}

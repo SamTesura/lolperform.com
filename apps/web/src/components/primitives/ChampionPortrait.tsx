@@ -14,17 +14,28 @@ interface Props {
   name: string;
   version?: string;
   size?: number;
+  /** Override the alt text. Pass "" when the name is already printed next to
+   *  the portrait (e.g. inside a link), so screen readers don't say it twice. */
+  alt?: string;
   /** When set, draws a 2px inner ring in the tier hue. */
   tier?: TierGrade;
   className?: string;
 }
 
 /** Square champion portrait from Data Dragon, with an optional tier-coded ring. */
-export function ChampionPortrait({ championId, name, version, size = 64, tier, className }: Props) {
+export function ChampionPortrait({
+  championId,
+  name,
+  alt,
+  version,
+  size = 64,
+  tier,
+  className,
+}: Props) {
   return (
     <img
       src={championSquare(championId, version)}
-      alt={name}
+      alt={alt ?? name}
       width={size}
       height={size}
       loading="lazy"

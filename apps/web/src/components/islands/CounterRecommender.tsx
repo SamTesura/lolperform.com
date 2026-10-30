@@ -102,7 +102,7 @@ function Recommender({ champions, version }: Props) {
           <select
             value={enemyKey}
             onChange={(e) => setEnemyKey(e.target.value)}
-            className="select min-h-11 min-w-56 rounded-sm border border-border-default bg-bg-elevated px-2 py-1.5 text-md text-text-primary pointer-fine:text-sm"
+            className="select min-h-11 min-w-56 rounded-sm border border-border-input bg-bg-elevated px-2 py-1.5 text-md text-text-primary pointer-fine:text-sm"
           >
             <option value="">Select a champion…</option>
             {enemyOptions.map((c) => (
@@ -147,6 +147,7 @@ function Recommender({ champions, version }: Props) {
                         <ChampionPortrait
                           championId={m.id}
                           name={m.name}
+                          alt=""
                           version={version}
                           size={40}
                         />
@@ -212,6 +213,7 @@ function Recommender({ champions, version }: Props) {
                         <ChampionPortrait
                           championId={m.id}
                           name={m.name}
+                          alt=""
                           version={version}
                           size={40}
                         />

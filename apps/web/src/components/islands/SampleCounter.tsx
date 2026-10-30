@@ -32,7 +32,9 @@ function Counter() {
       ) : (
         <span>Sampled, not full-ladder — and honest about it. </span>
       )}
-      <a href="/methodology">How the data works →</a>
+      <a href="/methodology">
+        How the data works <span aria-hidden="true">→</span>
+      </a>
     </p>
   );
 }
