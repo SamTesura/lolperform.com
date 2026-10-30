@@ -22,10 +22,16 @@
   --color-border-subtle: #1a2030; /* dividers between rows */
   --color-border-default: #232b3d; /* card outlines */
   --color-border-strong: #364259; /* focused inputs, emphasized borders */
+  /* Form-control outline. Needs 3:1 against base, surface and elevated
+     (WCAG 1.4.11) so selects and the search box read as controls. 3.2:1 on elevated. */
+  --color-border-input: #5b6984;
 
   --color-text-primary: #e8ecf3; /* body + headings.   Ratio 14.8:1 on base */
   --color-text-secondary: #a7b0c2; /* secondary copy.    Ratio  7.2:1 on base */
-  --color-text-muted: #7e8a9e; /* labels, captions. ~5.4:1 on base, ~4.6:1 on elevated (AA) */
+  /* Muted text also sits on the tinted *-subtle chips; #7e8a9e fell to 4.3:1 on
+     positive/accent-subtle. This is the smallest lift that clears 4.5:1 on every
+     surface: 5.9 base, 5.3 elevated, 4.7 overlay, 4.5 positive-subtle. */
+  --color-text-muted: #818da1; /* labels, captions */
   --color-text-disabled: #434b5c; /* disabled states */
   --color-text-inverse: #07090d; /* text on accent / tier fills */
 
@@ -101,7 +107,7 @@
      --------------------------------------------------------------------------- */
   --color-delta-up: #46d39a;
   --color-delta-down: #ff6b6b;
-  --color-delta-flat: #6b7689;
+  --color-delta-flat: #76829a; /* 4.9:1 on surface, 4.6:1 on elevated (hovered tile) */
 
   /* ---------------------------------------------------------------------------
      TYPOGRAPHY — font families

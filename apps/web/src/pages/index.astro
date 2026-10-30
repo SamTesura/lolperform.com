@@ -61,7 +61,7 @@ const cards = [
     <div class="flex items-baseline justify-between">
       <h2>Top picks right now</h2>
       <a href="/tier-list" class="text-sm">
-        Full list →
+        Full list <span aria-hidden="true">→</span>
       </a>
     </div>
     <TopPicks client:load />
@@ -75,7 +75,10 @@ const cards = [
       >
         <h3 class="flex items-center justify-between">
           {c.title}
-          <span class="text-accent transition-transform duration-150 group-hover:translate-x-0.5">
+          <span
+            aria-hidden="true"
+            class="text-accent transition-transform duration-150 group-hover:translate-x-0.5"
+          >
             →
           </span>
         </h3>

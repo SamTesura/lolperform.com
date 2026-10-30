@@ -15,6 +15,9 @@
   }
 
   html {
+    /* Keep focused elements and #main anchors clear of the sticky header
+       (WCAG 2.4.11). Below md the header wraps to two rows, ~135px. */
+    scroll-padding-top: 9rem;
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
@@ -89,6 +92,13 @@
   a:active {
     color: var(--color-accent-active);
   }
+  /* Links inside running text need a cue besides colour (WCAG 1.4.1): the
+     accent is only ~2:1 against the muted copy around it. Tables and tiles
+     are not inside <p>, so they stay clean. */
+  p a {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 
   /* Selection — accent-tinted, never default browser blue. */
   ::selection {
@@ -101,7 +111,10 @@
     outline: none;
   }
   :focus-visible {
-    outline: none;
+    /* Transparent outline: invisible normally, but forced-colors mode (Windows
+       High Contrast) paints it, where the box-shadow ring is dropped. */
+    outline: 2px solid transparent;
+    outline-offset: 2px;
     box-shadow: var(--focus-ring);
     border-radius: var(--radius-sm);
   }
@@ -123,6 +136,12 @@
   button:disabled {
     cursor: not-allowed;
     color: var(--color-text-disabled);
+  }
+
+  @media (min-width: 48rem) {
+    html {
+      scroll-padding-top: 4.5rem;
+    }
   }
 
   hr {
@@ -159,7 +178,7 @@
    from the edge, with enough right padding that text never runs under it. */
 .select {
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237e8a9e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23818da1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   background-size: 1rem;
@@ -194,6 +213,27 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Skip link: first tab stop on every page, hidden until focused (WCAG 2.4.1).
+   Its own class because the unlayered .sr-only above would beat Tailwind's
+   focus:not-sr-only utility. */
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 100;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  font-weight: var(--font-weight-semibold);
+  transform: translateY(-200%);
+}
+.skip-link:focus-visible,
+.skip-link:focus {
+  transform: none;
+  color: var(--color-accent-fg);
 }
 
 /* =============================================================================

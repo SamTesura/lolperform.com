@@ -30,14 +30,18 @@ export function TierBadge({ tier, grade, size = 'md', provisional }: Props) {
   return (
     <span
       className={`inline-flex items-center justify-center rounded-md font-display font-bold ${TIER_BG[tier]} ${SIZES[size]} ${provisional ? 'border border-dashed border-current' : ''}`}
-      aria-label={`Tier ${label}${provisional ? ' (provisional — early data)' : ''}`}
       title={
         provisional
           ? 'Provisional: this patch’s sample is still small, blended with the prior patch'
           : undefined
       }
     >
-      {label}
+      {/* aria-label on a plain span is ignored by screen readers, so the spoken
+          form lives in visually hidden text instead. */}
+      <span aria-hidden="true">{label}</span>
+      <span className="sr-only">
+        {`Tier ${label}${provisional ? ' (provisional, early data)' : ''}`}
+      </span>
     </span>
   );
 }

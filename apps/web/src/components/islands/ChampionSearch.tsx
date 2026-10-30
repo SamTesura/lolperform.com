@@ -1,4 +1,4 @@
-import { type KeyboardEvent as ReactKeyboardEvent, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent as ReactKeyboardEvent, useId, useMemo, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { championSquare } from '../../lib/ddragon';
 
@@ -44,6 +44,7 @@ export default function ChampionSearch({ champions, version }: Props) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listId = useId();
 
   const results = useMemo<Result[]>(() => {
     const raw = query.trim().toLowerCase();
@@ -91,6 +92,7 @@ export default function ChampionSearch({ champions, version }: Props) {
   function onKeyDown(e: ReactKeyboardEvent) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      setOpen(true); // reopen after Escape, as the combobox pattern expects
       setActive((i) => Math.min(i + 1, results.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -103,13 +105,29 @@ export default function ChampionSearch({ champions, version }: Props) {
   }
 
   const showList = open && results.length > 0;
+  const optionId = (i: number) => `${listId}-opt-${i}`;
+  // Announce the result count; otherwise screen-reader users hear nothing as the list changes.
+  const status =
+    open && query.trim()
+      ? results.length === 0
+        ? 'No matches'
+        : `${results.length} result${results.length === 1 ? '' : 's'}, use up and down arrows to choose`
+      : '';
 
   return (
     <div className="relative w-full">
-      <div className="flex items-center gap-2 rounded-md border border-border-default bg-bg-elevated px-2.5 py-1.5">
+      <div className="flex items-center gap-2 rounded-md border border-border-input bg-bg-elevated px-2.5 py-1.5">
         <Search size={15} className="shrink-0 text-text-muted" aria-hidden />
+        {/* ARIA combobox pattern: focus stays in the input, arrows move the
+            active option, and aria-activedescendant tells screen readers which. */}
         <input
           type="search"
+          role="combobox"
+          aria-expanded={showList}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={showList ? optionId(active) : undefined}
+          autoComplete="off"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -127,15 +145,24 @@ export default function ChampionSearch({ champions, version }: Props) {
         />
       </div>
 
-      {showList ? (
-        <ul
-          className="absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-md border border-border-default bg-bg-overlay shadow-lg"
-          role="listbox"
-        >
-          {results.map((r, i) => (
-            <li key={r.kind === 'champ' ? r.meta.key : r.href}>
-              <button
-                type="button"
+      <span role="status" className="sr-only">
+        {status}
+      </span>
+
+      {/* Options are not buttons: tabbing onto them blurred the input and closed
+          the list. The listbox stays in the DOM so aria-controls always resolves. */}
+      <ul
+        id={listId}
+        role="listbox"
+        aria-label="Search results"
+        hidden={!showList}
+        className="absolute top-full right-0 left-0 z-50 mt-1 overflow-hidden rounded-md border border-border-default bg-bg-overlay shadow-lg"
+      >
+        {showList
+          ? results.map((r, i) => (
+              <li
+                key={r.kind === 'champ' ? r.meta.key : r.href}
+                id={optionId(i)}
                 role="option"
                 aria-selected={i === active}
                 onMouseDown={(e) => {
@@ -144,7 +171,7 @@ export default function ChampionSearch({ champions, version }: Props) {
                   go(r);
                 }}
                 onMouseEnter={() => setActive(i)}
-                className={`flex w-full items-center gap-2 px-2.5 py-2 text-left text-sm ${
+                className={`flex w-full cursor-pointer items-center gap-2 px-2.5 py-2 text-left text-sm ${
                   i === active ? 'bg-bg-elevated text-text-primary' : 'text-text-secondary'
                 }`}
               >
@@ -162,18 +189,20 @@ export default function ChampionSearch({ champions, version }: Props) {
                   </>
                 ) : (
                   <>
-                    <span className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-sm bg-bg-inset text-2xs text-accent">
+                    <span
+                      aria-hidden="true"
+                      className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-sm bg-bg-inset text-2xs text-accent"
+                    >
                       ↗
                     </span>
                     <span className="truncate">{r.label}</span>
                     <span className="ml-auto text-2xs text-text-muted uppercase">Page</span>
                   </>
                 )}
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+              </li>
+            ))
+          : null}
+      </ul>
     </div>
   );
 }

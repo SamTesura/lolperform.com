@@ -27,7 +27,9 @@ export function RoleTabsInteractive({
   onChange: (role: Role) => void;
 }) {
   return (
-    <nav
+    // A group, not a <nav>: these are filter toggles, not links to other pages.
+    <div
+      role="group"
       aria-label="Role"
       className="flex items-center gap-1 overflow-x-auto border-b border-border-subtle"
     >
@@ -51,7 +53,7 @@ export function RoleTabsInteractive({
           </button>
         );
       })}
-    </nav>
+    </div>
   );
 }
 
@@ -74,7 +76,7 @@ function Select<T extends string>({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
-        className="select min-h-11 rounded-sm border border-border-default bg-bg-elevated px-2 py-1 text-md text-text-primary pointer-fine:text-sm"
+        className="select min-h-11 rounded-sm border border-border-input bg-bg-elevated px-2 py-1 text-md text-text-primary pointer-fine:text-sm"
       >
         {options.map((o) => (
           <option key={o} value={o}>
