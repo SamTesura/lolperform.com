@@ -1,22 +1,35 @@
 // @vitest-environment node
 /**
- * The security autofix decides what to re-resolve, what that fixed and when its
- * PR may merge itself. These pin those decisions. The commands it runs (pnpm,
- * git, gh) are exercised by the workflow on GitHub.
+ * The security autofix decides what to re-resolve, what that fixed, when its PR
+ * may merge itself and what it may never touch. These pin those decisions. The
+ * commands it runs (pnpm, git, gh) are exercised by the workflow on GitHub.
  */
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  BRANCH,
   EXPECTED_CHECKS,
-  checkVerdict,
+  MIN_RELEASE_AGE_DAYS,
+  commitMessage,
   compareAudits,
+  directDependencies,
+  dispatchedVerdict,
+  fixSignature,
   improved,
+  isBotCommit,
   isFixable,
-  newestRuns,
+  lockfileDelta,
+  lockfilePackages,
+  mergeAfter,
+  newestDispatchedRuns,
   packagesToRefresh,
   parseAudit,
+  pathShape,
+  plain,
   renderBody,
+  splitKey,
+  statusFor,
   titleFor,
   unexpectedChanges,
 } from './security-autofix.mjs';
@@ -32,8 +45,8 @@ interface Advisory {
   left?: number;
 }
 
-const SITEMAP = '4.5.4|apps/web > @astrojs/sitemap@3.7.4 > zod@4.5.4';
-const ASTRO = '4.6.6|apps/web > astro@7.4.0 > zod@4.6.6';
+const SITEMAP = 'apps/web > @astrojs/sitemap > zod';
+const ASTRO = 'apps/web > astro > zod';
 
 const advisory = (over: Partial<Advisory> = {}): Advisory => ({
   id: '1243066',
@@ -45,6 +58,16 @@ const advisory = (over: Partial<Advisory> = {}): Advisory => ({
   paths: [SITEMAP],
   ...over,
 });
+
+const body = (over: Partial<Parameters<typeof renderBody>[0]> = {}) =>
+  renderBody({
+    fixed: [advisory({ left: 0 })],
+    remaining: [],
+    added: [],
+    cooldown: { at: '', youngest: '' },
+    signature: 'abc123',
+    ...over,
+  });
 
 describe('parseAudit', () => {
   it('maps each advisory and every vulnerable copy pnpm found', () => {
@@ -91,29 +114,22 @@ describe('parseAudit', () => {
   });
 });
 
-describe('isFixable', () => {
+describe('isFixable and packagesToRefresh', () => {
   it('needs a patched release', () => {
     expect(isFixable(advisory())).toBe(true);
     expect(isFixable(advisory({ patched: '<0.0.0' }))).toBe(false);
     expect(isFixable(advisory({ patched: '' }))).toBe(false);
   });
-});
 
-describe('packagesToRefresh', () => {
   it('lists each fixable package once, sorted', () => {
     const list = [
       advisory(),
       advisory({ id: '2', name: 'source-map-js' }),
       advisory({ id: '3' }),
       advisory({ id: '4', name: '@astrojs/sitemap' }),
+      advisory({ id: '5', name: 'http-cache-semantics', patched: '<0.0.0' }),
     ];
     expect(packagesToRefresh(list)).toEqual(['@astrojs/sitemap', 'source-map-js', 'zod']);
-  });
-
-  it('skips packages with no patched release', () => {
-    expect(
-      packagesToRefresh([advisory({ name: 'http-cache-semantics', patched: '<0.0.0' })]),
-    ).toEqual([]);
   });
 
   it('never passes something that is not a package name to pnpm', () => {
@@ -145,141 +161,335 @@ describe('compareAudits and improved', () => {
   });
 
   it('reports copies a refresh would bring in, of any advisory', () => {
-    const newcomer = advisory({ id: '9', name: 'other', patched: '<0.0.0', paths: ['1.0.0|x'] });
-    expect(compareAudits([advisory()], [newcomer]).added).toEqual(['9|1.0.0|x']);
+    const newcomer = advisory({
+      id: '9',
+      name: 'other',
+      patched: '<0.0.0',
+      paths: ['apps/web > x'],
+    });
+    expect(compareAudits([advisory()], [newcomer]).added).toEqual(['9|apps/web > x']);
   });
 
-  it('never credits an advisory with no patched release', () => {
+  it('sees the same copy after a parent update, neither fixed nor new', () => {
+    const raw = (parent: string) =>
+      JSON.stringify({
+        advisories: {
+          1: {
+            id: 1,
+            module_name: 'p',
+            patched_versions: '>=2',
+            findings: [{ version: '1.0.0', paths: [`apps/web > b@${parent} > p@1.0.0`] }],
+          },
+        },
+      });
+    const before = parseAudit(raw('1.0.0')) ?? [];
+    const after = parseAudit(raw('1.1.0')) ?? [];
+    expect(compareAudits(before, after)).toEqual({ removed: [], added: [] });
+    expect(improved(before, after)).toEqual([]);
+  });
+
+  it('never credits an advisory with no patched release, or a refresh that changed nothing', () => {
     const gone = advisory({ name: 'http-cache-semantics', patched: '<0.0.0' });
-    expect(compareAudits([gone], []).removed).toEqual([]);
     expect(improved([gone], [])).toEqual([]);
-  });
-
-  it('reports nothing when the refresh changed nothing', () => {
     expect(improved([advisory()], [advisory()])).toEqual([]);
-    expect(compareAudits([advisory()], [advisory()])).toEqual({ removed: [], added: [] });
+  });
+});
+
+describe('pathShape', () => {
+  it('drops versions and peer suffixes from every segment', () => {
+    expect(pathShape('apps/web > @astrojs/sitemap@3.7.4 > zod@4.5.4')).toBe(
+      'apps/web > @astrojs/sitemap > zod',
+    );
+    expect(pathShape('. > react-dom@19.3.0(react@19.3.0) > scheduler@0.27.0')).toBe(
+      '. > react-dom > scheduler',
+    );
+    expect(pathShape('@astrojs/sitemap')).toBe('@astrojs/sitemap');
   });
 });
 
 describe('unexpectedChanges', () => {
-  it('accepts a lockfile-only change', () => {
+  it('accepts a lockfile-only change and reports anything else', () => {
     expect(unexpectedChanges(' M pnpm-lock.yaml\n')).toEqual([]);
     expect(unexpectedChanges('')).toEqual([]);
-  });
-
-  it('reports anything else pnpm touched', () => {
     const porcelain = ' M pnpm-lock.yaml\n M worker/package.json\n?? stray.txt\n';
     expect(unexpectedChanges(porcelain)).toEqual(['worker/package.json', 'stray.txt']);
   });
 });
 
-describe('titleFor', () => {
+describe('the lockfile', () => {
+  const lock = (packages: string[]) =>
+    [
+      "lockfileVersion: '9.0'",
+      '',
+      'importers:',
+      '',
+      '  .:',
+      '    dependencies:',
+      '      zod:',
+      '        specifier: 4.6.7',
+      '',
+      'packages:',
+      '',
+      ...packages.flatMap((p) => [`  ${p}:`, '    resolution: {integrity: sha512-x}', '']),
+      'snapshots:',
+      '',
+      '  zod@9.9.9: {}',
+    ].join('\n');
+
+  it('lists the packages section only, quoted or not', () => {
+    const text = lock(["'@astrojs/sitemap@3.7.4'", 'zod@4.5.4', 'zod@4.6.7']);
+    expect([...lockfilePackages(text)]).toEqual([
+      '@astrojs/sitemap@3.7.4',
+      'zod@4.5.4',
+      'zod@4.6.7',
+    ]);
+  });
+
+  it('lists our direct dependencies from importers, which pnpm update must not be given', () => {
+    const text = [
+      'importers:',
+      '',
+      '  .:',
+      '    devDependencies:',
+      "      '@eslint/js':",
+      '        specifier: 10.0.1',
+      '        version: 10.0.1',
+      '  worker:',
+      '    dependencies:',
+      '      zod:',
+      '        specifier: 4.6.7',
+      '        version: 4.6.7',
+      '',
+      'packages:',
+      '',
+      '  source-map-js@1.2.2:',
+    ].join('\n');
+    expect([...directDependencies(text)]).toEqual(['@eslint/js', 'zod']);
+  });
+
+  it('splits names that start with @', () => {
+    expect(splitKey('@astrojs/sitemap@3.7.4')).toEqual({
+      name: '@astrojs/sitemap',
+      version: '3.7.4',
+    });
+    expect(splitKey('zod@4.6.7')).toEqual({ name: 'zod', version: '4.6.7' });
+    expect(splitKey('@scope')).toBeNull();
+  });
+
+  it('tells a pure dedupe from a refresh that brings in new releases', () => {
+    const before = lock(['zod@4.5.4', 'zod@4.6.7']);
+    expect(lockfileDelta(before, lock(['zod@4.6.7']))).toEqual({
+      added: [],
+      removed: ['zod@4.5.4'],
+    });
+    expect(lockfileDelta(before, lock(['zod@4.6.7', 'zod@4.6.8']))).toEqual({
+      added: ['zod@4.6.8'],
+      removed: ['zod@4.5.4'],
+    });
+  });
+
+  it('signs a fix by what it changes, so the same change on a newer main matches', () => {
+    const delta = { added: ['zod@4.6.8'], removed: ['zod@4.5.4'] };
+    expect(fixSignature(delta)).toBe(fixSignature({ ...delta }));
+    expect(fixSignature(delta)).toMatch(/^[0-9a-f]{16}$/);
+    expect(fixSignature(delta)).not.toBe(fixSignature({ added: [], removed: ['zod@4.5.4'] }));
+  });
+});
+
+describe('mergeAfter', () => {
+  it('needs no wait when nothing new comes in', () => {
+    expect(mergeAfter([])).toEqual({ at: '', youngest: '' });
+  });
+
+  it(`waits ${MIN_RELEASE_AGE_DAYS} days after the newest release`, () => {
+    const published = [
+      { key: 'a@1.0.0', time: '2026-10-01T00:00:00.000Z' },
+      { key: 'b@2.0.0', time: '2026-10-10T12:00:00.000Z' },
+    ];
+    expect(mergeAfter(published, 3)).toEqual({
+      at: '2026-10-13T12:00:00.000Z',
+      youngest: 'b@2.0.0',
+    });
+  });
+
+  it('leaves the merge to a person when a publish date is unknown', () => {
+    const published = [
+      { key: 'a@1.0.0', time: '2026-10-01T00:00:00.000Z' },
+      { key: 'b@2.0.0', time: null },
+    ];
+    expect(mergeAfter(published)).toEqual({ at: 'unknown', youngest: 'b@2.0.0' });
+  });
+});
+
+describe('titleFor and commitMessage', () => {
   it('names the packages', () => {
-    expect(titleFor([advisory()])).toBe('chore(deps): refresh zod to a patched release');
     expect(titleFor([advisory(), advisory({ id: '2' })])).toBe(
       'chore(deps): refresh zod to a patched release',
     );
-  });
-
-  it('shortens a long list', () => {
     const list = ['a', 'b', 'c', 'd'].map((name, i) => advisory({ id: String(i), name }));
     expect(titleFor(list)).toBe('chore(deps): refresh a, b, c and 1 more to patched releases');
+  });
+
+  it('keeps advisory text out of the commit', () => {
+    const message = commitMessage('chore(deps): refresh zod to a patched release', [
+      advisory({ title: 'Fixes #12, see https://evil.example' }),
+    ]);
+    expect(message).toContain('- zod: GHSA-mrhx-c7xc-m3w5 (high)');
+    expect(message).not.toContain('evil.example');
+    expect(message).not.toContain('#12');
+  });
+});
+
+describe('plain', () => {
+  it('defuses mentions, issue references, links and markup', () => {
+    const text = plain(
+      'Fixes #12 @someone https://evil.example www.evil.example [x](y) ![i](j) <b>|',
+    );
+    expect(text).not.toMatch(/#\d|@\w|:\/\/|www\.|\]\(|<b>|\|/);
+  });
+
+  it('caps the length', () => {
+    expect(plain('x'.repeat(500)).length).toBe(120);
   });
 });
 
 describe('renderBody', () => {
-  it('tables what was fixed and says how the PR merges', () => {
-    const body = renderBody([advisory({ left: 0 })], []);
-    expect(body).toContain('| `zod` | high | GHSA-mrhx-c7xc-m3w5 | `>=4.6.6` | fixed |');
-    expect(body).toContain(EXPECTED_CHECKS.join(', '));
-    expect(body).toContain('commit status');
-    expect(body).not.toContain('Still reported');
+  it('tables what was fixed and carries the fix signature', () => {
+    const text = body();
+    expect(text).toContain('| `zod` | high | GHSA-mrhx-c7xc-m3w5 | `>=4.6.6` | fixed |');
+    expect(text).toContain('<!-- security-autofix-fix: abc123 -->');
+    expect(text).toContain('merges as soon as the checks pass');
+    expect(text).not.toContain('Still reported');
   });
 
-  it('says when copies are left', () => {
-    expect(renderBody([advisory({ left: 2 })], [])).toContain('| partly: 2 left |');
+  it('says when copies are left, and lists what remains', () => {
+    const left = advisory({ id: '2', name: 'esbuild', severity: 'moderate', patched: '>=1' });
+    const text = body({ fixed: [advisory({ left: 2 })], remaining: [left] });
+    expect(text).toContain('| partly: 2 left |');
+    expect(text).toContain('Still reported');
+    expect(text).toContain('| `esbuild` |');
   });
 
-  it('lists what is left for a person', () => {
-    const left = advisory({
-      id: '2',
-      name: 'http-cache-semantics',
-      patched: '<0.0.0',
-      ghsa: 'GHSA-ch52-4w7c-c8xp',
+  it('names new releases and when the bot will merge', () => {
+    const added = [{ key: 'zod@4.6.8', time: '2026-10-28T09:00:00.000Z' }];
+    const text = body({
+      added,
+      cooldown: { at: '2026-10-31T09:00:00.000Z', youngest: 'zod@4.6.8' },
     });
-    const body = renderBody([advisory({ left: 0 })], [left]);
-    expect(body).toContain('Still reported');
-    expect(body).toContain('| `http-cache-semantics` |');
+    expect(text).toContain('`zod@4.6.8` (published 2026-10-28)');
+    expect(text).toContain('no earlier than 2026-10-31 09:00 UTC');
+  });
+
+  it('leaves the merge to a person when a release date is unknown', () => {
+    const added = [{ key: 'zod@4.6.8', time: null }];
+    const text = body({ added, cooldown: { at: 'unknown', youngest: 'zod@4.6.8' } });
+    expect(text).toContain('waits for a person');
   });
 
   it('keeps advisory text from mentioning people or injecting markup', () => {
-    const title =
-      'ping @someone <img src=x> | col [click](https://evil.example) ![i](https://evil.example/i.png)';
-    const body = renderBody([advisory({ title, left: 0 })], []);
-    expect(body).toContain('ping @​someone');
-    expect(body).not.toContain('<img');
-    expect(body).not.toContain('| col');
-    expect(body).not.toContain('](https://evil.example');
+    const title = 'ping @someone <img src=x> | col [click](https://evil.example) Fixes #9';
+    const text = body({ fixed: [advisory({ title, left: 0 })] });
+    expect(text).not.toContain('<img');
+    expect(text).not.toContain('| col');
+    expect(text).not.toContain('https://evil');
+    expect(text).not.toContain('#9');
   });
 
   it('caps a runaway version range', () => {
-    const body = renderBody([advisory({ patched: `>=${'9'.repeat(400)}`, left: 0 })], []);
-    expect(body.split('\n').every((line) => line.length < 400)).toBe(true);
+    const text = body({ fixed: [advisory({ patched: `>=${'9'.repeat(400)}`, left: 0 })] });
+    expect(text.split('\n').every((line) => line.length < 600)).toBe(true);
   });
 });
 
-describe('checkVerdict', () => {
-  const run = (id: number, name: string, status: string, conclusion: string | null = null) => ({
-    id,
-    name,
+describe('dispatchedVerdict', () => {
+  const job = (conclusion: string | null, status = 'completed') => ({
     status,
     conclusion,
+    url: 'u',
   });
-  const allPassed = EXPECTED_CHECKS.map((name, i) => run(i + 1, name, 'completed', 'success'));
+  const all = (conclusion: string) =>
+    new Map(EXPECTED_CHECKS.map((name) => [name, job(conclusion)]));
 
-  it('passes once every expected check succeeded', () => {
-    expect(checkVerdict(allPassed).verdict).toBe('pass');
-  });
-
-  it('waits for an expected check that has not reported yet', () => {
-    const result = checkVerdict(allPassed.slice(1));
-    expect(result).toEqual({ verdict: 'pending', detail: [EXPECTED_CHECKS[0]] });
+  it('passes once every dispatched job succeeded', () => {
+    expect(dispatchedVerdict(all('success'), [])).toEqual({ verdict: 'pass', detail: [] });
   });
 
-  it('waits for any check still running, expected or not', () => {
-    const preview = run(99, 'Workers Builds: lolperform', 'in_progress');
-    expect(checkVerdict([...allPassed, preview]).verdict).toBe('pending');
-  });
-
-  it('fails on any failed check, expected or not', () => {
-    const preview = run(99, 'Workers Builds: lolperform', 'completed', 'failure');
-    expect(checkVerdict([...allPassed, preview])).toEqual({
-      verdict: 'fail',
-      detail: ['Workers Builds: lolperform: failure'],
+  it('waits for a job that has not started or finished', () => {
+    const jobs = all('success');
+    jobs.delete(EXPECTED_CHECKS[0]);
+    jobs.set(EXPECTED_CHECKS[1], job(null, 'in_progress'));
+    expect(dispatchedVerdict(jobs, [])).toEqual({
+      verdict: 'pending',
+      detail: [EXPECTED_CHECKS[0], EXPECTED_CHECKS[1]],
     });
   });
 
-  it('treats cancelled and timed-out runs as failures', () => {
-    for (const conclusion of ['cancelled', 'timed_out', 'action_required']) {
-      const last = run(50, EXPECTED_CHECKS[0], 'completed', conclusion);
-      expect(checkVerdict([...allPassed, last]).verdict).toBe('fail');
+  it('fails on a failed, cancelled or missing job', () => {
+    for (const conclusion of ['failure', 'cancelled', 'timed_out', 'missing']) {
+      const jobs = all('success');
+      jobs.set('gates', job(conclusion));
+      expect(dispatchedVerdict(jobs, [])).toEqual({ verdict: 'fail', detail: ['gates'] });
     }
   });
 
-  it('accepts neutral and skipped', () => {
-    const others = [
-      run(60, 'lint-bot', 'completed', 'neutral'),
-      run(61, 'docs', 'completed', 'skipped'),
-    ];
-    expect(checkVerdict([...allPassed, ...others]).verdict).toBe('pass');
+  it('lets other checks hold a merge back but never pass one', () => {
+    const preview = {
+      name: 'Workers Builds: lolperform',
+      status: 'completed',
+      conclusion: 'failure',
+    };
+    expect(dispatchedVerdict(all('success'), [preview]).verdict).toBe('fail');
+    const running = { ...preview, status: 'in_progress', conclusion: null };
+    expect(dispatchedVerdict(all('success'), [running]).verdict).toBe('pending');
+    const passingImpostor = { name: 'verify', status: 'completed', conclusion: 'success' };
+    expect(dispatchedVerdict(new Map(), [passingImpostor]).verdict).toBe('pending');
   });
 
-  it('judges each check by its newest run', () => {
-    const retried = [run(0, EXPECTED_CHECKS[0], 'completed', 'failure'), ...allPassed];
-    expect(checkVerdict(retried).verdict).toBe('pass');
-    expect(newestRuns(retried).get(EXPECTED_CHECKS[0])?.id).toBe(1);
-    const regressed = [...allPassed, run(70, EXPECTED_CHECKS[0], 'completed', 'failure')];
-    expect(checkVerdict(regressed).verdict).toBe('fail');
+  it('maps each job to the status it records', () => {
+    expect(statusFor(job('success'))).toBe('success');
+    expect(statusFor(job('skipped'))).toBe('success');
+    expect(statusFor(job('failure'))).toBe('failure');
+    expect(statusFor(job(null, 'queued'))).toBe('pending');
+    expect(statusFor(undefined)).toBe('pending');
+  });
+});
+
+describe('newestDispatchedRuns', () => {
+  const run = (id: number, path: string, over: Record<string, unknown> = {}) => ({
+    id,
+    path,
+    event: 'workflow_dispatch',
+    head_branch: BRANCH,
+    ...over,
+  });
+
+  it('keeps the newest dispatched run of each checked workflow on the bot branch', () => {
+    const newest = newestDispatchedRuns([
+      run(1, '.github/workflows/ci.yml'),
+      run(5, '.github/workflows/ci.yml'),
+      run(3, '.github/workflows/quality-gates.yml'),
+      run(9, '.github/workflows/patch-watch.yml'),
+      run(10, '.github/workflows/quality-gates-security.yml', { event: 'pull_request' }),
+      run(11, '.github/workflows/quality-gates-security.yml', { head_branch: 'someone-else' }),
+    ]);
+    expect([...newest.entries()].map(([file, r]) => [file, r.id])).toEqual([
+      ['ci.yml', 5],
+      ['quality-gates.yml', 3],
+    ]);
+  });
+});
+
+describe('isBotCommit', () => {
+  const email = '41898282+github-actions[bot]@users.noreply.github.com';
+  const commit = (author: string, committer: string) => ({
+    commit: { author: { email: author }, committer: { email: committer } },
+  });
+
+  it('knows its own commits from a person’s', () => {
+    expect(isBotCommit(commit(email, email))).toBe(true);
+    expect(isBotCommit(commit('sam@example.com', email))).toBe(false);
+    expect(isBotCommit(commit(email, 'noreply@github.com'))).toBe(false);
+    expect(isBotCommit(null)).toBe(false);
   });
 });
 

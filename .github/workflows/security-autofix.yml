@@ -19,19 +19,17 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: write # push the fix branch, merge the PR
-  pull-requests: write # open, update, merge or close the PR
-  actions: write # start the checks on the branch: GITHUB_TOKEN pushes start no workflows
-  checks: read # read their results
-  statuses: write # record passed checks where the ruleset counts them (see the script)
+# Two jobs on purpose. Plan installs packages and gets a read-only token, so
+# nothing it downloads could write to the repository. Ship holds the write
+# token and never runs pnpm.
+permissions: {}
 
 concurrency:
   group: security-autofix
   cancel-in-progress: false
 
 jobs:
-  autofix:
+  plan:
     # After a failed scan, only one of ours: a fork's PR can come from a branch
     # it named main too.
     if: >-
@@ -39,13 +37,20 @@ jobs:
       (github.event.workflow_run.conclusion == 'failure' &&
       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      state: ${{ steps.plan.outputs.state }}
+      base: ${{ steps.plan.outputs.base }}
+      title: ${{ steps.plan.outputs.title }}
+      merge_after: ${{ steps.plan.outputs.merge_after }}
+      signature: ${{ steps.plan.outputs.signature }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Always main: a manual run started from another branch still fixes main.
           ref: main
-          # No token left in .git/config. Only the Ship step can push.
           persist-credentials: false
 
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -59,15 +64,57 @@ jobs:
           # release that rejects the compromised eMudhra CA keys (2026-10).
           check-latest: true
 
-      # No token here, and pnpm runs with --ignore-scripts: no dependency code runs.
+      # pnpm runs with --ignore-scripts: no dependency code runs here.
       - name: Plan
         id: plan
         run: node scripts/security-autofix.mjs plan
 
+      - name: Hand the fix to Ship
+        if: steps.plan.outputs.state == 'fixed'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-autofix
+          path: ${{ runner.temp }}/security-autofix/
+          if-no-files-found: error
+          retention-days: 1
+
+  ship:
+    needs: plan
+    if: needs.plan.outputs.state == 'fixed' || needs.plan.outputs.state == 'clean'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write # push the fix branch, merge the PR
+      pull-requests: write # open, update, merge or close the PR
+      actions: write # start the checks: GITHUB_TOKEN pushes start no workflows
+      checks: read # read other checks on the commit
+      statuses: write # record check results where the ruleset counts them
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The commit Plan ran on, so the fix lands on exactly what it tested.
+          ref: ${{ needs.plan.outputs.base }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          check-latest: true
+
+      - name: Take the fix from Plan
+        if: needs.plan.outputs.state == 'fixed'
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: security-autofix
+          path: ${{ runner.temp }}/security-autofix
+
       - name: Ship
         env:
           GH_TOKEN: ${{ github.token }}
-          PLAN_STATE: ${{ steps.plan.outputs.state }}
-          PLAN_TITLE: ${{ steps.plan.outputs.title }}
-          PLAN_BODY: ${{ steps.plan.outputs.body }}
+          PLAN_STATE: ${{ needs.plan.outputs.state }}
+          PLAN_BASE: ${{ needs.plan.outputs.base }}
+          PLAN_TITLE: ${{ needs.plan.outputs.title }}
+          PLAN_MERGE_AFTER: ${{ needs.plan.outputs.merge_after }}
+          PLAN_SIGNATURE: ${{ needs.plan.outputs.signature }}
+          PLAN_DIR: ${{ runner.temp }}/security-autofix
         run: node scripts/security-autofix.mjs ship
