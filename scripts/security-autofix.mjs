@@ -65,7 +65,11 @@ const BOT = {
   email: '41898282+github-actions[bot]@users.noreply.github.com',
 };
 const MARKER = 'security-autofix-fix';
+const WITHDRAWN = 'security-autofix-withdrawn';
 const DAY_MS = 24 * 60 * 60 * 1000;
+// The Cloudflare preview build, and how long after a push it gets to report.
+const PREVIEW_APP = 'cloudflare-workers-and-pages';
+const PREVIEW_WAIT_MS = 15 * 60_000;
 
 /* ------------------------------------------------------------ pure helpers */
 
@@ -211,6 +215,13 @@ export function fixSignature(delta) {
 }
 
 /**
+ * A PR body whose signature no longer reads as a person's veto. The bot closing
+ * its own PR, because main needs it no more, doesn't turn the change down.
+ */
+export const withdraw = (body) =>
+  String(body ?? '').replaceAll(`<!-- ${MARKER}: `, `<!-- ${WITHDRAWN}: `);
+
+/**
  * When the newest added version is old enough to merge on its own. `at` is ''
  * when nothing new comes in, 'unknown' when a publish date couldn't be read
  * (a person decides), or an ISO time.
@@ -295,7 +306,9 @@ export function renderBody({ fixed, remaining, added, cooldown, signature }) {
     );
   }
   lines.push(
-    `The checks (${EXPECTED_CHECKS.join(', ')}) run as dispatched workflows, which GitHub doesn't count for a PR, so the bot records each result as a commit status of the same name, linking to its run. If one fails, re-run it from that link; the bot merges on a later pass once all of them are green. Closing this PR tells the bot not to offer this exact change again. GitHub may also show workflows awaiting approval here: those are the regular PR checks, and approving them is optional.`,
+    `The checks (${EXPECTED_CHECKS.join(', ')}) run as dispatched workflows, which GitHub doesn't count for a PR, so the bot records each result as a commit status of the same name, linking to its run. If one fails, re-run it from that link; the bot merges on a later pass once all of them are green. Any other check here, such as the Cloudflare preview, must pass too.`,
+    '',
+    'GitHub may also show workflows awaiting approval: the regular PR checks, held because a bot opened this PR. Approving them is optional, but once approved they must pass as well. Closing this PR tells the bot not to offer this exact change again.',
     '',
     `<!-- ${MARKER}: ${signature} -->`,
   );
@@ -315,16 +328,17 @@ export function statusFor(job) {
 }
 
 /**
- * The bot's own dispatched jobs decide; check runs from anything else (the
- * Cloudflare preview build) can only hold the merge back, never pass it.
- * `jobs` maps each expected job name to its newest dispatched job, if any.
+ * The bot's own dispatched jobs decide; every other check on the commit can
+ * only hold the merge back, never pass it. `jobs` maps each expected job name
+ * to its newest dispatched job, if any; `others` is what checksThatCount and
+ * previewsBuilding found.
  */
 export function dispatchedVerdict(jobs, others) {
   const failed = [
     ...EXPECTED_CHECKS.filter((name) => statusFor(jobs.get(name)) === 'failure'),
     ...others
       .filter((r) => r.status === 'completed' && !PASSING.has(r.conclusion))
-      .map((r) => r.name),
+      .map((r) => (r.conclusion === 'action_required' ? `${r.name} (awaiting approval)` : r.name)),
   ];
   if (failed.length) return { verdict: 'fail', detail: failed };
   const waiting = [
@@ -353,6 +367,33 @@ export function newestDispatchedRuns(runs) {
     if (!newest.has(file) || run.id > newest.get(file).id) newest.set(file, run);
   }
   return newest;
+}
+
+/**
+ * Check runs that can hold the merge back: those of any app but GitHub
+ * Actions (the Cloudflare preview), and those of the regular PR checks. GitHub
+ * holds those for approval on a PR a workflow opened, and once a person
+ * approves them they count: the ruleset needs a check and a status of the same
+ * name to both pass. `prRuns` are the pull_request workflow runs on the commit.
+ */
+export function checksThatCount(checkRuns, prRuns) {
+  const suites = new Set(
+    prRuns.filter((run) => run.event === 'pull_request').map((run) => run.check_suite_id),
+  );
+  return checkRuns.filter((r) => r.app?.slug !== 'github-actions' || suites.has(r.check_suite?.id));
+}
+
+/**
+ * The Cloudflare preview creates its one check run only once its build is
+ * done, so until then just its check suite shows it. It gets PREVIEW_WAIT_MS
+ * from the push to report: a preview that never does can't hold a fix back for
+ * good.
+ */
+export function previewsBuilding(suites, now) {
+  return suites
+    .filter((s) => s.app?.slug === PREVIEW_APP && s.status !== 'completed')
+    .filter((s) => !s.latest_check_runs_count && now - Date.parse(s.created_at) < PREVIEW_WAIT_MS)
+    .map(() => ({ name: 'Workers Builds', status: 'in_progress', conclusion: null }));
 }
 
 /* ------------------------------------------------------------ side effects */
@@ -612,24 +653,31 @@ function dispatchedJobs(runs) {
   return jobs;
 }
 
-/** Check runs on the commit from anything but GitHub Actions. */
+/** Every check on the commit that can hold the merge back, or null if one can't be read. */
 function otherChecks(sha) {
-  const doc = apiJson(`commits/${sha}/check-runs?per_page=100`);
-  return (doc?.check_runs ?? []).filter((r) => r.app?.slug !== 'github-actions');
+  const runs = apiJson(`commits/${sha}/check-runs?per_page=100`);
+  const suites = apiJson(`commits/${sha}/check-suites?per_page=100`);
+  const prRuns = apiJson(`actions/runs?event=pull_request&head_sha=${sha}&per_page=100`);
+  if (!runs || !suites || !prRuns) return null;
+  return [
+    ...checksThatCount(runs.check_runs ?? [], prRuns.workflow_runs ?? []),
+    ...previewsBuilding(suites.check_suites ?? [], Date.now()),
+  ];
 }
 
 function startChecks(files) {
   for (const file of files) gh(['workflow', 'run', file, '--ref', BRANCH]);
 }
 
-async function waitForChecks(sha, { timeoutMs = 30 * 60_000, everyMs = 20_000 } = {}) {
+async function waitForChecks(sha, { timeoutMs = 30 * 60_000, everyMs = 30_000 } = {}) {
   const deadline = Date.now() + timeoutMs;
   let last = { verdict: 'pending', detail: EXPECTED_CHECKS, jobs: new Map() };
   while (Date.now() < deadline) {
     const runs = dispatchedRuns(sha);
-    if (runs) {
+    const others = runs && otherChecks(sha);
+    if (others) {
       const jobs = dispatchedJobs(runs);
-      last = { ...dispatchedVerdict(jobs, otherChecks(sha)), jobs };
+      last = { ...dispatchedVerdict(jobs, others), jobs };
       if (last.verdict !== 'pending') return last;
     }
     await new Promise((resolve) => setTimeout(resolve, everyMs));
@@ -679,6 +727,13 @@ function problem(loud, message) {
 /** main has nothing a refresh can fix: drop what an earlier run left behind. */
 function tidyUp(existing, tip) {
   if (existing) {
+    // Withdraw the signature first, or a later run would read this close as a
+    // person turning the change down and never offer it again.
+    const body = ['-X', 'PATCH', '-f', `body=${withdraw(existing.body)}`];
+    const edited = api(`pulls/${existing.number}`, body);
+    if (edited.status !== 0) {
+      throw new Error(`Editing PR #${existing.number} failed: ${edited.stderr.trim()}`);
+    }
     const comment = 'main has no fixable advisory any more, so this is no longer needed.';
     gh(['pr', 'close', String(existing.number), '--delete-branch', '--comment', comment]);
     report(`Closed PR #${existing.number}: nothing left to fix.`);
@@ -760,7 +815,20 @@ export async function ship() {
   let number = existing?.number;
   let loud = true;
   if (!same) {
-    sh('git', ['push', '--force', 'origin', `HEAD:refs/heads/${BRANCH}`]);
+    // Leased to the tip read above: a commit someone pushes meanwhile is theirs.
+    const lease = `--force-with-lease=refs/heads/${BRANCH}:${tip?.sha ?? ''}`;
+    const pushed = sh('git', ['push', lease, 'origin', `HEAD:refs/heads/${BRANCH}`], {
+      check: false,
+    });
+    if (pushed.status !== 0) {
+      if (!/stale info/.test(pushed.stderr)) {
+        throw new Error(`git push exited with ${pushed.status}\n${pushed.stderr.slice(-2000)}`);
+      }
+      return problem(
+        false,
+        `The ${BRANCH} branch changed while this run worked; the next run looks again.`,
+      );
+    }
     number = openOrUpdatePr(existing, title, join(dir, 'body.md'));
     startChecks(Object.keys(CHECK_WORKFLOWS));
     report(`Opened or updated PR #${number} and started ${EXPECTED_CHECKS.join(', ')} on it.`);
@@ -778,10 +846,8 @@ export async function ship() {
   const result = await waitForChecks(head);
   recordStatuses(head, result.jobs);
   if (result.verdict !== 'pass') {
-    return problem(
-      loud,
-      `Not merging PR #${number}: checks ${result.verdict} (${result.detail.join(', ')}).`,
-    );
+    const why = result.verdict === 'fail' ? 'not passing' : 'still running after 30 minutes';
+    return problem(loud, `Not merging PR #${number}: ${why}: ${result.detail.join(', ')}.`);
   }
   if (cooldown === 'unknown') {
     return problem(

@@ -11,6 +11,7 @@ import {
   BRANCH,
   EXPECTED_CHECKS,
   MIN_RELEASE_AGE_DAYS,
+  checksThatCount,
   commitMessage,
   compareAudits,
   directDependencies,
@@ -27,11 +28,13 @@ import {
   parseAudit,
   pathShape,
   plain,
+  previewsBuilding,
   renderBody,
   splitKey,
   statusFor,
   titleFor,
   unexpectedChanges,
+  withdraw,
 } from './security-autofix.mjs';
 
 interface Advisory {
@@ -399,6 +402,14 @@ describe('renderBody', () => {
     const text = body({ fixed: [advisory({ patched: `>=${'9'.repeat(400)}`, left: 0 })] });
     expect(text.split('\n').every((line) => line.length < 600)).toBe(true);
   });
+
+  it('withdraws its signature when the bot closes the PR itself, so that is no veto', () => {
+    const text = withdraw(body());
+    expect(text).not.toContain('<!-- security-autofix-fix: abc123 -->');
+    expect(text).toContain('<!-- security-autofix-withdrawn: abc123 -->');
+    expect(withdraw(text)).toBe(text);
+    expect(withdraw(null)).toBe('');
+  });
 });
 
 describe('dispatchedVerdict', () => {
@@ -445,6 +456,14 @@ describe('dispatchedVerdict', () => {
     expect(dispatchedVerdict(new Map(), [passingImpostor]).verdict).toBe('pending');
   });
 
+  it('says so when a check waits for a person to approve it', () => {
+    const held = { name: 'verify', status: 'completed', conclusion: 'action_required' };
+    expect(dispatchedVerdict(all('success'), [held])).toEqual({
+      verdict: 'fail',
+      detail: ['verify (awaiting approval)'],
+    });
+  });
+
   it('maps each job to the status it records', () => {
     expect(statusFor(job('success'))).toBe('success');
     expect(statusFor(job('skipped'))).toBe('success');
@@ -476,6 +495,64 @@ describe('newestDispatchedRuns', () => {
       ['ci.yml', 5],
       ['quality-gates.yml', 3],
     ]);
+  });
+});
+
+describe('checksThatCount', () => {
+  const check = (name: string, slug: string, suite: number) => ({
+    name,
+    status: 'completed',
+    conclusion: 'failure',
+    app: { slug },
+    check_suite: { id: suite },
+  });
+  const runs = [
+    check('Workers Builds: lolperform', 'cloudflare-workers-and-pages', 1),
+    check('verify', 'github-actions', 2),
+    check('verify', 'github-actions', 3),
+    check('gates', 'github-actions', 4),
+  ];
+
+  it('counts other apps and the PR checks a person approved, not the bot’s own runs', () => {
+    const prRuns = [
+      { event: 'pull_request', check_suite_id: 3 },
+      { event: 'workflow_dispatch', check_suite_id: 2 },
+      { event: 'push', check_suite_id: 4 },
+    ];
+    expect(checksThatCount(runs, prRuns).map((r) => r.check_suite.id)).toEqual([1, 3]);
+  });
+
+  it('counts only other apps while the PR checks await approval', () => {
+    expect(checksThatCount(runs, []).map((r) => r.name)).toEqual(['Workers Builds: lolperform']);
+  });
+});
+
+describe('previewsBuilding', () => {
+  const now = Date.parse('2026-10-30T12:00:00Z');
+  const suite = (over: Record<string, unknown> = {}) => ({
+    app: { slug: 'cloudflare-workers-and-pages' },
+    status: 'queued',
+    latest_check_runs_count: 0,
+    created_at: '2026-10-30T11:59:00Z',
+    ...over,
+  });
+
+  it('waits for a preview that has not reported yet', () => {
+    expect(previewsBuilding([suite(), suite({ status: 'in_progress' })], now)).toHaveLength(2);
+  });
+
+  it('stops waiting once it reported, finished, or never reported in 15 minutes', () => {
+    const done = [
+      suite({ latest_check_runs_count: 1 }),
+      suite({ status: 'completed' }),
+      suite({ created_at: '2026-10-30T11:44:00Z' }),
+    ];
+    expect(previewsBuilding(done, now)).toEqual([]);
+  });
+
+  it('ignores apps that never report', () => {
+    const silent = [suite({ app: { slug: 'claude' } }), suite({ app: { slug: 'graphify-labs' } })];
+    expect(previewsBuilding(silent, now)).toEqual([]);
   });
 });
 
