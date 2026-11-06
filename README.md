@@ -68,26 +68,27 @@ has not cleared the grading floor is left ungraded rather than assigned a mislea
 
 ## 2. Architecture
 
-The system has three independent halves. They share type definitions but deploy on separate
+The system has three independent parts. They share type definitions but deploy on separate
 schedules, so a data problem cannot break the site and a site deploy cannot disturb the data.
 
-```
-┌──────────────────────────── GitHub Actions (scheduled) ────────────────────────────┐
-│                                                                                    │
-│   R2 match store  ──restore──▶  crawl 8 regions  ──▶  accumulate  ──▶  aggregate   │
-│         ▲                       (league-v4 → match-v5)   (dedupe)      (stats)     │
-│         └──────────save──────────────────────────────────────────────────┐         │
-│                                                                          ▼         │
-└──────────────────────────────────────────────────────────── generate SQL ──────────┘
-                                                                           │
-                                                                           ▼
-                                                              ┌────────── D1 ──────────┐
-                                                              │  source of truth       │
-                                                              └────────────┬───────────┘
-                                                                           │
-   browser ──▶ Cloudflare Worker ──▶ KV cache (600 s) ──▶ D1 ──────────────┘
-                     │
-                     └──▶ ASSETS (prebuilt Astro site)
+```mermaid
+flowchart TB
+  subgraph data["Data · GitHub Actions, every 6 h"]
+    direction LR
+    r2[("R2 match store")] -- restore --> crawl["Crawl 8 regions<br/>league-v4 → match-v5"]
+    crawl --> acc["Accumulate<br/>dedupe"]
+    acc --> agg["Aggregate<br/>stats"]
+    agg --> sql["Generate SQL"]
+    acc -. save .-> r2
+  end
+  data -- load --> d1[("D1<br/>source of truth")]
+  d1 -- "read on a KV miss" --> req
+  subgraph req["Requests · every visit"]
+    direction LR
+    browser["Browser"] --> worker["Cloudflare Worker"]
+    worker -- "/api/*" --> kv[("KV cache<br/>600 s")]
+    worker -- pages --> assets[("ASSETS<br/>prebuilt Astro site")]
+  end
 ```
 
 | Layer       | Technology                                              | Responsibility                                                                                   |
