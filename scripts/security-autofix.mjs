@@ -195,7 +195,15 @@ export function splitKey(key) {
   return at > 0 ? { name: key.slice(0, at), version: key.slice(at + 1) } : null;
 }
 
-/** Every line of a pnpm v9 lockfile's `snapshots:` section, qualified by its entry and section. */
+// A snapshot key or value without its peer suffix: "astro@7.2.9(zod@4.5.4)" -> "astro@7.2.9".
+const withoutPeers = (text) => text.replace(/\(.*$/, '');
+
+/**
+ * Every line of a pnpm v9 lockfile's `snapshots:` section, qualified by its
+ * entry's package name and section, without peer suffixes or the entry's own
+ * version: a routine bump elsewhere changes those, and a fix shouldn't look
+ * different because of it.
+ */
 export function lockfileEdges(text) {
   const edges = new Set();
   let inSnapshots = false;
@@ -205,13 +213,14 @@ export function lockfileEdges(text) {
     if (/^\S/.test(line)) inSnapshots = line.startsWith('snapshots:');
     if (!inSnapshots || /^\S/.test(line) || !line.trim()) continue;
     if (/^ {2}\S/.test(line)) {
-      entry = line.trim();
+      const key = withoutPeers(line.trim().replace(/^'/, '')).replace(/'?:( \{\})?$/, '');
+      entry = splitKey(key)?.name ?? key;
       section = '';
     } else if (/^ {4}\S/.test(line)) {
       section = line.trim();
       if (!section.endsWith(':')) edges.add(`${entry} ${section}`);
     } else {
-      edges.add(`${entry} ${section} ${line.trim()}`);
+      edges.add(`${entry} ${section} ${withoutPeers(line.trim())}`);
     }
   }
   return edges;
@@ -254,6 +263,10 @@ export function fixSignature(delta) {
  */
 export const withdraw = (body) =>
   String(body ?? '').replaceAll(`<!-- ${MARKER}: `, `<!-- ${WITHDRAWN}: `);
+
+/** The live fix signature a PR body carries, or null. */
+export const signatureIn = (body) =>
+  new RegExp(`<!-- ${MARKER}: ([0-9a-f]{16}) -->`).exec(String(body ?? ''))?.[1] ?? null;
 
 const flat = (text) =>
   String(text ?? '')
@@ -498,9 +511,7 @@ const escapeCommand = (text) =>
  * runner, which reads `::name::` at a line's start and `##[name]` anywhere.
  */
 export const inert = (text) =>
-  String(text)
-    .replace(/##\[/g, '##\u200b[')
-    .replace(/^(\s*)::/gm, '$1:\u200b:');
+  String(text).replace(/##\[/g, '##\u200b[').replace(/::/g, ':\u200b:');
 
 function setOutputs(values) {
   // One line per value: a newline in a value would forge another output.
@@ -917,10 +928,10 @@ export async function ship() {
   // merge it. That PR's own change is then out of date, so it goes too.
   const turnedDown = rejected(signature);
   if (turnedDown) {
-    // Not one a person closed in the meantime, nor one that carries the
-    // turned-down change itself, which someone chose to open.
-    const carriesIt = Boolean(tip && tip.tree === tree && tip.parent === base);
-    if (existing && existing.number !== turnedDown && !carriesIt) {
+    // Only the bot's own PR for another change: a PR a person opened carries
+    // no live signature, and closeOwnPr leaves one closed meanwhile alone.
+    const other = existing && signatureIn(existing.body);
+    if (other && other !== signature) {
       closeOwnPr(
         existing,
         `main now needs only the change turned down in #${turnedDown}, so this is no longer needed.`,

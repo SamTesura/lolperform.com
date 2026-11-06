@@ -34,6 +34,7 @@ import {
   previewsBuilding,
   renderBody,
   sameText,
+  signatureIn,
   splitKey,
   statusFor,
   titleFor,
@@ -321,10 +322,10 @@ describe('the lockfile', () => {
 
   it('reads every snapshot line with its entry and section', () => {
     expect([...lockfileEdges(rewire('4.5.4'))]).toEqual([
-      "'@astrojs/sitemap@3.7.4': dependencies: sitemap: 8.0.0",
-      "'@astrojs/sitemap@3.7.4': dependencies: zod: 4.5.4",
-      "'@astrojs/sitemap@3.7.4': transitivePeerDependencies: - supports-color",
-      'zod@4.6.7: optional: true',
+      '@astrojs/sitemap dependencies: sitemap: 8.0.0',
+      '@astrojs/sitemap dependencies: zod: 4.5.4',
+      '@astrojs/sitemap transitivePeerDependencies: - supports-color',
+      'zod optional: true',
     ]);
   });
 
@@ -333,8 +334,8 @@ describe('the lockfile', () => {
       added: [],
       removed: [],
       rewired: [
-        "+ '@astrojs/sitemap@3.7.4': dependencies: zod: 4.6.7",
-        "- '@astrojs/sitemap@3.7.4': dependencies: zod: 4.5.4",
+        '+ @astrojs/sitemap dependencies: zod: 4.6.7',
+        '- @astrojs/sitemap dependencies: zod: 4.5.4',
       ],
     });
   });
@@ -355,6 +356,22 @@ describe('the lockfile', () => {
     expect(fixSignature(zod)).toBe(fixSignature(lockfileDelta(rewire('4.5.4'), rewire('4.6.7'))));
     expect(fixSignature(zod)).not.toBe(fixSignature(other));
     expect(fixSignature(zod)).not.toBe(fixSignature({ added: [], removed: [], rewired: [] }));
+  });
+
+  it('signs a rewire the same after a routine bump changes peer suffixes or the parent', () => {
+    const at = (parent: string, zod: string) =>
+      rewire(zod)
+        .replace("'@astrojs/sitemap@3.7.4':", `'${parent}':`)
+        .replace(`zod: ${zod}`, `zod: ${zod}(@types/node@26.4.0)`);
+    const before = lockfileDelta(
+      at('@astrojs/sitemap@3.7.4', '4.5.4'),
+      at('@astrojs/sitemap@3.7.4', '4.6.7'),
+    );
+    const bumped = lockfileDelta(
+      at('@astrojs/sitemap@3.7.5(@types/node@26.4.1)', '4.5.4').replace(/26\.4\.0/g, '26.4.1'),
+      at('@astrojs/sitemap@3.7.5(@types/node@26.4.1)', '4.6.7').replace(/26\.4\.0/g, '26.4.1'),
+    );
+    expect(fixSignature(bumped)).toBe(fixSignature(before));
   });
 });
 
@@ -428,10 +445,10 @@ describe('titleFor and commitMessage', () => {
 
 describe('inert', () => {
   it('keeps the runner from reading workflow commands in passed-on text', () => {
-    const text = 'peer *##[add-mask]Z\n  ::add-mask::2026\nok :: fine';
+    const text = 'peer *##[add-mask]Z\n  ::add-mask::2026\n\u0085::ADD-MASK::Z\nx ::y::z';
     const safe = inert(text);
     expect(safe).not.toMatch(/##\[/);
-    expect(safe.split('\n').some((line) => line.trimStart().startsWith('::'))).toBe(false);
+    expect(safe).not.toMatch(/::/);
     expect(safe.replace(/\u200b/g, '')).toBe(text);
   });
 });
@@ -502,6 +519,16 @@ describe('renderBody', () => {
     expect(text).toContain('<!-- security-autofix-withdrawn: abc123 -->');
     expect(withdraw(text)).toBe(text);
     expect(withdraw(null)).toBe('');
+  });
+
+  it('reads the live signature a PR carries, and none from one a person wrote or withdrew', () => {
+    expect(signatureIn(body({ signature: '6b4bbba33b60e1ed' }))).toBe('6b4bbba33b60e1ed');
+    expect(signatureIn('x <!-- security-autofix-fix: 6b4bbba33b60e1ed --> y')).toBe(
+      '6b4bbba33b60e1ed',
+    );
+    expect(signatureIn(withdraw('<!-- security-autofix-fix: 6b4bbba33b60e1ed -->'))).toBeNull();
+    expect(signatureIn('I want this one.')).toBeNull();
+    expect(signatureIn(null)).toBeNull();
   });
 
   it('tells a PR text that needs refreshing from one GitHub only reformatted', () => {
