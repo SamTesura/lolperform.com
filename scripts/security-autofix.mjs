@@ -221,6 +221,14 @@ export function fixSignature(delta) {
 export const withdraw = (body) =>
   String(body ?? '').replaceAll(`<!-- ${MARKER}: `, `<!-- ${WITHDRAWN}: `);
 
+const flat = (text) =>
+  String(text ?? '')
+    .replace(/\r\n/g, '\n')
+    .trim();
+
+/** Two PR texts match once line endings and surrounding whitespace are set aside. */
+export const sameText = (a, b) => flat(a) === flat(b);
+
 /**
  * When the newest added version is old enough to merge on its own. `at` is ''
  * when nothing new comes in, 'unknown' when a publish date couldn't be read
@@ -375,19 +383,27 @@ export function newestDispatchedRuns(runs) {
  * holds those for approval on a PR a workflow opened, and once a person
  * approves them they count: the ruleset needs a check and a status of the same
  * name to both pass. `prRuns` are the pull_request workflow runs on the commit.
+ * A preview that is still running after PREVIEW_WAIT_MS, or that GitHub marked
+ * stale, has given up and holds nothing back.
  */
-export function checksThatCount(checkRuns, prRuns) {
+export function checksThatCount(checkRuns, prRuns, now) {
   const suites = new Set(
     prRuns.filter((run) => run.event === 'pull_request').map((run) => run.check_suite_id),
   );
-  return checkRuns.filter((r) => r.app?.slug !== 'github-actions' || suites.has(r.check_suite?.id));
+  const gaveUp = (r) =>
+    r.app?.slug === PREVIEW_APP &&
+    (r.conclusion === 'stale' ||
+      (r.status !== 'completed' && now - Date.parse(r.started_at) >= PREVIEW_WAIT_MS));
+  return checkRuns
+    .filter((r) => r.app?.slug !== 'github-actions' || suites.has(r.check_suite?.id))
+    .filter((r) => !gaveUp(r));
 }
 
 /**
- * The Cloudflare preview creates its one check run only once its build is
- * done, so until then just its check suite shows it. It gets PREVIEW_WAIT_MS
- * from the push to report: a preview that never does can't hold a fix back for
- * good.
+ * The Cloudflare preview reports a running check a minute or two after the
+ * push and its result when the build ends; until the first appears, just its
+ * check suite shows it. It gets PREVIEW_WAIT_MS from the push to report: a
+ * preview that never does can't hold a fix back for good.
  */
 export function previewsBuilding(suites, now) {
   return suites
@@ -659,9 +675,10 @@ function otherChecks(sha) {
   const suites = apiJson(`commits/${sha}/check-suites?per_page=100`);
   const prRuns = apiJson(`actions/runs?event=pull_request&head_sha=${sha}&per_page=100`);
   if (!runs || !suites || !prRuns) return null;
+  const now = Date.now();
   return [
-    ...checksThatCount(runs.check_runs ?? [], prRuns.workflow_runs ?? []),
-    ...previewsBuilding(suites.check_suites ?? [], Date.now()),
+    ...checksThatCount(runs.check_runs ?? [], prRuns.workflow_runs ?? [], now),
+    ...previewsBuilding(suites.check_suites ?? [], now),
   ];
 }
 
@@ -724,18 +741,22 @@ function problem(loud, message) {
   return 0;
 }
 
+/** Close the bot's own PR and delete its branch, saying why. */
+function closeOwnPr(pr, comment) {
+  // Withdraw the signature first, or a later run would read this close as a
+  // person turning the change down and never offer it again.
+  const body = ['-X', 'PATCH', '-f', `body=${withdraw(pr.body)}`];
+  const edited = api(`pulls/${pr.number}`, body);
+  if (edited.status !== 0) {
+    throw new Error(`Editing PR #${pr.number} failed: ${edited.stderr.trim()}`);
+  }
+  gh(['pr', 'close', String(pr.number), '--delete-branch', '--comment', comment]);
+}
+
 /** main has nothing a refresh can fix: drop what an earlier run left behind. */
 function tidyUp(existing, tip) {
   if (existing) {
-    // Withdraw the signature first, or a later run would read this close as a
-    // person turning the change down and never offer it again.
-    const body = ['-X', 'PATCH', '-f', `body=${withdraw(existing.body)}`];
-    const edited = api(`pulls/${existing.number}`, body);
-    if (edited.status !== 0) {
-      throw new Error(`Editing PR #${existing.number} failed: ${edited.stderr.trim()}`);
-    }
-    const comment = 'main has no fixable advisory any more, so this is no longer needed.';
-    gh(['pr', 'close', String(existing.number), '--delete-branch', '--comment', comment]);
+    closeOwnPr(existing, 'main has no fixable advisory any more, so this is no longer needed.');
     report(`Closed PR #${existing.number}: nothing left to fix.`);
   } else if (tip && api(`git/refs/heads/${BRANCH}`, ['-X', 'DELETE']).status === 0) {
     report(`Deleted the leftover ${BRANCH} branch.`);
@@ -799,14 +820,21 @@ export async function ship() {
   const cooldown = process.env.PLAN_MERGE_AFTER ?? '';
   const tree = commitFix(dir, base);
 
-  if (!existing) {
-    const turnedDown = rejected(signature);
-    if (turnedDown) {
-      report(
-        `This exact change was closed without merging in PR #${turnedDown}; not offering it again.`,
+  // A veto holds even while another bot PR is open: main can come to need
+  // only a change a person turned down, and pushing it onto that PR would
+  // merge it. That PR's own change is then out of date, so it goes too.
+  const turnedDown = rejected(signature);
+  if (turnedDown) {
+    if (existing) {
+      closeOwnPr(
+        existing,
+        `main now needs only the change turned down in #${turnedDown}, so this is no longer needed.`,
       );
-      return 0;
     }
+    report(
+      `This exact change was closed without merging in PR #${turnedDown}; not offering it again.`,
+    );
+    return 0;
   }
   const same = Boolean(
     existing && tip && tip.tree === tree && tip.parent === base && tip.parents === 1,
@@ -833,6 +861,13 @@ export async function ship() {
     startChecks(Object.keys(CHECK_WORKFLOWS));
     report(`Opened or updated PR #${number} and started ${EXPECTED_CHECKS.join(', ')} on it.`);
   } else {
+    // Keep the PR's text current: a publish date read since, or a signature
+    // an interrupted close left withdrawn.
+    const bodyFile = join(dir, 'body.md');
+    const body = readFileSync(bodyFile, 'utf8');
+    if (!sameText(existing.title, title) || !sameText(existing.body, body)) {
+      openOrUpdatePr(existing, title, bodyFile);
+    }
     // An earlier run may have stopped before starting every workflow.
     const runs = dispatchedRuns(head) ?? new Map();
     const missing = Object.keys(CHECK_WORKFLOWS).filter((file) => !runs.has(file));

@@ -30,6 +30,7 @@ import {
   plain,
   previewsBuilding,
   renderBody,
+  sameText,
   splitKey,
   statusFor,
   titleFor,
@@ -410,6 +411,13 @@ describe('renderBody', () => {
     expect(withdraw(text)).toBe(text);
     expect(withdraw(null)).toBe('');
   });
+
+  it('tells a PR text that needs refreshing from one GitHub only reformatted', () => {
+    const text = body();
+    expect(sameText(text.replace(/\n/g, '\r\n').trimEnd(), text)).toBe(true);
+    expect(sameText(withdraw(text), text)).toBe(false);
+    expect(sameText(null, '')).toBe(true);
+  });
 });
 
 describe('dispatchedVerdict', () => {
@@ -499,10 +507,12 @@ describe('newestDispatchedRuns', () => {
 });
 
 describe('checksThatCount', () => {
+  const now = Date.parse('2026-10-30T12:00:00Z');
   const check = (name: string, slug: string, suite: number) => ({
     name,
     status: 'completed',
     conclusion: 'failure',
+    started_at: '2026-10-30T11:59:00Z',
     app: { slug },
     check_suite: { id: suite },
   });
@@ -519,11 +529,23 @@ describe('checksThatCount', () => {
       { event: 'workflow_dispatch', check_suite_id: 2 },
       { event: 'push', check_suite_id: 4 },
     ];
-    expect(checksThatCount(runs, prRuns).map((r) => r.check_suite.id)).toEqual([1, 3]);
+    expect(checksThatCount(runs, prRuns, now).map((r) => r.check_suite.id)).toEqual([1, 3]);
   });
 
   it('counts only other apps while the PR checks await approval', () => {
-    expect(checksThatCount(runs, []).map((r) => r.name)).toEqual(['Workers Builds: lolperform']);
+    expect(checksThatCount(runs, [], now).map((r) => r.name)).toEqual([
+      'Workers Builds: lolperform',
+    ]);
+  });
+
+  it('lets a preview still running after 15 minutes, or marked stale, hold nothing back', () => {
+    const preview = runs[0];
+    const running = { ...preview, status: 'in_progress', conclusion: null };
+    const stuck = { ...running, started_at: '2026-10-30T11:44:00Z' };
+    const stale = { ...preview, conclusion: 'stale' };
+    expect(checksThatCount([running], [], now)).toEqual([running]);
+    expect(checksThatCount([stuck, stale], [], now)).toEqual([]);
+    expect(checksThatCount([preview], [], now)).toEqual([preview]);
   });
 });
 
