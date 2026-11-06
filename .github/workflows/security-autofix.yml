@@ -40,12 +40,12 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    # Only these two, and losing either stops Ship. The title, release-age date
+    # and signature travel in the artifact: the runner drops a job output that
+    # holds text masked in the log.
     outputs:
       state: ${{ steps.plan.outputs.state }}
       base: ${{ steps.plan.outputs.base }}
-      title: ${{ steps.plan.outputs.title }}
-      merge_after: ${{ steps.plan.outputs.merge_after }}
-      signature: ${{ steps.plan.outputs.signature }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -113,8 +113,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PLAN_STATE: ${{ needs.plan.outputs.state }}
           PLAN_BASE: ${{ needs.plan.outputs.base }}
-          PLAN_TITLE: ${{ needs.plan.outputs.title }}
-          PLAN_MERGE_AFTER: ${{ needs.plan.outputs.merge_after }}
-          PLAN_SIGNATURE: ${{ needs.plan.outputs.signature }}
           PLAN_DIR: ${{ runner.temp }}/security-autofix
         run: node scripts/security-autofix.mjs ship

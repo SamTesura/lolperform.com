@@ -18,18 +18,23 @@ import {
   dispatchedVerdict,
   fixSignature,
   improved,
+  inert,
   isBotCommit,
   isFixable,
   lockfileDelta,
+  lockfileEdges,
   lockfilePackages,
   mergeAfter,
   newestDispatchedRuns,
   packagesToRefresh,
   parseAudit,
+  parsePlan,
   pathShape,
   plain,
   previewsBuilding,
   renderBody,
+  sameText,
+  signatureIn,
   splitKey,
   statusFor,
   titleFor,
@@ -284,10 +289,54 @@ describe('the lockfile', () => {
     expect(lockfileDelta(before, lock(['zod@4.6.7']))).toEqual({
       added: [],
       removed: ['zod@4.5.4'],
+      rewired: [],
     });
     expect(lockfileDelta(before, lock(['zod@4.6.7', 'zod@4.6.8']))).toEqual({
       added: ['zod@4.6.8'],
       removed: ['zod@4.5.4'],
+      rewired: [],
+    });
+  });
+
+  const rewire = (zod: string, other = 'sitemap: 8.0.0') =>
+    [
+      'packages:',
+      '',
+      '  zod@4.5.4:',
+      '  zod@4.6.7:',
+      '',
+      'snapshots:',
+      '',
+      "  '@astrojs/sitemap@3.7.4':",
+      '    dependencies:',
+      `      ${other}`,
+      `      zod: ${zod}`,
+      '    transitivePeerDependencies:',
+      '      - supports-color',
+      '',
+      '  zod@4.5.4: {}',
+      '',
+      '  zod@4.6.7:',
+      '    optional: true',
+    ].join('\n');
+
+  it('reads every snapshot line with its entry and section', () => {
+    expect([...lockfileEdges(rewire('4.5.4'))]).toEqual([
+      '@astrojs/sitemap dependencies: sitemap: 8.0.0',
+      '@astrojs/sitemap dependencies: zod: 4.5.4',
+      '@astrojs/sitemap transitivePeerDependencies: - supports-color',
+      'zod optional: true',
+    ]);
+  });
+
+  it('records what a fix rewires when it adds and drops no package', () => {
+    expect(lockfileDelta(rewire('4.5.4'), rewire('4.6.7'))).toEqual({
+      added: [],
+      removed: [],
+      rewired: [
+        '+ @astrojs/sitemap dependencies: zod: 4.6.7',
+        '- @astrojs/sitemap dependencies: zod: 4.5.4',
+      ],
     });
   });
 
@@ -296,6 +345,57 @@ describe('the lockfile', () => {
     expect(fixSignature(delta)).toBe(fixSignature({ ...delta }));
     expect(fixSignature(delta)).toMatch(/^[0-9a-f]{16}$/);
     expect(fixSignature(delta)).not.toBe(fixSignature({ added: [], removed: ['zod@4.5.4'] }));
+  });
+
+  it('tells fixes that only rewire snapshots apart, so one veto blocks only its own', () => {
+    const zod = lockfileDelta(rewire('4.5.4'), rewire('4.6.7'));
+    const other = lockfileDelta(
+      rewire('4.5.4', 'sitemap: 8.0.0'),
+      rewire('4.5.4', 'sitemap: 8.0.1'),
+    );
+    expect(fixSignature(zod)).toBe(fixSignature(lockfileDelta(rewire('4.5.4'), rewire('4.6.7'))));
+    expect(fixSignature(zod)).not.toBe(fixSignature(other));
+    expect(fixSignature(zod)).not.toBe(fixSignature({ added: [], removed: [], rewired: [] }));
+  });
+
+  it('signs a rewire the same after a routine bump changes peer suffixes or the parent', () => {
+    const at = (parent: string, zod: string) =>
+      rewire(zod)
+        .replace("'@astrojs/sitemap@3.7.4':", `'${parent}':`)
+        .replace(`zod: ${zod}`, `zod: ${zod}(@types/node@26.4.0)`);
+    const before = lockfileDelta(
+      at('@astrojs/sitemap@3.7.4', '4.5.4'),
+      at('@astrojs/sitemap@3.7.4', '4.6.7'),
+    );
+    const bumped = lockfileDelta(
+      at('@astrojs/sitemap@3.7.5(@types/node@26.4.1)', '4.5.4').replace(/26\.4\.0/g, '26.4.1'),
+      at('@astrojs/sitemap@3.7.5(@types/node@26.4.1)', '4.6.7').replace(/26\.4\.0/g, '26.4.1'),
+    );
+    expect(fixSignature(bumped)).toBe(fixSignature(before));
+  });
+});
+
+describe('parsePlan', () => {
+  const good = { title: 'chore(deps): refresh zod', signature: '6b4bbba33b60e1ed' };
+
+  it('takes a complete plan, with or without a release-age date', () => {
+    for (const mergeAfter of ['', 'unknown', '2026-11-09T10:00:00.000Z']) {
+      expect(parsePlan(JSON.stringify({ ...good, mergeAfter }))).toEqual({ ...good, mergeAfter });
+    }
+  });
+
+  it('refuses a plan with anything missing or malformed, rather than read it as nothing new', () => {
+    for (const doc of [
+      { ...good },
+      { ...good, mergeAfter: 'soon' },
+      { ...good, title: '', mergeAfter: '' },
+      { ...good, signature: '', mergeAfter: '' },
+      { ...good, signature: 'not-a-signature!', mergeAfter: '' },
+      null,
+    ]) {
+      expect(parsePlan(JSON.stringify(doc))).toBeNull();
+    }
+    expect(parsePlan('')).toBeNull();
   });
 });
 
@@ -340,6 +440,16 @@ describe('titleFor and commitMessage', () => {
     expect(message).toContain('- zod: GHSA-mrhx-c7xc-m3w5 (high)');
     expect(message).not.toContain('evil.example');
     expect(message).not.toContain('#12');
+  });
+});
+
+describe('inert', () => {
+  it('keeps the runner from reading workflow commands in passed-on text', () => {
+    const text = 'peer *##[add-mask]Z\n  ::add-mask::2026\n\u0085::ADD-MASK::Z\nx ::y::z';
+    const safe = inert(text);
+    expect(safe).not.toMatch(/##\[/);
+    expect(safe).not.toMatch(/::/);
+    expect(safe.replace(/\u200b/g, '')).toBe(text);
   });
 });
 
@@ -409,6 +519,23 @@ describe('renderBody', () => {
     expect(text).toContain('<!-- security-autofix-withdrawn: abc123 -->');
     expect(withdraw(text)).toBe(text);
     expect(withdraw(null)).toBe('');
+  });
+
+  it('reads the live signature a PR carries, and none from one a person wrote or withdrew', () => {
+    expect(signatureIn(body({ signature: '6b4bbba33b60e1ed' }))).toBe('6b4bbba33b60e1ed');
+    expect(signatureIn('x <!-- security-autofix-fix: 6b4bbba33b60e1ed --> y')).toBe(
+      '6b4bbba33b60e1ed',
+    );
+    expect(signatureIn(withdraw('<!-- security-autofix-fix: 6b4bbba33b60e1ed -->'))).toBeNull();
+    expect(signatureIn('I want this one.')).toBeNull();
+    expect(signatureIn(null)).toBeNull();
+  });
+
+  it('tells a PR text that needs refreshing from one GitHub only reformatted', () => {
+    const text = body();
+    expect(sameText(text.replace(/\n/g, '\r\n').trimEnd(), text)).toBe(true);
+    expect(sameText(withdraw(text), text)).toBe(false);
+    expect(sameText(null, '')).toBe(true);
   });
 });
 
@@ -499,10 +626,12 @@ describe('newestDispatchedRuns', () => {
 });
 
 describe('checksThatCount', () => {
+  const now = Date.parse('2026-10-30T12:00:00Z');
   const check = (name: string, slug: string, suite: number) => ({
     name,
     status: 'completed',
     conclusion: 'failure',
+    started_at: '2026-10-30T11:59:00Z',
     app: { slug },
     check_suite: { id: suite },
   });
@@ -519,11 +648,23 @@ describe('checksThatCount', () => {
       { event: 'workflow_dispatch', check_suite_id: 2 },
       { event: 'push', check_suite_id: 4 },
     ];
-    expect(checksThatCount(runs, prRuns).map((r) => r.check_suite.id)).toEqual([1, 3]);
+    expect(checksThatCount(runs, prRuns, now).map((r) => r.check_suite.id)).toEqual([1, 3]);
   });
 
   it('counts only other apps while the PR checks await approval', () => {
-    expect(checksThatCount(runs, []).map((r) => r.name)).toEqual(['Workers Builds: lolperform']);
+    expect(checksThatCount(runs, [], now).map((r) => r.name)).toEqual([
+      'Workers Builds: lolperform',
+    ]);
+  });
+
+  it('lets a preview still running after 15 minutes, or marked stale, hold nothing back', () => {
+    const preview = runs[0];
+    const running = { ...preview, status: 'in_progress', conclusion: null };
+    const stuck = { ...running, started_at: '2026-10-30T11:44:00Z' };
+    const stale = { ...preview, conclusion: 'stale' };
+    expect(checksThatCount([running], [], now)).toEqual([running]);
+    expect(checksThatCount([stuck, stale], [], now)).toEqual([]);
+    expect(checksThatCount([preview], [], now)).toEqual([preview]);
   });
 });
 

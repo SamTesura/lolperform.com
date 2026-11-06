@@ -20,7 +20,7 @@
  * a person to decide.
  */
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { appendFileSync, copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -195,23 +195,66 @@ export function splitKey(key) {
   return at > 0 ? { name: key.slice(0, at), version: key.slice(at + 1) } : null;
 }
 
-/** Package versions the refresh added to, and dropped from, the lockfile. */
+// A snapshot key or value without its peer suffix: "astro@7.2.9(zod@4.5.4)" -> "astro@7.2.9".
+const withoutPeers = (text) => text.replace(/\(.*$/, '');
+
+/**
+ * Every line of a pnpm v9 lockfile's `snapshots:` section, qualified by its
+ * entry's package name and section, without peer suffixes or the entry's own
+ * version: a routine bump elsewhere changes those, and a fix shouldn't look
+ * different because of it.
+ */
+export function lockfileEdges(text) {
+  const edges = new Set();
+  let inSnapshots = false;
+  let entry = '';
+  let section = '';
+  for (const line of text.split('\n')) {
+    if (/^\S/.test(line)) inSnapshots = line.startsWith('snapshots:');
+    if (!inSnapshots || /^\S/.test(line) || !line.trim()) continue;
+    if (/^ {2}\S/.test(line)) {
+      const key = withoutPeers(line.trim().replace(/^'/, '')).replace(/'?:( \{\})?$/, '');
+      entry = splitKey(key)?.name ?? key;
+      section = '';
+    } else if (/^ {4}\S/.test(line)) {
+      section = line.trim();
+      if (!section.endsWith(':')) edges.add(`${entry} ${section}`);
+    } else {
+      edges.add(`${entry} ${section} ${withoutPeers(line.trim())}`);
+    }
+  }
+  return edges;
+}
+
+/**
+ * Package versions the refresh added to, and dropped from, the lockfile, and
+ * the snapshot lines it rewired.
+ */
 export function lockfileDelta(beforeText, afterText) {
   const before = lockfilePackages(beforeText);
   const after = lockfilePackages(afterText);
+  const was = lockfileEdges(beforeText);
+  const now = lockfileEdges(afterText);
   return {
     added: [...after].filter((key) => !before.has(key)).sort(),
     removed: [...before].filter((key) => !after.has(key)).sort(),
+    rewired: [
+      ...[...now].filter((edge) => !was.has(edge)).map((edge) => `+ ${edge}`),
+      ...[...was].filter((edge) => !now.has(edge)).map((edge) => `- ${edge}`),
+    ].sort(),
   };
 }
 
 /**
  * Identifies a fix by what it changes in the lockfile, not by the whole tree,
- * so a fix a person turned down stays turned down after main moves on.
+ * so a fix a person turned down stays turned down after main moves on. A fix
+ * that only moves copies onto versions the lockfile already holds adds and
+ * drops no package, so it is told apart by the snapshot lines it rewires.
  */
 export function fixSignature(delta) {
-  const text = JSON.stringify([delta.added, delta.removed]);
-  return createHash('sha256').update(text).digest('hex').slice(0, 16);
+  const packages = delta.added.length || delta.removed.length;
+  const parts = packages ? [delta.added, delta.removed] : ['rewired', delta.rewired ?? []];
+  return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16);
 }
 
 /**
@@ -220,6 +263,40 @@ export function fixSignature(delta) {
  */
 export const withdraw = (body) =>
   String(body ?? '').replaceAll(`<!-- ${MARKER}: `, `<!-- ${WITHDRAWN}: `);
+
+/** The live fix signature a PR body carries, or null. */
+export const signatureIn = (body) =>
+  new RegExp(`<!-- ${MARKER}: ([0-9a-f]{16}) -->`).exec(String(body ?? ''))?.[1] ?? null;
+
+const flat = (text) =>
+  String(text ?? '')
+    .replace(/\r\n/g, '\n')
+    .trim();
+
+/** Two PR texts match once line endings and surrounding whitespace are set aside. */
+export const sameText = (a, b) => flat(a) === flat(b);
+
+/**
+ * What Plan hands Ship besides the lockfile and the PR text, or null if any of
+ * it is missing or malformed. It travels in the artifact, never in job outputs:
+ * the runner drops an output that holds text masked in the log, and an empty
+ * date or signature would read as "nothing new" and "no veto".
+ */
+export function parsePlan(text) {
+  let doc;
+  try {
+    doc = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  const { title, signature, mergeAfter: at } = doc ?? {};
+  if (typeof title !== 'string' || !title || !/^[0-9a-f]{16}$/.test(String(signature))) {
+    return null;
+  }
+  const dated =
+    typeof at === 'string' && (at === '' || at === 'unknown' || !Number.isNaN(Date.parse(at)));
+  return dated ? { title, signature, mergeAfter: at } : null;
+}
 
 /**
  * When the newest added version is old enough to merge on its own. `at` is ''
@@ -306,7 +383,7 @@ export function renderBody({ fixed, remaining, added, cooldown, signature }) {
     );
   }
   lines.push(
-    `The checks (${EXPECTED_CHECKS.join(', ')}) run as dispatched workflows, which GitHub doesn't count for a PR, so the bot records each result as a commit status of the same name, linking to its run. If one fails, re-run it from that link; the bot merges on a later pass once all of them are green. Any other check here, such as the Cloudflare preview, must pass too.`,
+    `The checks (${EXPECTED_CHECKS.join(', ')}) run as dispatched workflows, which GitHub doesn't count for a PR, so the bot records each result as a commit status of the same name, linking to its run. If one fails, re-run it from that link; the bot merges on a later pass once all of them are green. Any other check here must pass too, except a Cloudflare preview that hasn't reported ${PREVIEW_WAIT_MS / 60_000} minutes after the push or is still running ${PREVIEW_WAIT_MS / 60_000} minutes after it started.`,
     '',
     'GitHub may also show workflows awaiting approval: the regular PR checks, held because a bot opened this PR. Approving them is optional, but once approved they must pass as well. Closing this PR tells the bot not to offer this exact change again.',
     '',
@@ -375,19 +452,27 @@ export function newestDispatchedRuns(runs) {
  * holds those for approval on a PR a workflow opened, and once a person
  * approves them they count: the ruleset needs a check and a status of the same
  * name to both pass. `prRuns` are the pull_request workflow runs on the commit.
+ * A preview that is still running after PREVIEW_WAIT_MS, or that GitHub marked
+ * stale, has given up and holds nothing back.
  */
-export function checksThatCount(checkRuns, prRuns) {
+export function checksThatCount(checkRuns, prRuns, now) {
   const suites = new Set(
     prRuns.filter((run) => run.event === 'pull_request').map((run) => run.check_suite_id),
   );
-  return checkRuns.filter((r) => r.app?.slug !== 'github-actions' || suites.has(r.check_suite?.id));
+  const gaveUp = (r) =>
+    r.app?.slug === PREVIEW_APP &&
+    (r.conclusion === 'stale' ||
+      (r.status !== 'completed' && now - Date.parse(r.started_at) >= PREVIEW_WAIT_MS));
+  return checkRuns
+    .filter((r) => r.app?.slug !== 'github-actions' || suites.has(r.check_suite?.id))
+    .filter((r) => !gaveUp(r));
 }
 
 /**
- * The Cloudflare preview creates its one check run only once its build is
- * done, so until then just its check suite shows it. It gets PREVIEW_WAIT_MS
- * from the push to report: a preview that never does can't hold a fix back for
- * good.
+ * The Cloudflare preview reports a running check a minute or two after the
+ * push and its result when the build ends; until the first appears, just its
+ * check suite shows it. It gets PREVIEW_WAIT_MS from the push to report: a
+ * preview that never does can't hold a fix back for good.
  */
 export function previewsBuilding(suites, now) {
   return suites
@@ -401,7 +486,10 @@ export function previewsBuilding(suites, now) {
 function sh(cmd, args, { check = true, quiet = true } = {}) {
   const r = spawnSync(cmd, args, {
     encoding: 'utf8',
-    stdio: quiet ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+    // Output passed through goes to stdout only: the runner can handle a
+    // batch's stderr lines before its stdout lines, which would put them
+    // ahead of plan's ::stop-commands:: marker.
+    stdio: quiet ? ['ignore', 'pipe', 'pipe'] : ['ignore', 'inherit', 1],
     maxBuffer: 256 * 1024 * 1024,
   });
   if (r.error) throw r.error;
@@ -417,6 +505,13 @@ const audit = () => parseAudit(sh('pnpm', ['audit', '--json'], { check: false })
 
 const escapeCommand = (text) =>
   String(text).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+
+/**
+ * Text that may carry pnpm's or the registry's words, made inert for the
+ * runner, which reads `::name::` at a line's start and `##[name]` anywhere.
+ */
+export const inert = (text) =>
+  String(text).replace(/##\[/g, '##\u200b[').replace(/::/g, ':\u200b:');
 
 function setOutputs(values) {
   // One line per value: a newline in a value would forge another output.
@@ -497,6 +592,19 @@ function refresh(names) {
 }
 
 export function plan() {
+  // Plan prints text from the registry: pnpm passes on a package's metadata.
+  // GitHub must not act on workflow commands in it. An `::add-mask::` there
+  // would make the runner drop every job output holding the masked text.
+  const token = randomBytes(16).toString('hex');
+  console.info(`::stop-commands::${token}`);
+  try {
+    return planFix();
+  } finally {
+    console.info(`::${token}::`);
+  }
+}
+
+function planFix() {
   setOutputs({ base: sh('git', ['rev-parse', 'HEAD']).stdout.trim() });
   // pnpm audit lists no dependency paths until node_modules exists, and the
   // refresh below installs it, so install first: both audits then see the same
@@ -552,7 +660,11 @@ export function plan() {
     renderBody({ fixed, remaining: after, added, cooldown, signature }),
   );
   writeFileSync(join(dir, 'commit.txt'), commitMessage(title, fixed));
-  setOutputs({ state: 'fixed', title, merge_after: cooldown.at, signature });
+  writeFileSync(
+    join(dir, 'plan.json'),
+    `${JSON.stringify({ title, mergeAfter: cooldown.at, signature })}\n`,
+  );
+  setOutputs({ state: 'fixed' });
   report(`Fixes ${fixed.map((a) => `${a.name} (${plain(a.ghsa || a.id)})`).join(', ')}.`);
   return 0;
 }
@@ -659,9 +771,10 @@ function otherChecks(sha) {
   const suites = apiJson(`commits/${sha}/check-suites?per_page=100`);
   const prRuns = apiJson(`actions/runs?event=pull_request&head_sha=${sha}&per_page=100`);
   if (!runs || !suites || !prRuns) return null;
+  const now = Date.now();
   return [
-    ...checksThatCount(runs.check_runs ?? [], prRuns.workflow_runs ?? []),
-    ...previewsBuilding(suites.check_suites ?? [], Date.now()),
+    ...checksThatCount(runs.check_runs ?? [], prRuns.workflow_runs ?? [], now),
+    ...previewsBuilding(suites.check_suites ?? [], now),
   ];
 }
 
@@ -724,19 +837,30 @@ function problem(loud, message) {
   return 0;
 }
 
+/**
+ * Close the bot's own PR and delete its branch, saying why. A PR someone closed
+ * since it was listed is left exactly as it is: that close may be a veto.
+ */
+function closeOwnPr(pr, comment) {
+  if (apiJson(`pulls/${pr.number}`)?.state !== 'open') return false;
+  // Withdraw the signature first, or a later run would read this close as a
+  // person turning the change down and never offer it again.
+  const body = ['-X', 'PATCH', '-f', `body=${withdraw(pr.body)}`];
+  const edited = api(`pulls/${pr.number}`, body);
+  if (edited.status !== 0) {
+    throw new Error(`Editing PR #${pr.number} failed: ${edited.stderr.trim()}`);
+  }
+  gh(['pr', 'close', String(pr.number), '--delete-branch', '--comment', comment]);
+  return true;
+}
+
 /** main has nothing a refresh can fix: drop what an earlier run left behind. */
 function tidyUp(existing, tip) {
   if (existing) {
-    // Withdraw the signature first, or a later run would read this close as a
-    // person turning the change down and never offer it again.
-    const body = ['-X', 'PATCH', '-f', `body=${withdraw(existing.body)}`];
-    const edited = api(`pulls/${existing.number}`, body);
-    if (edited.status !== 0) {
-      throw new Error(`Editing PR #${existing.number} failed: ${edited.stderr.trim()}`);
-    }
     const comment = 'main has no fixable advisory any more, so this is no longer needed.';
-    gh(['pr', 'close', String(existing.number), '--delete-branch', '--comment', comment]);
-    report(`Closed PR #${existing.number}: nothing left to fix.`);
+    if (closeOwnPr(existing, comment)) {
+      report(`Closed PR #${existing.number}: nothing left to fix.`);
+    }
   } else if (tip && api(`git/refs/heads/${BRANCH}`, ['-X', 'DELETE']).status === 0) {
     report(`Deleted the leftover ${BRANCH} branch.`);
   }
@@ -792,21 +916,31 @@ export async function ship() {
   }
   if (state === 'clean') return tidyUp(existing, tip);
 
-  const title = process.env.PLAN_TITLE ?? '';
   const base = process.env.PLAN_BASE ?? '';
   const dir = process.env.PLAN_DIR ?? '';
-  const signature = process.env.PLAN_SIGNATURE ?? '';
-  const cooldown = process.env.PLAN_MERGE_AFTER ?? '';
+  const planned = parsePlan(readFileSync(join(dir, 'plan.json'), 'utf8'));
+  if (!planned) throw new Error('The plan handed to Ship is missing or malformed.');
+  const { title, signature, mergeAfter: cooldown } = planned;
   const tree = commitFix(dir, base);
 
-  if (!existing) {
-    const turnedDown = rejected(signature);
-    if (turnedDown) {
-      report(
-        `This exact change was closed without merging in PR #${turnedDown}; not offering it again.`,
+  // A veto holds even while another bot PR is open: main can come to need
+  // only a change a person turned down, and pushing it onto that PR would
+  // merge it. That PR's own change is then out of date, so it goes too.
+  const turnedDown = rejected(signature);
+  if (turnedDown) {
+    // Only the bot's own PR for another change: a PR a person opened carries
+    // no live signature, and closeOwnPr leaves one closed meanwhile alone.
+    const other = existing && signatureIn(existing.body);
+    if (other && other !== signature) {
+      closeOwnPr(
+        existing,
+        `main now needs only the change turned down in #${turnedDown}, so this is no longer needed.`,
       );
-      return 0;
     }
+    report(
+      `This exact change was closed without merging in PR #${turnedDown}; not offering it again.`,
+    );
+    return 0;
   }
   const same = Boolean(
     existing && tip && tip.tree === tree && tip.parent === base && tip.parents === 1,
@@ -833,6 +967,13 @@ export async function ship() {
     startChecks(Object.keys(CHECK_WORKFLOWS));
     report(`Opened or updated PR #${number} and started ${EXPECTED_CHECKS.join(', ')} on it.`);
   } else {
+    // Keep the PR's text current: a publish date read since, or a signature
+    // an interrupted close left withdrawn.
+    const bodyFile = join(dir, 'body.md');
+    const body = readFileSync(bodyFile, 'utf8');
+    if (!sameText(existing.title, title) || !sameText(existing.body, body)) {
+      openOrUpdatePr(existing, title, bodyFile);
+    }
     // An earlier run may have stopped before starting every workflow.
     const runs = dispatchedRuns(head) ?? new Map();
     const missing = Object.keys(CHECK_WORKFLOWS).filter((file) => !runs.has(file));
@@ -902,7 +1043,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     },
     (err) => {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(message);
+      console.error(inert(message));
       console.info(`::error title=security autofix::${escapeCommand(message)}`);
       if (process.env.GITHUB_STEP_SUMMARY) {
         appendFileSync(process.env.GITHUB_STEP_SUMMARY, `**Failed:** ${message}\n\n`);
