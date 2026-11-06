@@ -21,11 +21,13 @@ import {
   isBotCommit,
   isFixable,
   lockfileDelta,
+  lockfileEdges,
   lockfilePackages,
   mergeAfter,
   newestDispatchedRuns,
   packagesToRefresh,
   parseAudit,
+  parsePlan,
   pathShape,
   plain,
   previewsBuilding,
@@ -285,10 +287,54 @@ describe('the lockfile', () => {
     expect(lockfileDelta(before, lock(['zod@4.6.7']))).toEqual({
       added: [],
       removed: ['zod@4.5.4'],
+      rewired: [],
     });
     expect(lockfileDelta(before, lock(['zod@4.6.7', 'zod@4.6.8']))).toEqual({
       added: ['zod@4.6.8'],
       removed: ['zod@4.5.4'],
+      rewired: [],
+    });
+  });
+
+  const rewire = (zod: string, other = 'sitemap: 8.0.0') =>
+    [
+      'packages:',
+      '',
+      '  zod@4.5.4:',
+      '  zod@4.6.7:',
+      '',
+      'snapshots:',
+      '',
+      "  '@astrojs/sitemap@3.7.4':",
+      '    dependencies:',
+      `      ${other}`,
+      `      zod: ${zod}`,
+      '    transitivePeerDependencies:',
+      '      - supports-color',
+      '',
+      '  zod@4.5.4: {}',
+      '',
+      '  zod@4.6.7:',
+      '    optional: true',
+    ].join('\n');
+
+  it('reads every snapshot line with its entry and section', () => {
+    expect([...lockfileEdges(rewire('4.5.4'))]).toEqual([
+      "'@astrojs/sitemap@3.7.4': dependencies: sitemap: 8.0.0",
+      "'@astrojs/sitemap@3.7.4': dependencies: zod: 4.5.4",
+      "'@astrojs/sitemap@3.7.4': transitivePeerDependencies: - supports-color",
+      'zod@4.6.7: optional: true',
+    ]);
+  });
+
+  it('records what a fix rewires when it adds and drops no package', () => {
+    expect(lockfileDelta(rewire('4.5.4'), rewire('4.6.7'))).toEqual({
+      added: [],
+      removed: [],
+      rewired: [
+        "+ '@astrojs/sitemap@3.7.4': dependencies: zod: 4.6.7",
+        "- '@astrojs/sitemap@3.7.4': dependencies: zod: 4.5.4",
+      ],
     });
   });
 
@@ -297,6 +343,41 @@ describe('the lockfile', () => {
     expect(fixSignature(delta)).toBe(fixSignature({ ...delta }));
     expect(fixSignature(delta)).toMatch(/^[0-9a-f]{16}$/);
     expect(fixSignature(delta)).not.toBe(fixSignature({ added: [], removed: ['zod@4.5.4'] }));
+  });
+
+  it('tells fixes that only rewire snapshots apart, so one veto blocks only its own', () => {
+    const zod = lockfileDelta(rewire('4.5.4'), rewire('4.6.7'));
+    const other = lockfileDelta(
+      rewire('4.5.4', 'sitemap: 8.0.0'),
+      rewire('4.5.4', 'sitemap: 8.0.1'),
+    );
+    expect(fixSignature(zod)).toBe(fixSignature(lockfileDelta(rewire('4.5.4'), rewire('4.6.7'))));
+    expect(fixSignature(zod)).not.toBe(fixSignature(other));
+    expect(fixSignature(zod)).not.toBe(fixSignature({ added: [], removed: [], rewired: [] }));
+  });
+});
+
+describe('parsePlan', () => {
+  const good = { title: 'chore(deps): refresh zod', signature: '6b4bbba33b60e1ed' };
+
+  it('takes a complete plan, with or without a release-age date', () => {
+    for (const mergeAfter of ['', 'unknown', '2026-11-09T10:00:00.000Z']) {
+      expect(parsePlan(JSON.stringify({ ...good, mergeAfter }))).toEqual({ ...good, mergeAfter });
+    }
+  });
+
+  it('refuses a plan with anything missing or malformed, rather than read it as nothing new', () => {
+    for (const doc of [
+      { ...good },
+      { ...good, mergeAfter: 'soon' },
+      { ...good, title: '', mergeAfter: '' },
+      { ...good, signature: '', mergeAfter: '' },
+      { ...good, signature: 'not-a-signature!', mergeAfter: '' },
+      null,
+    ]) {
+      expect(parsePlan(JSON.stringify(doc))).toBeNull();
+    }
+    expect(parsePlan('')).toBeNull();
   });
 });
 
