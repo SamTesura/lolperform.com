@@ -473,7 +473,10 @@ export function previewsBuilding(suites, now) {
 function sh(cmd, args, { check = true, quiet = true } = {}) {
   const r = spawnSync(cmd, args, {
     encoding: 'utf8',
-    stdio: quiet ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+    // Output passed through goes to stdout only: the runner can handle a
+    // batch's stderr lines before its stdout lines, which would put them
+    // ahead of plan's ::stop-commands:: marker.
+    stdio: quiet ? ['ignore', 'pipe', 'pipe'] : ['ignore', 'inherit', 1],
     maxBuffer: 256 * 1024 * 1024,
   });
   if (r.error) throw r.error;
@@ -489,6 +492,15 @@ const audit = () => parseAudit(sh('pnpm', ['audit', '--json'], { check: false })
 
 const escapeCommand = (text) =>
   String(text).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+
+/**
+ * Text that may carry pnpm's or the registry's words, made inert for the
+ * runner, which reads `::name::` at a line's start and `##[name]` anywhere.
+ */
+export const inert = (text) =>
+  String(text)
+    .replace(/##\[/g, '##\u200b[')
+    .replace(/^(\s*)::/gm, '$1:\u200b:');
 
 function setOutputs(values) {
   // One line per value: a newline in a value would forge another output.
@@ -1020,7 +1032,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     },
     (err) => {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(message);
+      console.error(inert(message));
       console.info(`::error title=security autofix::${escapeCommand(message)}`);
       if (process.env.GITHUB_STEP_SUMMARY) {
         appendFileSync(process.env.GITHUB_STEP_SUMMARY, `**Failed:** ${message}\n\n`);

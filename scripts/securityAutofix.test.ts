@@ -18,6 +18,7 @@ import {
   dispatchedVerdict,
   fixSignature,
   improved,
+  inert,
   isBotCommit,
   isFixable,
   lockfileDelta,
@@ -422,6 +423,16 @@ describe('titleFor and commitMessage', () => {
     expect(message).toContain('- zod: GHSA-mrhx-c7xc-m3w5 (high)');
     expect(message).not.toContain('evil.example');
     expect(message).not.toContain('#12');
+  });
+});
+
+describe('inert', () => {
+  it('keeps the runner from reading workflow commands in passed-on text', () => {
+    const text = 'peer *##[add-mask]Z\n  ::add-mask::2026\nok :: fine';
+    const safe = inert(text);
+    expect(safe).not.toMatch(/##\[/);
+    expect(safe.split('\n').some((line) => line.trimStart().startsWith('::'))).toBe(false);
+    expect(safe.replace(/\u200b/g, '')).toBe(text);
   });
 });
 
