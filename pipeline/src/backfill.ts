@@ -34,9 +34,10 @@ export interface BackfillStatements {
 /**
  * The three statements that rebuild one (patch, region, rank) slice.
  *
- * `loaded_at` is stamped 'backfill', so the next pipeline load (which stamps its
- * own generated_at and prunes rows that do not carry it) replaces everything
- * this pass wrote.
+ * `loaded_at` is stamped 'backfill', so the next load of the same patch (which
+ * stamps its own generated_at and prunes that patch's rows that do not carry
+ * it) replaces what this pass wrote for it. Rows written for an older patch
+ * stay until it leaves the loader's retention window.
  */
 export function buildBackfillSql(patch: string, region: string, rank: string): BackfillStatements {
   const scope = `patch = ${q(patch)} AND region = ${q(region)} AND rank = ${q(rank)}`;

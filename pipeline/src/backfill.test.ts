@@ -8,14 +8,21 @@ import { buildBackfillSql } from './backfill.js';
  */
 const D1_COMPOUND_SELECT_LIMIT = 5;
 
-/** Terms in each compound SELECT chain of `sql`, one entry per parenthesis level. */
+/** Comments, quoted names and strings (skipped whole), parentheses, compound operators. */
+const TOKENS =
+  /--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)|"(?:[^"]|"")*"|'(?:[^']|'')*'|\(|\)|\b(?:UNION|INTERSECT|EXCEPT)\b/gi;
+
+/**
+ * Terms in each compound SELECT chain of `sql`: one entry per parenthesised
+ * group, plus one for the top level.
+ */
 function compoundTerms(sql: string): number[] {
   const terms: number[] = [];
   const open: number[] = [1];
-  for (const [token] of sql.matchAll(/'(?:[^']|'')*'|\(|\)|\b(?:UNION|INTERSECT|EXCEPT)\b/gi)) {
+  for (const [token] of sql.matchAll(TOKENS)) {
     if (token === '(') open.push(1);
     else if (token === ')') terms.push(open.pop()!);
-    else if (!token.startsWith("'")) open[open.length - 1]!++;
+    else if (/^(?:UNION|INTERSECT|EXCEPT)$/i.test(token)) open[open.length - 1]!++;
   }
   return [...terms, ...open];
 }
@@ -26,6 +33,13 @@ describe('compoundTerms', () => {
     const nested = compoundTerms('SELECT * FROM (SELECT 1 UNION SELECT 2) UNION SELECT 3');
     expect(nested.sort()).toEqual([2, 2]);
     expect(Math.max(...compoundTerms("SELECT 'a UNION b' WHERE x IN (1, 2)"))).toBe(1);
+  });
+
+  it('skips what sits inside comments, quoted names and strings', () => {
+    const chain = Array.from({ length: 6 }, (_, i) => `SELECT ${i}`).join(' UNION ');
+    expect(Math.max(...compoundTerms(`-- every source's keys (\n${chain}`))).toBe(6);
+    expect(Math.max(...compoundTerms(`/* don't ( */ ${chain}`))).toBe(6);
+    expect(Math.max(...compoundTerms(`SELECT "a UNION (b" UNION SELECT 'c''s UNION ('`))).toBe(2);
   });
 });
 
