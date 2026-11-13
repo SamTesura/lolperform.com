@@ -42,10 +42,11 @@ export function buildBackfillSql(patch: string, region: string, rank: string): B
   const scope = `patch = ${q(patch)} AND region = ${q(region)} AND rank = ${q(rank)}`;
   const key = `k.patch = ${q(patch)} AND k.region = ${q(region)} AND k.rank = ${q(rank)}`;
 
-  // Each nested array comes out of a scalar subquery, and SQLite 3.54 stopped
-  // carrying the JSON subtype across that boundary, so json_object would store
-  // the array as a quoted string. json() marks it as JSON again on every
-  // version. (roleSlice and duoSlice aggregate in the same SELECT and keep it.)
+  // Each nested array comes out of a scalar subquery, and SQLite 3.54.1 clears
+  // the JSON subtype of a scalar subquery's result (3.54.0 and earlier kept it,
+  // and workerd's build patches the change out), so on node:sqlite json_object
+  // would store the array as a quoted string. json() marks it as JSON again on
+  // every version. (roleSlice and duoSlice aggregate in the same SELECT.)
   //
   // D1 rejects a compound SELECT of more than 5 terms (workerd sets
   // SQLITE_LIMIT_COMPOUND_SELECT to 5, where node:sqlite keeps SQLite's 500), so
@@ -123,7 +124,10 @@ SELECT patch, region, rank, role,
 FROM role_stats WHERE ${scope}
 GROUP BY patch, region, rank, role`.trim();
 
-  // Capped at the 500 rows /api/v1/duos serves, matching the loader.
+  // Capped at the 500 rows /api/v1/duos serves, matching the loader. Without a
+  // GROUP BY the aggregate yields a row even when the slice has no legacy duos,
+  // and that empty board would replace the loader's; HAVING skips it, as the
+  // loader writes no row for an empty slice.
   const duoSlice = `
 INSERT OR REPLACE INTO duo_slice (patch, region, rank, payload, loaded_at)
 SELECT ${q(patch)}, ${q(region)}, ${q(rank)},
@@ -131,7 +135,8 @@ SELECT ${q(patch)}, ${q(region)}, ${q(rank)},
     'adcKey', adc_key, 'supportKey', support_key, 'games', games, 'wins', wins,
     'winRate', win_rate, 'wilsonLower', wilson_lower)), json('[]'))),
   'backfill'
-FROM (SELECT * FROM duos WHERE ${scope} ORDER BY games DESC LIMIT 500)`.trim();
+FROM (SELECT * FROM duos WHERE ${scope} ORDER BY games DESC LIMIT 500)
+HAVING COUNT(*) > 0`.trim();
 
   return { championSlice, roleSlice, duoSlice };
 }
