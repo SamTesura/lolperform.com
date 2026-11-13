@@ -34,26 +34,36 @@ export interface BackfillStatements {
 /**
  * The three statements that rebuild one (patch, region, rank) slice.
  *
- * `loaded_at` is stamped 'backfill', so the next pipeline load (which stamps its
- * own generated_at and prunes rows that do not carry it) replaces everything
- * this pass wrote.
+ * `loaded_at` is stamped 'backfill', so the next load of the same patch (which
+ * stamps its own generated_at and prunes that patch's rows that do not carry
+ * it) replaces what this pass wrote for it. Rows written for an older patch
+ * stay until it leaves the loader's retention window.
  */
 export function buildBackfillSql(patch: string, region: string, rank: string): BackfillStatements {
   const scope = `patch = ${q(patch)} AND region = ${q(region)} AND rank = ${q(rank)}`;
   const key = `k.patch = ${q(patch)} AND k.region = ${q(region)} AND k.rank = ${q(rank)}`;
 
+  // Each nested array comes out of a scalar subquery, and SQLite 3.54.1 clears
+  // the JSON subtype of a scalar subquery's result (3.54.0 and earlier kept it,
+  // and workerd's build patches the change out), so on node:sqlite json_object
+  // would store the array as a quoted string. json() marks it as JSON again on
+  // every version. (roleSlice and duoSlice aggregate in the same SELECT.)
+  //
+  // D1 rejects a compound SELECT of more than 5 terms (workerd sets
+  // SQLITE_LIMIT_COMPOUND_SELECT to 5, where node:sqlite keeps SQLite's 500), so
+  // the seven key sources are unioned in two groups instead of one chain.
   const championSlice = `
 INSERT OR REPLACE INTO champion_slice (patch, region, rank, champion_key, role, payload, loaded_at)
 SELECT k.patch, k.region, k.rank, k.champion_key, k.role,
   json_object(
-    'matchups', COALESCE((
+    'matchups', json(COALESCE((
       SELECT json_group_array(json_object(
         'opponentKey', m.opponent_key, 'games', m.games, 'wins', m.wins,
         'winRate', m.win_rate, 'wilsonLower', m.wilson_lower))
       FROM matchups m
       WHERE m.patch = k.patch AND m.region = k.region AND m.rank = k.rank
-        AND m.role = k.role AND m.champion_key = k.champion_key), json('[]')),
-    'builds', COALESCE((
+        AND m.role = k.role AND m.champion_key = k.champion_key), '[]')),
+    'builds', json(COALESCE((
       SELECT json_group_array(json_object(
         'opponentKey', CASE WHEN b.opponent_key = '-' THEN NULL ELSE b.opponent_key END,
         'items', json(b.items), 'runes', json(b.runes),
@@ -63,39 +73,43 @@ SELECT k.patch, k.region, k.rank, k.champion_key, k.role,
         'startOptions', json(b.start_options)))
       FROM builds b
       WHERE b.patch = k.patch AND b.region = k.region AND b.rank = k.rank
-        AND b.role = k.role AND b.champion_key = k.champion_key), json('[]')),
-    'keystones', COALESCE((
+        AND b.role = k.role AND b.champion_key = k.champion_key), '[]')),
+    'keystones', json(COALESCE((
       SELECT json_group_array(json_object(
         'keystone', ks.keystone, 'games', ks.games, 'wins', ks.wins,
         'winRate', ks.win_rate, 'wilsonLower', ks.wilson_lower))
       FROM keystone_stats ks
       WHERE ks.patch = k.patch AND ks.region = k.region AND ks.rank = k.rank
-        AND ks.role = k.role AND ks.champion_key = k.champion_key), json('[]')),
-    'runePages', COALESCE((
+        AND ks.role = k.role AND ks.champion_key = k.champion_key), '[]')),
+    'runePages', json(COALESCE((
       SELECT json_group_array(json_object(
         'slot', rp.slot, 'runes', json(rp.runes), 'games', rp.games, 'wins', rp.wins,
         'winRate', rp.win_rate, 'wilsonLower', rp.wilson_lower))
       FROM rune_pages rp
       WHERE rp.patch = k.patch AND rp.region = k.region AND rp.rank = k.rank
-        AND rp.role = k.role AND rp.champion_key = k.champion_key), json('[]')),
-    'duos', COALESCE((
+        AND rp.role = k.role AND rp.champion_key = k.champion_key), '[]')),
+    'duos', json(COALESCE((
       SELECT json_group_array(json_object(
         'adcKey', d.adc_key, 'supportKey', d.support_key, 'games', d.games,
         'wins', d.wins, 'winRate', d.win_rate, 'wilsonLower', d.wilson_lower))
       FROM duos d
       WHERE d.patch = k.patch AND d.region = k.region AND d.rank = k.rank
         AND ((k.role = 'BOTTOM' AND d.adc_key = k.champion_key)
-          OR (k.role = 'UTILITY' AND d.support_key = k.champion_key))), json('[]'))
+          OR (k.role = 'UTILITY' AND d.support_key = k.champion_key))), '[]'))
   ),
   'backfill'
 FROM (
-  SELECT patch, region, rank, role, champion_key FROM role_stats WHERE ${scope}
-  UNION SELECT patch, region, rank, role, champion_key FROM matchups WHERE ${scope}
-  UNION SELECT patch, region, rank, role, champion_key FROM builds WHERE ${scope}
-  UNION SELECT patch, region, rank, role, champion_key FROM keystone_stats WHERE ${scope}
-  UNION SELECT patch, region, rank, role, champion_key FROM rune_pages WHERE ${scope}
-  UNION SELECT patch, region, rank, 'BOTTOM', adc_key FROM duos WHERE ${scope}
-  UNION SELECT patch, region, rank, 'UTILITY', support_key FROM duos WHERE ${scope}
+  SELECT * FROM (
+    SELECT patch, region, rank, role, champion_key FROM role_stats WHERE ${scope}
+    UNION SELECT patch, region, rank, role, champion_key FROM matchups WHERE ${scope}
+    UNION SELECT patch, region, rank, role, champion_key FROM builds WHERE ${scope}
+    UNION SELECT patch, region, rank, role, champion_key FROM keystone_stats WHERE ${scope}
+  )
+  UNION SELECT * FROM (
+    SELECT patch, region, rank, role, champion_key FROM rune_pages WHERE ${scope}
+    UNION SELECT patch, region, rank, 'BOTTOM', adc_key FROM duos WHERE ${scope}
+    UNION SELECT patch, region, rank, 'UTILITY', support_key FROM duos WHERE ${scope}
+  )
 ) k
 WHERE ${key}`.trim();
 
@@ -111,7 +125,10 @@ SELECT patch, region, rank, role,
 FROM role_stats WHERE ${scope}
 GROUP BY patch, region, rank, role`.trim();
 
-  // Capped at the 500 rows /api/v1/duos serves, matching the loader.
+  // Capped at the 500 rows /api/v1/duos serves, matching the loader. Without a
+  // GROUP BY the aggregate yields a row even when the slice has no legacy duos,
+  // and that empty board would replace the loader's; HAVING skips it, as the
+  // loader writes no row for an empty slice.
   const duoSlice = `
 INSERT OR REPLACE INTO duo_slice (patch, region, rank, payload, loaded_at)
 SELECT ${q(patch)}, ${q(region)}, ${q(rank)},
@@ -119,7 +136,8 @@ SELECT ${q(patch)}, ${q(region)}, ${q(rank)},
     'adcKey', adc_key, 'supportKey', support_key, 'games', games, 'wins', wins,
     'winRate', win_rate, 'wilsonLower', wilson_lower)), json('[]'))),
   'backfill'
-FROM (SELECT * FROM duos WHERE ${scope} ORDER BY games DESC LIMIT 500)`.trim();
+FROM (SELECT * FROM duos WHERE ${scope} ORDER BY games DESC LIMIT 500)
+HAVING COUNT(*) > 0`.trim();
 
   return { championSlice, roleSlice, duoSlice };
 }

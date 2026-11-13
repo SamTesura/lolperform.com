@@ -401,4 +401,32 @@ withSqlite('backfill from the legacy tables', () => {
     expect(duoSlice.duos).toHaveLength(1);
     expect(duoSlice.duos[0].games).toBe(90);
   });
+
+  it('leaves the loaded slices alone when the legacy tables hold nothing for them', () => {
+    const db = freshDb();
+    const board = '{"duos":[{"adcKey":"145","supportKey":"412","games":90}]}';
+    db.exec(`INSERT INTO patches VALUES ('16.12','16.12.1','2026-06-17T00:00:00.000Z',1000)`);
+    db.prepare('INSERT INTO duo_slice VALUES (?,?,?,?,?)').run(
+      '16.12',
+      'na1',
+      'emerald_plus',
+      board,
+      '2026-06-17T00:00:00.000Z',
+    );
+
+    const sql = buildBackfillSql('16.12', 'na1', 'emerald_plus');
+    for (const statement of Object.values(sql) as string[]) db.exec(statement);
+
+    const duos = db.prepare('SELECT payload, loaded_at FROM duo_slice').all() as {
+      payload: string;
+      loaded_at: string;
+    }[];
+    expect(duos.map((r) => [r.payload, r.loaded_at])).toEqual([
+      [board, '2026-06-17T00:00:00.000Z'],
+    ]);
+    const count = (table: string) =>
+      (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
+    expect(count('champion_slice')).toBe(0);
+    expect(count('role_slice')).toBe(0);
+  });
 });
