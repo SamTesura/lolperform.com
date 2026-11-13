@@ -42,18 +42,22 @@ export function buildBackfillSql(patch: string, region: string, rank: string): B
   const scope = `patch = ${q(patch)} AND region = ${q(region)} AND rank = ${q(rank)}`;
   const key = `k.patch = ${q(patch)} AND k.region = ${q(region)} AND k.rank = ${q(rank)}`;
 
+  // Each nested array comes out of a scalar subquery, and SQLite 3.54 stopped
+  // carrying the JSON subtype across that boundary, so json_object would store
+  // the array as a quoted string. json() marks it as JSON again on every
+  // version. (roleSlice and duoSlice aggregate in the same SELECT and keep it.)
   const championSlice = `
 INSERT OR REPLACE INTO champion_slice (patch, region, rank, champion_key, role, payload, loaded_at)
 SELECT k.patch, k.region, k.rank, k.champion_key, k.role,
   json_object(
-    'matchups', COALESCE((
+    'matchups', json(COALESCE((
       SELECT json_group_array(json_object(
         'opponentKey', m.opponent_key, 'games', m.games, 'wins', m.wins,
         'winRate', m.win_rate, 'wilsonLower', m.wilson_lower))
       FROM matchups m
       WHERE m.patch = k.patch AND m.region = k.region AND m.rank = k.rank
-        AND m.role = k.role AND m.champion_key = k.champion_key), json('[]')),
-    'builds', COALESCE((
+        AND m.role = k.role AND m.champion_key = k.champion_key), '[]')),
+    'builds', json(COALESCE((
       SELECT json_group_array(json_object(
         'opponentKey', CASE WHEN b.opponent_key = '-' THEN NULL ELSE b.opponent_key END,
         'items', json(b.items), 'runes', json(b.runes),
@@ -63,29 +67,29 @@ SELECT k.patch, k.region, k.rank, k.champion_key, k.role,
         'startOptions', json(b.start_options)))
       FROM builds b
       WHERE b.patch = k.patch AND b.region = k.region AND b.rank = k.rank
-        AND b.role = k.role AND b.champion_key = k.champion_key), json('[]')),
-    'keystones', COALESCE((
+        AND b.role = k.role AND b.champion_key = k.champion_key), '[]')),
+    'keystones', json(COALESCE((
       SELECT json_group_array(json_object(
         'keystone', ks.keystone, 'games', ks.games, 'wins', ks.wins,
         'winRate', ks.win_rate, 'wilsonLower', ks.wilson_lower))
       FROM keystone_stats ks
       WHERE ks.patch = k.patch AND ks.region = k.region AND ks.rank = k.rank
-        AND ks.role = k.role AND ks.champion_key = k.champion_key), json('[]')),
-    'runePages', COALESCE((
+        AND ks.role = k.role AND ks.champion_key = k.champion_key), '[]')),
+    'runePages', json(COALESCE((
       SELECT json_group_array(json_object(
         'slot', rp.slot, 'runes', json(rp.runes), 'games', rp.games, 'wins', rp.wins,
         'winRate', rp.win_rate, 'wilsonLower', rp.wilson_lower))
       FROM rune_pages rp
       WHERE rp.patch = k.patch AND rp.region = k.region AND rp.rank = k.rank
-        AND rp.role = k.role AND rp.champion_key = k.champion_key), json('[]')),
-    'duos', COALESCE((
+        AND rp.role = k.role AND rp.champion_key = k.champion_key), '[]')),
+    'duos', json(COALESCE((
       SELECT json_group_array(json_object(
         'adcKey', d.adc_key, 'supportKey', d.support_key, 'games', d.games,
         'wins', d.wins, 'winRate', d.win_rate, 'wilsonLower', d.wilson_lower))
       FROM duos d
       WHERE d.patch = k.patch AND d.region = k.region AND d.rank = k.rank
         AND ((k.role = 'BOTTOM' AND d.adc_key = k.champion_key)
-          OR (k.role = 'UTILITY' AND d.support_key = k.champion_key))), json('[]'))
+          OR (k.role = 'UTILITY' AND d.support_key = k.champion_key))), '[]'))
   ),
   'backfill'
 FROM (
