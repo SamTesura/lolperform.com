@@ -46,6 +46,10 @@ export function buildBackfillSql(patch: string, region: string, rank: string): B
   // carrying the JSON subtype across that boundary, so json_object would store
   // the array as a quoted string. json() marks it as JSON again on every
   // version. (roleSlice and duoSlice aggregate in the same SELECT and keep it.)
+  //
+  // D1 rejects a compound SELECT of more than 5 terms (workerd sets
+  // SQLITE_LIMIT_COMPOUND_SELECT to 5, where node:sqlite keeps SQLite's 500), so
+  // the seven key sources are unioned in two groups instead of one chain.
   const championSlice = `
 INSERT OR REPLACE INTO champion_slice (patch, region, rank, champion_key, role, payload, loaded_at)
 SELECT k.patch, k.region, k.rank, k.champion_key, k.role,
@@ -93,13 +97,17 @@ SELECT k.patch, k.region, k.rank, k.champion_key, k.role,
   ),
   'backfill'
 FROM (
-  SELECT patch, region, rank, role, champion_key FROM role_stats WHERE ${scope}
-  UNION SELECT patch, region, rank, role, champion_key FROM matchups WHERE ${scope}
-  UNION SELECT patch, region, rank, role, champion_key FROM builds WHERE ${scope}
-  UNION SELECT patch, region, rank, role, champion_key FROM keystone_stats WHERE ${scope}
-  UNION SELECT patch, region, rank, role, champion_key FROM rune_pages WHERE ${scope}
-  UNION SELECT patch, region, rank, 'BOTTOM', adc_key FROM duos WHERE ${scope}
-  UNION SELECT patch, region, rank, 'UTILITY', support_key FROM duos WHERE ${scope}
+  SELECT * FROM (
+    SELECT patch, region, rank, role, champion_key FROM role_stats WHERE ${scope}
+    UNION SELECT patch, region, rank, role, champion_key FROM matchups WHERE ${scope}
+    UNION SELECT patch, region, rank, role, champion_key FROM builds WHERE ${scope}
+    UNION SELECT patch, region, rank, role, champion_key FROM keystone_stats WHERE ${scope}
+  )
+  UNION SELECT * FROM (
+    SELECT patch, region, rank, role, champion_key FROM rune_pages WHERE ${scope}
+    UNION SELECT patch, region, rank, 'BOTTOM', adc_key FROM duos WHERE ${scope}
+    UNION SELECT patch, region, rank, 'UTILITY', support_key FROM duos WHERE ${scope}
+  )
 ) k
 WHERE ${key}`.trim();
 
