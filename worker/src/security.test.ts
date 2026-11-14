@@ -8,9 +8,6 @@ describe('security headers', () => {
     expect(csp).toContain("script-src 'self'");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain('https://ddragon.leagueoflegends.com');
-
-    // Cloudflare Web Analytics: the injected beacon script and its
-    // measurement endpoint must both pass CSP or every page logs a violation.
     expect(csp).toContain('https://static.cloudflareinsights.com');
     expect(csp).toContain('https://cloudflareinsights.com');
 
@@ -19,14 +16,48 @@ describe('security headers', () => {
       /googlesyndication|googleadservices|doubleclick|adtrafficquality|googletagservices|adservice\.google/i,
     );
 
-    // Inline JavaScript must not be allowed.
     const scriptSrc = csp.match(/script-src ([^;]+)/)?.[1] ?? '';
     expect(scriptSrc).not.toContain("'unsafe-inline'");
   });
 
+  it('adds a fresh nonce to HTML responses', () => {
+    const response = () =>
+      withSecurityHeaders(
+        new Response('<html></html>', {
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        }),
+      );
+
+    const first = response();
+    const second = response();
+
+    const firstCsp = first.headers.get('Content-Security-Policy') ?? '';
+    const secondCsp = second.headers.get('Content-Security-Policy') ?? '';
+
+    const firstNonce = firstCsp.match(/'nonce-([^']+)'/)?.[1];
+    const secondNonce = secondCsp.match(/'nonce-([^']+)'/)?.[1];
+
+    expect(firstNonce).toBeTruthy();
+    expect(secondNonce).toBeTruthy();
+    expect(firstNonce).not.toBe(secondNonce);
+    expect(firstCsp).toContain(`'nonce-${firstNonce}'`);
+    expect(first.headers.get('Cache-Control')).toBe('private, no-store');
+  });
+
+  it('does not add a nonce to API JSON responses', () => {
+    const response = withSecurityHeaders(
+      new Response('{"ok":true}', {
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const csp = response.headers.get('Content-Security-Policy') ?? '';
+
+    expect(csp).not.toContain("'nonce-");
+    expect(response.headers.get('Cache-Control')).not.toBe('private, no-store');
+  });
+
   it('names no Permissions-Policy feature browsers do not recognize', () => {
-    // browsing-topics never shipped broadly; Chrome logs "Unrecognized
-    // feature" for it on every load.
     expect(SECURITY_HEADERS['Permissions-Policy']).not.toContain('browsing-topics');
     expect(SECURITY_HEADERS['Permissions-Policy']).toContain('camera=()');
   });
