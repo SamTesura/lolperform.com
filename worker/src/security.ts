@@ -1,4 +1,3 @@
-
 /**
  * Security headers applied to every response the Worker emits: API JSON and the
  * static site served through the ASSETS binding.
