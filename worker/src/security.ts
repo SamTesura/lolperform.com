@@ -1,13 +1,13 @@
 /**
- * Security headers applied to every response the Worker emits: API JSON and the
- * static site served through the ASSETS binding.
+ * Security headers applied to every response the Worker emits: API JSON and
+ * the static site served through the ASSETS binding.
  *
- * HTML responses receive a fresh CSP nonce so Cloudflare JavaScript Detections
- * can authorize its injected script without allowing unsafe-inline.
+ * HTML responses receive a fresh CSP nonce. HTMLRewriter adds that nonce
+ * to inline script elements so they are authorized by the CSP.
  *
  * - img-src allows the Data Dragon CDN and data: URIs.
  * - script-src allows first-party scripts, Cloudflare Web Analytics, and
- *   nonce-authorized scripts.
+ *   nonce-authorized inline scripts.
  * - style-src 'unsafe-inline' is retained because Astro can inline small
  *   critical CSS during production builds.
  */
@@ -51,7 +51,7 @@ export const SECURITY_HEADERS: Record<string, string> = {
   'X-Frame-Options': 'DENY',
 };
 
-/** Return a new Response with the security headers merged in. */
+/** Return a new Response with security headers applied. */
 export function withSecurityHeaders(response: Response): Response {
   const headers = new Headers(response.headers);
   const contentType = headers.get('Content-Type') ?? '';
@@ -61,18 +61,35 @@ export function withSecurityHeaders(response: Response): Response {
     headers.set(key, value);
   }
 
-  if (isHtml) {
-    const nonce = createNonce();
-
-    headers.set('Content-Security-Policy', buildCsp(nonce));
-
-    // A nonce must not be reused through cached HTML responses.
-    headers.set('Cache-Control', 'private, no-store');
+  if (!isHtml) {
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
   }
 
-  return new Response(response.body, {
+  const nonce = createNonce();
+
+  headers.set('Content-Security-Policy', buildCsp(nonce));
+
+  // Nonce-bearing HTML must not be reused from a cache.
+  headers.set('Cache-Control', 'private, no-store');
+
+  const nonceResponse = new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
     headers,
   });
+
+  return new HTMLRewriter()
+    .on('script', {
+      element(element) {
+        // Add the nonce to inline scripts, not external script elements.
+        if (!element.hasAttribute('src')) {
+          element.setAttribute('nonce', nonce);
+        }
+      },
+    })
+    .transform(nonceResponse);
 }
