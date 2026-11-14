@@ -21,7 +21,7 @@ function buildCsp(nonce?: string): string {
   return [
     "default-src 'self'",
     "base-uri 'self'",
-    "img-src 'self' data: https://ddragon.leagueoflegends.com https://*.gstatic.com",
+    `img-src 'self' data: https://ddragon.leagueoflegends.com https://*.gstatic.com`,
     `script-src 'self' ${nonceSource}${CF_INSIGHTS_SCRIPT}`,
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",

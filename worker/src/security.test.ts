@@ -15,7 +15,6 @@ type MockHandler = {
  * Minimal HTMLRewriter mock for testing nonce injection in Vitest.
  * Production uses Cloudflare's native HTMLRewriter implementation.
  */
-
 class MockHTMLRewriter {
   private handlers: MockHandler[] = [];
 
