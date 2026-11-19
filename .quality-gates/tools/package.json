@@ -1,0 +1,8 @@
+{
+  "name": "quality-gates-tools",
+  "private": true,
+  "description": "Pinned third-party tools for .quality-gates. Exact versions + lockfile integrity; installed with npm ci --ignore-scripts.",
+  "dependencies": {
+    "modern-web-guidance": "1.0.1"
+  }
+}
