@@ -193,16 +193,26 @@ export function posix(p) {
   return p.split(sep).join('/');
 }
 
-// Matching control characters is the point: they are stripped from scanned text
-// before it reaches a log, an annotation or a step summary.
-// eslint-disable-next-line no-control-regex
-const CONTROL = /[\u0000-\u001F\u007F-\u009F\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
+// Stripped from scanned text before it reaches a log, an annotation or a step
+// summary: C0 controls, DEL, C1 controls, and the bidi marks, embeddings,
+// overrides and isolates. Code-point ranges rather than a regex, so no control
+// character (and no lint suppression) has to appear in the source.
+const HIDDEN = Object.freeze([
+  [0x0000, 0x001f],
+  [0x007f, 0x009f],
+  [0x200e, 0x200f],
+  [0x202a, 0x202e],
+  [0x2066, 0x2069],
+]);
+
+function isHidden(char) {
+  const code = char.codePointAt(0);
+  return HIDDEN.some(([low, high]) => code >= low && code <= high);
+}
 
 export function clean(text, max = 200) {
-  const flat = String(text ?? '')
-    .replace(CONTROL, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const visible = Array.from(String(text ?? ''), (char) => (isHidden(char) ? ' ' : char)).join('');
+  const flat = visible.replace(/\s+/g, ' ').trim();
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
 
