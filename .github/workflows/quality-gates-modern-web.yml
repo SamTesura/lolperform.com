@@ -1,0 +1,52 @@
+# Installed by .quality-gates-kit (legacy-web gate). Do not edit in the repo; edit the kit.
+#
+# Scans for legacy web-platform patterns with Google Chrome's modern-web-guidance,
+# pinned by lockfile integrity, verified against npm's registry signature and its
+# SLSA provenance on every run, telemetry off. Enforced rules (default: Subresource
+# Integrity on versioned CDN assets) fail from `blockAfter` on; everything else is
+# advisory. Exit 2 means the scan could not be trusted, which is never a pass.
+name: Modern web gates
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+# Read-only, and no secrets: nothing here writes or deploys.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  legacy-web:
+    name: legacy-web
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          # check-latest: the runner image's cached 22.x can predate 22.23.4, the
+          # release that rejects the compromised eMudhra CA keys (2026-10).
+          check-latest: true
+          # No cache: this job installs only the pinned tools, never the repo's deps.
+          package-manager-cache: false
+
+      - name: Install pinned scanner (lockfile integrity, no install scripts)
+        run: npm ci --prefix .quality-gates/tools --ignore-scripts --no-audit --no-fund
+
+      - name: Verify registry signature and SLSA provenance
+        run: npm audit signatures --prefix .quality-gates/tools
+
+      - name: Scan
+        env:
+          DISABLE_TELEMETRY: '1'
+        run: node .quality-gates/legacy-web.mjs --json "$RUNNER_TEMP/legacy-web.json"
